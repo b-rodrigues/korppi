@@ -1,0 +1,30 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Tauri
+src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Nix
+result
+.direnv/
+
+# Test artifacts
+/test-repos/
+*.pijul-test/
