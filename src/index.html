@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korppi Prototype</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🦀 Korppi Prototype</h1>
+            <p>Pijul Validation Tests</p>
+        </header>
+
+        <!-- DAY 1: Initialization Test -->
+        <section class="test-section">
+            <h2>Day 1: Initialization Test</h2>
+            <p>Can we create a Pijul repository?</p>
+            <button id="test-init">Test Pijul Init</button>
+            <div id="init-result" class="result"></div>
+        </section>
+
+        <!-- DAY 2: Recording Changes -->
+        <section class="test-section">
+            <h2>Day 2: Recording Changes</h2>
+            <textarea id="content" placeholder="Type some text...">Hello, world!</textarea>
+            <input type="text" id="message" placeholder="Commit message" value="Test commit">
+            <button id="record-change">Record Change</button>
+            <button id="show-history">Show History</button>
+            <div id="record-result" class="result"></div>
+            <pre id="history" class="history"></pre>
+        </section>
+
+        <!-- DAY 3: Conflict Detection -->
+        <section class="test-section">
+            <h2>Day 3: Conflict Detection (Critical Test)</h2>
+            <p>Can Pijul detect and represent conflicts?</p>
+            <button id="test-conflict">Simulate Conflict</button>
+            <div id="conflict-result" class="result"></div>
+        </section>
+
+        <!-- Utilities -->
+        <section class="test-section">
+            <h2>Utilities</h2>
+            <button id="reset-repo" class="danger">Reset Test Repository</button>
+        </section>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
