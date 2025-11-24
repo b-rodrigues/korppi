@@ -7,21 +7,92 @@ function showResult(elementId, success, message, details = null) {
     element.innerHTML = `
         <strong>${success ? '✅ Success' : '❌ Failed'}</strong>
         <p>${message}</p>
-        ${details ? `<pre style="margin-top: 8px; font-size: 0.9em;">${details}</pre>` : ''}
+        ${details ? `<pre style="margin-top: 8px; font-size: 0.9em; white-space: pre-wrap;">${details}</pre>` : ''}
     `;
 }
 
-// DAY 1: Test Pijul Initialization
+// Clear a result display
+function clearResult(elementId) {
+    const element = document.getElementById(elementId);
+    element.style.display = 'none';
+}
+
+// DAY 1: Test Pijul Initialization (PRIMARY TEST)
 document.getElementById('test-init').addEventListener('click', async () => {
+    const button = document.getElementById('test-init');
+    button.disabled = true;
+    button.textContent = '⏳ Initializing...';
+    
+    clearResult('init-result');
+    
     try {
         const result = await invoke('test_pijul_init');
         showResult('init-result', result.success, result.message, result.details);
+        
+        if (result.success) {
+            // Celebrate Day 1 completion!
+            setTimeout(() => {
+                const celebration = document.createElement('div');
+                celebration.className = 'celebration';
+                celebration.textContent = '🎉 Day 1 Complete! 🎉';
+                document.querySelector('.priority').appendChild(celebration);
+                
+                setTimeout(() => celebration.remove(), 3000);
+            }, 500);
+        }
     } catch (error) {
         showResult('init-result', false, 'Error calling Tauri command', error);
+    } finally {
+        button.disabled = false;
+        button.textContent = '▶️ Test Pijul Init';
     }
 });
 
-// DAY 2: Record a change
+// Check repository status (for debugging)
+document.getElementById('repo-status').addEventListener('click', async () => {
+    const button = document.getElementById('repo-status');
+    button.disabled = true;
+    
+    clearResult('status-result');
+    
+    try {
+        const status = await invoke('get_repo_status');
+        showResult('status-result', true, 'Repository Status', status);
+    } catch (error) {
+        showResult('status-result', false, 'Error checking status', error);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+// Reset test repository
+document.getElementById('reset-repo').addEventListener('click', async () => {
+    if (!confirm('This will delete the test repository. Continue?')) {
+        return;
+    }
+    
+    const button = document.getElementById('reset-repo');
+    button.disabled = true;
+    
+    try {
+        const result = await invoke('reset_test_repo');
+        
+        // Clear all result displays
+        clearResult('init-result');
+        clearResult('status-result');
+        clearResult('record-result');
+        clearResult('conflict-result');
+        document.getElementById('history').classList.remove('show');
+        
+        alert('✅ ' + result.message);
+    } catch (error) {
+        alert('❌ Error resetting repository: ' + error);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+// DAY 2: Record a change (PLACEHOLDER - will return mock data)
 document.getElementById('record-change').addEventListener('click', async () => {
     const content = document.getElementById('content').value;
     const message = document.getElementById('message').value;
@@ -34,14 +105,14 @@ document.getElementById('record-change').addEventListener('click', async () => {
     }
 });
 
-// DAY 2: Show patch history
+// DAY 2: Show patch history (PLACEHOLDER - will return empty list)
 document.getElementById('show-history').addEventListener('click', async () => {
     try {
         const history = await invoke('get_history');
         const historyElement = document.getElementById('history');
 
         if (history.length === 0) {
-            historyElement.textContent = 'No patches yet. Record some changes first!';
+            historyElement.textContent = '📝 No patches yet.\n\nDay 2 implementation needed to record actual changes.';
         } else {
             historyElement.textContent = JSON.stringify(history, null, 2);
         }
@@ -52,14 +123,14 @@ document.getElementById('show-history').addEventListener('click', async () => {
     }
 });
 
-// DAY 3: Test conflict detection (THE CRITICAL TEST)
+// DAY 3: Test conflict detection (PLACEHOLDER)
 document.getElementById('test-conflict').addEventListener('click', async () => {
     try {
         const conflicts = await invoke('test_conflict_detection');
 
         const message = conflicts.has_conflict
             ? `Conflict detected! Found ${conflicts.locations.length} conflict location(s)`
-            : 'No conflicts detected (this might be a problem!)';
+            : '⚠️ No conflicts detected (Day 3 not implemented yet)';
 
         showResult(
             'conflict-result',
@@ -72,22 +143,32 @@ document.getElementById('test-conflict').addEventListener('click', async () => {
     }
 });
 
-// Utility: Reset test repository
-document.getElementById('reset-repo').addEventListener('click', async () => {
-    if (!confirm('This will delete the test repository. Continue?')) {
-        return;
-    }
-
+// Debug information
+document.getElementById('show-debug').addEventListener('click', async () => {
+    const debugOutput = document.getElementById('debug-output');
+    debugOutput.style.display = 'block';
+    
     try {
-        const result = await invoke('reset_test_repo');
-        alert(result.message);
+        const status = await invoke('get_repo_status');
+        
+        debugOutput.textContent = `
+Debug Information
+=================
 
-        // Clear all result displays
-        document.querySelectorAll('.result').forEach(el => {
-            el.style.display = 'none';
-        });
-        document.getElementById('history').classList.remove('show');
+Tauri Version: ${window.__TAURI_METADATA__?.version || 'unknown'}
+Platform: ${navigator.platform}
+User Agent: ${navigator.userAgent}
+
+${status}
+        `.trim();
     } catch (error) {
-        alert('Error resetting repository: ' + error);
+        debugOutput.textContent = 'Error getting debug info: ' + error;
     }
+});
+
+// Initial load message
+window.addEventListener('DOMContentLoaded', () => {
+    console.log('🦀 Korppi Prototype loaded');
+    console.log('📋 Focus: Day 1 - Repository Initialization');
+    console.log('🎯 Goal: Verify Pijul can create a repository in Tauri');
 });
