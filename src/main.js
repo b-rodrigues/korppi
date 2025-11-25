@@ -161,20 +161,26 @@ document.getElementById('show-history').addEventListener('click', async () => {
 // DAY 3: Test conflict detection
 document.getElementById('test-conflict').addEventListener('click', async () => {
     try {
-        const conflicts = await invoke('test_conflict_detection');
+        const result = await invoke('test_conflict_detection');
 
-        const message = conflicts.has_conflict
-            ? `Conflict detected! Found ${conflicts.locations.length} conflict location(s)`
-            : '⚠️ No conflicts detected (Day 3 not implemented yet)';
+        const message = result.has_conflict
+            ? `Conflict detected! Found ${result.locations.length} conflict location(s).`
+            : '✅ No conflicts detected.';
+
+        // Format the structured conflict data for display.
+        const details = result.locations.map(loc => {
+            const lineInfo = loc.line ? ` on line ${loc.line}` : '';
+            return `[${loc.conflict_type}] in "${loc.path}"${lineInfo}: ${loc.description}`;
+        }).join('<br>');
 
         showResult(
             'conflict-result',
-            conflicts.has_conflict,
+            true, // The operation was successful, even if conflicts were found
             message,
-            conflicts
+            details
         );
     } catch (error) {
-        showResult('conflict-result', false, 'Error testing conflicts', error);
+        showResult('conflict-result', false, 'Error running conflict simulation', error);
     }
 });
 

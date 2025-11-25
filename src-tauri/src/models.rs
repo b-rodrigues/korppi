@@ -13,10 +13,12 @@ pub struct ConflictInfo {
     pub locations: Vec<ConflictLocation>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConflictLocation {
-    pub line: usize,
-    pub options: Vec<String>,
+    pub path: String,
+    pub line: Option<usize>,
+    pub conflict_type: String,
+    pub description: String,
 }
 
 #[derive(Debug, Serialize)]
