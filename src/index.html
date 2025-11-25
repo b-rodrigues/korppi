@@ -3,49 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korppi Prototype - Day 1</title>
+    <title>Korppi Prototype</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
+
         <header>
             <h1>🦀 Korppi Prototype</h1>
-            <p>Pijul Validation Tests - Day 1 Focus</p>
+            <p>Pijul Validation Tests</p>
         </header>
 
-        <!-- DAY 1: Initialization Test (PRIORITY) -->
+        <!-- DAY 1: Initialization -->
         <section class="test-section priority">
-            <h2>🎯 Day 1: Initialization Test (Current Focus)</h2>
-            <p>This test verifies that Pijul can create a repository structure in Tauri.</p>
+            <h2>🎯 Day 1: Initialization Test</h2>
+            <p>Verify that Pijul can create and validate a repository structure inside a Tauri app.</p>
 
             <div class="button-group">
                 <button id="test-init" class="primary">▶️ Test Pijul Init</button>
-                <button id="repo-status">📊 Check Repository Status</button>
-                <button id="reset-repo" class="danger">🗑️ Reset Repository</button>
+                <button id="repo-status">📊 Status</button>
+                <button id="reset-repo" class="danger">🗑️ Reset</button>
             </div>
 
             <div id="init-result" class="result"></div>
             <div id="status-result" class="result"></div>
         </section>
 
-        <!-- Success Criteria -->
+        <!-- Help / Explanation -->
         <section class="info-section">
-            <h3>✅ Day 1 Success Criteria</h3>
+            <h3>Day 1 Success Criteria</h3>
             <ul>
-                <li><strong>Repository structure created:</strong> .pijul/ directory with pristine/ and changes/</li>
-                <li><strong>Database initialized:</strong> pristine/db file exists</li>
-                <li><strong>Main channel created:</strong> Can open the repository without errors</li>
-                <li><strong>No compilation errors:</strong> Rust code compiles and runs</li>
+                <li><strong>Created:</strong> .pijul/ with pristine/ and changes/</li>
+                <li><strong>Database:</strong> pristine/db exists</li>
+                <li><strong>Main channel:</strong> opens without errors</li>
+                <li><strong>No runtime errors:</strong> Tauri + libpijul run cleanly</li>
             </ul>
         </section>
 
-        <!-- DAY 2: Recording Changes -->
+        <!-- DAY 2 -->
         <section class="test-section">
-            <h2>✅ Day 2: Recording Changes</h2>
-            <p>This section tests Pijul's ability to record file edits as patches and retrieve the history.</p>
+            <h2>Day 2: Recording Changes</h2>
+            <p>Test Pijul's change recording mechanism.</p>
 
-            <textarea id="content" placeholder="Type some text...">Hello, world!</textarea>
-            <input type="text" id="message" placeholder="Commit message" value="Test commit">
+            <textarea id="content">Hello, world!</textarea>
+            <input id="message" type="text" value="Test commit" placeholder="Commit message">
 
             <div class="button-group">
                 <button id="record-change">Record Change</button>
@@ -56,22 +58,22 @@
             <pre id="history" class="history"></pre>
         </section>
 
-        <!-- DAY 3: Conflict Detection -->
+        <!-- DAY 3 -->
         <section class="test-section">
-            <h2>✅ Day 3: Conflict Detection</h2>
-            <p>This section will test conflict detection.</p>
+            <h2>Day 3: Conflict Detection</h2>
+            <p>Simulate a deterministic conflict.</p>
 
             <button id="test-conflict">Simulate Conflict</button>
             <div id="conflict-result" class="result"></div>
         </section>
 
-        <!-- Debug Information -->
+        <!-- Debug -->
         <section class="debug-section">
-            <h3>🔍 Debug Information</h3>
-            <p>Use this to troubleshoot issues</p>
+            <h3>Debug Information</h3>
             <button id="show-debug">Show Debug Info</button>
             <pre id="debug-output" class="debug-output"></pre>
         </section>
+
     </div>
 
     <script src="main.js"></script>
