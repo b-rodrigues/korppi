@@ -7,6 +7,14 @@
     "dev": "tauri dev",
     "build": "tauri build"
   },
+  "dependencies": {
+    "@milkdown/core": "^7.0.0",
+    "@milkdown/prose": "^7.0.0",
+    "@milkdown/preset-commonmark": "^7.0.0",
+    "@milkdown/theme-nord": "^7.0.0",
+    "yjs": "^13.6.0",
+    "y-prosemirror": "^1.0.20"
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.9"
   }
