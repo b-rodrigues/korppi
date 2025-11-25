@@ -1,8 +1,12 @@
+// src/yjs-setup.js
 import * as Y from "yjs";
 import { invoke } from "@tauri-apps/api/tauri";
 
 export const ydoc = new Y.Doc();
 export const yXmlFragment = ydoc.getXmlFragment("prosemirror");
+
+let isApplyingFromDisk = false;
+let saveTimeout = null;
 
 export async function loadInitialDoc() {
   const update = await invoke("load_doc").catch(() => []);
@@ -11,18 +15,27 @@ export async function loadInitialDoc() {
   }
 }
 
-// Attach a listener to push updates to Rust.
-let isApplyingFromDisk = false;
-
-export function enablePersistence() {
-  ydoc.on("update", async (update) => {
-    if (isApplyingFromDisk) return; // avoid feedback loop
-
+// Debounced save to avoid hammering the filesystem
+function debouncedSave() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  
+  saveTimeout = setTimeout(async () => {
+    if (isApplyingFromDisk) return;
+    
     try {
-      await invoke("store_update", { update: Array.from(update) });
+      // Send the entire state vector instead of individual updates
+      const fullState = Y.encodeStateAsUpdate(ydoc);
+      await invoke("store_update", { fullState: Array.from(fullState) });
     } catch (err) {
       console.error("Failed to store update:", err);
     }
+  }, 300); // 300ms debounce
+}
+
+export function enablePersistence() {
+  ydoc.on("update", () => {
+    if (isApplyingFromDisk) return;
+    debouncedSave();
   });
 }
 
@@ -32,4 +45,13 @@ export function beginApplyingDiskUpdates() {
 
 export function endApplyingDiskUpdates() {
   isApplyingFromDisk = false;
+}
+
+// Force immediate save (for beforeunload, etc.)
+export async function forceSave() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  if (isApplyingFromDisk) return;
+  
+  const fullState = Y.encodeStateAsUpdate(ydoc);
+  await invoke("store_update", { fullState: Array.from(fullState) });
 }
