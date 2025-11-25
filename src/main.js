@@ -1,215 +1,194 @@
 const { invoke } = window.__TAURI__.tauri;
 
-// Utility: normalize details (Error, object, string) for display
+/* ---------- Utility helpers ---------- */
+
 function stringifyDetails(details) {
     if (!details) return null;
     if (typeof details === "string") return details;
-    if (details instanceof Error) {
-        return details.stack || details.message || String(details);
-    }
+    if (details instanceof Error) return details.stack || details.message;
+
     try {
         return JSON.stringify(details, null, 2);
-    } catch (_) {
+    } catch {
         return String(details);
     }
 }
 
-// Utility: Show result message
-function showResult(elementId, success, message, details = null) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
+function showResult(id, success, message, details = null) {
+    const el = document.getElementById(id);
+    if (!el) return;
 
-    const normalizedDetails = stringifyDetails(details);
+    const formatted = stringifyDetails(details);
 
-    element.style.display = "block";
-    element.className = `result ${success ? 'success' : 'error'}`;
-    element.innerHTML = `
-        <strong>${success ? '✅ Success' : '❌ Failed'}</strong>
+    el.style.display = "block";
+    el.className = `result ${success ? "success" : "error"}`;
+    el.innerHTML = `
+        <strong>${success ? "Success" : "Failed"}</strong>
         <p>${message}</p>
-        ${
-            normalizedDetails
-                ? `<pre style="margin-top: 8px; font-size: 0.9em; white-space: pre-wrap;">${normalizedDetails}</pre>`
-                : ''
-        }
+        ${formatted ? `<pre>${formatted}</pre>` : ""}
     `;
 }
 
-
-// Clear a result display
-function clearResult(elementId) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-
-    // Do not permanently hide; just reset content and classes.
-    element.style.display = 'none';
-    element.className = 'result';
-    element.innerHTML = '';
+function clearResult(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "none";
+    el.className = "result";
+    el.innerHTML = "";
 }
 
-// DAY 1: Test Pijul Initialization (PRIMARY TEST)
-document.getElementById('test-init').addEventListener('click', async () => {
-    const button = document.getElementById('test-init');
-    button.disabled = true;
-    button.textContent = '⏳ Initializing...';
+function disableButton(btn, label) {
+    btn.disabled = true;
+    if (label) btn.dataset.original = btn.textContent;
+    if (label) btn.textContent = label;
+}
 
-    clearResult('init-result');
+function enableButton(btn) {
+    btn.disabled = false;
+    if (btn.dataset.original) {
+        btn.textContent = btn.dataset.original;
+        delete btn.dataset.original;
+    }
+}
+
+/* ---------- Conflict formatting ---------- */
+
+function formatConflict(loc) {
+    const line = loc.line ? ` (line ${loc.line})` : "";
+    return `[${loc.conflict_type}] ${loc.path}${line}: ${loc.description}`;
+}
+
+/* ---------- Event handlers ---------- */
+
+// INIT
+document.getElementById("test-init").addEventListener("click", async () => {
+    const btn = document.getElementById("test-init");
+    disableButton(btn, "⏳ Initializing...");
+    clearResult("init-result");
 
     try {
-        const result = await invoke('test_pijul_init');
-        showResult('init-result', result.success, result.message, result.details);
-
-        if (result.success) {
-            // Celebrate Day 1 completion!
-            setTimeout(() => {
-                const celebration = document.createElement('div');
-                celebration.className = 'celebration';
-                celebration.textContent = '🎉 Day 1 Complete! 🎉';
-                document.querySelector('.priority').appendChild(celebration);
-
-                setTimeout(() => celebration.remove(), 3000);
-            }, 500);
-        }
-    } catch (error) {
-        showResult('init-result', false, 'Error calling Tauri command', error);
+        const r = await invoke("test_pijul_init");
+        showResult("init-result", r.success, r.message, r.details);
+    } catch (err) {
+        showResult("init-result", false, "Error initializing repository", err);
     } finally {
-        button.disabled = false;
-        button.textContent = '▶️ Test Pijul Init';
+        enableButton(btn);
     }
 });
 
-// Check repository status (for debugging)
-document.getElementById('repo-status').addEventListener('click', async () => {
-    const button = document.getElementById('repo-status');
-    button.disabled = true;
-
-    clearResult('status-result');
+// STATUS
+document.getElementById("repo-status").addEventListener("click", async () => {
+    const btn = document.getElementById("repo-status");
+    disableButton(btn);
+    clearResult("status-result");
 
     try {
-        const status = await invoke('get_repo_status');
-        showResult('status-result', true, 'Repository Status', status);
-    } catch (error) {
-        showResult('status-result', false, 'Error checking status', error);
+        const status = await invoke("get_repo_status");
+        showResult("status-result", true, "Repository Status", status);
+    } catch (err) {
+        showResult("status-result", false, "Error fetching status", err);
     } finally {
-        button.disabled = false;
+        enableButton(btn);
     }
 });
 
-// Reset test repository
-document.getElementById('reset-repo').addEventListener('click', async () => {
-    if (!confirm('This will delete the test repository. Continue?')) {
-        return;
-    }
+// RESET
+document.getElementById("reset-repo").addEventListener("click", async () => {
+    if (!confirm("This will delete the test repository. Continue?")) return;
 
-    const button = document.getElementById('reset-repo');
-    button.disabled = true;
+    const btn = document.getElementById("reset-repo");
+    disableButton(btn);
 
     try {
-        const result = await invoke('reset_test_repo');
-
-        // Clear all result displays
-        clearResult('init-result');
-        clearResult('status-result');
-        clearResult('record-result');
-        clearResult('conflict-result');
-        document.getElementById('history').classList.remove('show');
-
-        alert('✅ ' + result.message);
-    } catch (error) {
-        alert('❌ Error resetting repository: ' + error);
+        const r = await invoke("reset_test_repo");
+        clearResult("init-result");
+        clearResult("status-result");
+        clearResult("record-result");
+        clearResult("conflict-result");
+        document.getElementById("history").style.display = "none";
+        alert("✔ " + r.message);
+    } catch (err) {
+        alert("Error: " + err);
     } finally {
-        button.disabled = false;
+        enableButton(btn);
     }
 });
 
-// DAY 2: Record a change
-document.getElementById('record-change').addEventListener('click', async () => {
-    const content = document.getElementById('content').value;
-    const message = document.getElementById('message').value;
+// RECORD CHANGE
+document.getElementById("record-change").addEventListener("click", async () => {
+    const content = document.getElementById("content").value;
+    const message = document.getElementById("message").value;
 
     try {
-        const result = await invoke('record_edit', { content, message });
-        showResult('record-result', result.success, result.message, result.details);
-    } catch (error) {
-        showResult('record-result', false, 'Error recording change', error);
+        const r = await invoke("record_edit", { content, message });
+        showResult("record-result", r.success, r.message, r.details);
+    } catch (err) {
+        showResult("record-result", false, "Error recording change", err);
     }
 });
 
-// DAY 2: Show patch history
-document.getElementById('show-history').addEventListener('click', async () => {
-    try {
-        const history = await invoke('get_history');
-        const historyElement = document.getElementById('history');
+// HISTORY
+document.getElementById("show-history").addEventListener("click", async () => {
+    const out = document.getElementById("history");
 
-        if (history.length === 0) {
-            historyElement.textContent = '📝 No patches yet.\n\nDay 2 implementation needed to record actual changes.';
+    try {
+        const history = await invoke("get_history");
+
+        if (!history.length) {
+            out.textContent = "No patches yet.";
         } else {
-            // Simple, human-friendly rendering of history
-            historyElement.textContent = history
-                .map(
-                    (p) =>
-                        `${p.timestamp} – ${p.description} (${p.hash.slice(0, 8)}…)`
-                )
-                .join('\n');
+            out.textContent = history
+                .map(p => `${p.timestamp} — ${p.description} (${p.hash.slice(0, 8)}…)`)
+                .join("\n");
         }
 
-        historyElement.classList.add('show');
-    } catch (error) {
-        showResult('record-result', false, 'Error fetching history', error);
+        out.style.display = "block";
+    } catch (err) {
+        showResult("record-result", false, "Error fetching history", err);
     }
 });
 
-// DAY 3: Test conflict detection
-document.getElementById('test-conflict').addEventListener('click', async () => {
+// CONFLICTS
+document.getElementById("test-conflict").addEventListener("click", async () => {
     try {
-        const result = await invoke('test_conflict_detection');
+        const r = await invoke("test_conflict_detection");
 
-        const message = result.has_conflict
-            ? `Conflict detected! Found ${result.locations.length} conflict location(s).`
-            : '✅ No conflicts detected.';
+        const message = r.has_conflict
+            ? `Detected ${r.locations.length} conflict(s).`
+            : "No conflicts detected.";
 
-        // Format the structured conflict data for display.
-        const details = result.locations.map(loc => {
-            const lineInfo = loc.line ? ` on line ${loc.line}` : '';
-            return `[${loc.conflict_type}] in "${loc.path}"${lineInfo}: ${loc.description}`;
-        }).join('<br>');
+        const details = r.locations
+            .map(formatConflict)
+            .join("\n");
 
-        showResult(
-            'conflict-result',
-            true, // The operation was successful, even if conflicts were found
-            message,
-            details
-        );
-    } catch (error) {
-        showResult('conflict-result', false, 'Error running conflict simulation', error);
+        showResult("conflict-result", true, message, details);
+    } catch (err) {
+        showResult("conflict-result", false, "Error simulating conflict", err);
     }
 });
 
-// Debug information
-document.getElementById('show-debug').addEventListener('click', async () => {
-    const debugOutput = document.getElementById('debug-output');
-    debugOutput.style.display = 'block';
+// DEBUG
+document.getElementById("show-debug").addEventListener("click", async () => {
+    const out = document.getElementById("debug-output");
+    out.style.display = "block";
 
     try {
-        const status = await invoke('get_repo_status');
-
-        debugOutput.textContent = `
-Debug Information
-=================
-
-Tauri Version: ${window.__TAURI_METADATA__?.version || 'unknown'}
-Platform: ${navigator.platform}
-User Agent: ${navigator.userAgent}
-
-${status}
-        `.trim();
-    } catch (error) {
-        debugOutput.textContent = 'Error getting debug info: ' + error;
+        const status = await invoke("get_repo_status");
+        out.textContent = [
+            "Debug Information",
+            "=================",
+            "",
+            `Platform: ${navigator.platform}`,
+            `User Agent: ${navigator.userAgent}`,
+            "",
+            status
+        ].join("\n");
+    } catch (err) {
+        out.textContent = "Error fetching debug info: " + err;
     }
 });
 
-// Initial load message
-window.addEventListener('DOMContentLoaded', () => {
-    console.log('🦀 Korppi Prototype loaded');
-    console.log('📋 Focus: Day 1 - Repository Initialization');
-    console.log('🎯 Goal: Verify Pijul can create a repository in Tauri');
+// Startup
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("Korppi Prototype Loaded.");
 });
