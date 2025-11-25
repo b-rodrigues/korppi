@@ -15,6 +15,7 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
 import { stepToSemanticPatch } from "./patch-extractor.js";
+import { addSemanticPatches, flushGroup } from "./patch-grouper.js";
 
 async function setupEditor() {
   const mount = document.getElementById("editor");
@@ -42,7 +43,6 @@ async function setupEditor() {
         appendTransaction(transactions, oldState, newState) {
             if (!transactions.length) return;
 
-            // Process each Step in each transaction
             const semanticPatches = [];
 
             for (const tr of transactions) {
@@ -54,17 +54,15 @@ async function setupEditor() {
 
             if (semanticPatches.length === 0) return;
 
-            // Send to backend
-            const patchRecord = {
-                timestamp: Date.now(),
-                author: "local",
-                kind: "semantic", // you can change this later
-                data: semanticPatches,
-            };
+            // Feed the new semantic patches into the grouper
+            const groupedRecord = addSemanticPatches(semanticPatches, "local");
 
-            invoke("record_patch", { patch: patchRecord }).catch((err) => {
-                console.error("Failed to record semantic patch:", err);
-            });
+            // Only write to SQLite when a group is flushed
+            if (groupedRecord) {
+              invoke("record_patch", { patch: groupedRecord }).catch((err) => {
+                console.error("Failed to record grouped patch:", err);
+              });
+            }
 
             return null;
         },
@@ -85,3 +83,18 @@ async function setupEditor() {
 }
 
 setupEditor();
+
+window.addEventListener("blur", () => {
+  const record = flushGroup("local");
+  if (!record) return;
+  invoke("record_patch", { patch: record }).catch((err) => {
+    console.error("Failed to record grouped patch on blur:", err);
+  });
+});
+
+window.addEventListener("beforeunload", (event) => {
+  const record = flushGroup("local");
+  if (!record) return;
+  // We can't reliably await here; just fire and forget.
+  invoke("record_patch", { patch: record }).catch(() => {});
+});
