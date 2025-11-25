@@ -8,6 +8,10 @@ use patch_log::{list_patches, record_patch, get_patch};
 use yjs_store::{load_doc, store_update};
 
 fn main() {
+    // Initialize logger in debug mode
+    #[cfg(debug_assertions)]
+    env_logger::init();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             load_doc,
@@ -18,4 +22,15 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_placeholder() {
+        // Add actual tests here
+        assert!(true);
+    }
 }
