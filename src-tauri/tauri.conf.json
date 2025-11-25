@@ -19,7 +19,9 @@
     "bundle": {
       "active": true,
       "identifier": "com.korppi.prototype",
-      "icon": [],
+      "icon": [
+        "icons/icon.png"
+      ],
       "targets": "all"
     },
     "security": {
