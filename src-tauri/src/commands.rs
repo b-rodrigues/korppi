@@ -2,7 +2,7 @@ use crate::pijul_ops::*;
 use crate::models::*;
 
 /// Test Pijul initialization
-/// 
+///
 /// This command:
 /// 1. Gets or creates the test repository path
 /// 2. Cleans any existing repository
@@ -61,6 +61,7 @@ pub fn record_edit(content: String, message: String) -> Result<TestResult, Strin
     }
 
     match record_change(&repo_path, &content, &message) {
+        // Special-case "no_change" so we don't display it as a fake hash
         Ok(hash) if hash == "no_change" => Ok(TestResult {
             success: true,
             message: "No changes to record".to_string(),
@@ -85,36 +86,31 @@ pub fn record_edit(content: String, message: String) -> Result<TestResult, Strin
 /// Get patch history
 #[tauri::command]
 pub fn get_history() -> Result<Vec<PatchInfo>, String> {
-    let repo_path = get_test_repo_path()
-        .map_err(|e| e.to_string())?;
+    let repo_path = get_test_repo_path().map_err(|e| e.to_string())?;
 
     if !repo_path.join(".pijul").exists() {
         return Err("Repository not initialized. Run 'Test Pijul Init' first.".to_string());
     }
 
-    get_patch_history(&repo_path)
-        .map_err(|e| format!("Failed to get history: {}", e))
+    get_patch_history(&repo_path).map_err(|e| format!("Failed to get history: {}", e))
 }
 
 /// Test conflict detection
 #[tauri::command]
 pub fn test_conflict_detection() -> Result<ConflictInfo, String> {
-    let repo_path = get_test_repo_path()
-        .map_err(|e| e.to_string())?;
+    let repo_path = get_test_repo_path().map_err(|e| e.to_string())?;
 
     if !repo_path.join(".pijul").exists() {
         return Err("Repository not initialized. Run 'Test Pijul Init' first.".to_string());
     }
 
-    simulate_conflict(&repo_path)
-        .map_err(|e| format!("Failed to simulate conflict: {}", e))
+    simulate_conflict(&repo_path).map_err(|e| format!("Failed to simulate conflict: {}", e))
 }
 
 /// Reset the test repository
 #[tauri::command]
 pub fn reset_test_repo() -> Result<TestResult, String> {
-    let repo_path = get_test_repo_path()
-        .map_err(|e| e.to_string())?;
+    let repo_path = get_test_repo_path().map_err(|e| e.to_string())?;
 
     if repo_path.exists() {
         std::fs::remove_dir_all(&repo_path)
@@ -131,8 +127,7 @@ pub fn reset_test_repo() -> Result<TestResult, String> {
 /// Get repository status (for debugging)
 #[tauri::command]
 pub fn get_repo_status() -> Result<String, String> {
-    let repo_path = get_test_repo_path()
-        .map_err(|e| e.to_string())?;
+    let repo_path = get_test_repo_path().map_err(|e| e.to_string())?;
 
     if !repo_path.exists() {
         return Ok(format!("❌ Repository path does not exist: {:?}", repo_path));
@@ -149,28 +144,37 @@ pub fn get_repo_status() -> Result<String, String> {
     let mut status = format!("📁 Repository Status\n\nPath: {:?}\n\n", repo_path);
 
     status.push_str("Structure:\n");
-    status.push_str(&format!("  .pijul/ - {}\n", if pijul_dir.exists() { "✅" } else { "❌" }));
-    status.push_str(&format!("  pristine/ - {}\n", if pijul_dir.join("pristine").exists() { "✅" } else { "❌" }));
-    status.push_str(&format!("  changes/ - {}\n", if pijul_dir.join("changes").exists() { "✅" } else { "❌" }));
-    status.push_str(&format!("  pristine/db - {}\n", if pijul_dir.join("pristine/db").exists() { "✅" } else { "❌" }));
+    status.push_str(&format!(
+        "  .pijul/        - {}\n",
+        if pijul_dir.exists() { "✅" } else { "❌" }
+    ));
+    status.push_str(&format!(
+        "  pristine/      - {}\n",
+        if pijul_dir.join("pristine").exists() {
+            "✅"
+        } else {
+            "❌"
+        }
+    ));
+    status.push_str(&format!(
+        "  changes/       - {}\n",
+        if pijul_dir.join("changes").exists() {
+            "✅"
+        } else {
+            "❌"
+        }
+    ));
+    status.push_str(&format!(
+        "  pristine/db    - {}\n",
+        if pijul_dir.join("pristine/db").exists() {
+            "✅"
+        } else {
+            "❌"
+        }
+    ));
 
     match verify_repository(&repo_path) {
-        Ok(true) => {
-            status.push_str("\n✅ Repository is valid and functional");
-
-            // Try to open the pristine environment to list channels
-            let db_path = pijul_dir.join("pristine/db");
-            if let Ok(pristine) = libpijul::pristine::sanakirja::Pristine::new(&db_path) {
-                if let Ok(txn) = pristine.txn_begin() {
-                    if let Ok(channels) = txn.list_channels() {
-                        status.push_str("\n\nChannels:\n");
-                        for ch in channels {
-                            status.push_str(&format!("  - {}\n", ch.0));
-                        }
-                    }
-                }
-            }
-        },
+        Ok(true) => status.push_str("\n✅ Repository is valid and functional"),
         Ok(false) => status.push_str("\n⚠️ Repository structure incomplete"),
         Err(e) => status.push_str(&format!("\n❌ Verification error: {}", e)),
     }
