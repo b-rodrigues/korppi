@@ -2,11 +2,18 @@ use crate::pijul_ops::*;
 use crate::models::*;
 
 /// Test Pijul initialization
+/// 
+/// This command:
+/// 1. Gets or creates the test repository path
+/// 2. Cleans any existing repository
+/// 3. Initializes a new Pijul repository
+/// 4. Verifies the initialization was successful
 #[tauri::command]
 pub fn test_pijul_init() -> Result<TestResult, String> {
     let repo_path = get_test_repo_path()
         .map_err(|e| format!("Failed to get repo path: {}", e))?;
 
+    // Clean slate
     if repo_path.exists() {
         std::fs::remove_dir_all(&repo_path)
             .map_err(|e| format!("Failed to clean old repo: {}", e))?;
