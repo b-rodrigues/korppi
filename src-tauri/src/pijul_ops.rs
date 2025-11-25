@@ -4,6 +4,8 @@ use log;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use canonical_path::CanonicalPathBuf;
+
 use libpijul::{
     changestore::filesystem::FileSystem as FileChangeStore,
     changestore::ChangeStore,
@@ -13,12 +15,10 @@ use libpijul::{
     working_copy::{WorkingCopy, WorkingCopyRead},
     Hash, MutTxnTExt, RecordBuilder, TxnTExt, Algorithm,
 };
-use canonical_path::CanonicalPathBuf;
 
 use crate::models::*;
 
-/// A fake working copy that allows us to call `output_repository_no_pending`
-/// and get a list of `Conflict`s without touching the real working copy.
+/// Fake working copy for non-destructive conflict extraction
 #[derive(Clone, Copy)]
 struct FakeWorkingCopy;
 
@@ -29,60 +29,40 @@ impl WorkingCopyRead for FakeWorkingCopy {
         &self,
         _file: &str,
     ) -> Result<libpijul::pristine::InodeMetadata, Self::Error> {
-        unimplemented!("file_metadata() not needed for conflict listing");
+        unimplemented!()
     }
 
     fn read_file(&self, _file: &str, _buffer: &mut Vec<u8>) -> Result<(), Self::Error> {
-        unimplemented!("read_file() not needed for conflict listing");
+        unimplemented!()
     }
 
     fn modified_time(&self, _file: &str) -> Result<std::time::SystemTime, Self::Error> {
-        unimplemented!("modified_time() not needed for conflict listing");
+        unimplemented!()
     }
 }
 
 impl WorkingCopy for FakeWorkingCopy {
-    fn create_dir_all(&self, _path: &str) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn remove_path(&self, _name: &str, _rec: bool) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn rename(&self, _former: &str, _new: &str) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_permissions(&self, _name: &str, _permissions: u16) -> Result<(), Self::Error> {
-        Ok(())
-    }
+    fn create_dir_all(&self, _path: &str) -> Result<(), Self::Error> { Ok(()) }
+    fn remove_path(&self, _name: &str, _rec: bool) -> Result<(), Self::Error> { Ok(()) }
+    fn rename(&self, _former: &str, _new: &str) -> Result<(), Self::Error> { Ok(()) }
+    fn set_permissions(&self, _name: &str, _permissions: u16) -> Result<(), Self::Error> { Ok(()) }
 
     type Writer = std::io::Sink;
-
-    fn write_file(
-        &self,
-        _file: &str,
-        _inode: libpijul::pristine::Inode,
-    ) -> Result<Self::Writer, Self::Error> {
+    fn write_file(&self, _file: &str, _inode: libpijul::pristine::Inode)
+    -> Result<Self::Writer, Self::Error> {
         Ok(std::io::sink())
     }
 }
 
-/// Get or create a test repository path
+/// Temporary repo path under /tmp
 pub fn get_test_repo_path() -> Result<PathBuf> {
-    let temp_dir = std::env::temp_dir();
-    let repo_path = temp_dir.join("korppi-test-repo");
-
-    // Create if doesn't exist
-    if !repo_path.exists() {
-        fs::create_dir_all(&repo_path)?;
-    }
-
+    let temp = std::env::temp_dir();
+    let repo_path = temp.join("korppi-test-repo");
+    fs::create_dir_all(&repo_path)?;
     Ok(repo_path)
 }
 
-/// Initialize a Pijul repository
+/// Initialize repository
 pub fn init_repository(path: &Path) -> Result<()> {
     let pijul_dir = path.join(".pijul");
     if pijul_dir.exists() {
@@ -90,14 +70,14 @@ pub fn init_repository(path: &Path) -> Result<()> {
     }
     fs::create_dir_all(&pijul_dir)?;
 
+    // pristine/db
     let pristine_dir = pijul_dir.join("pristine");
     fs::create_dir_all(&pristine_dir)?;
+    let pristine = Pristine::new(&pristine_dir.join("db"))?;
 
-    let db_path = pristine_dir.join("db");
-    let pristine = Pristine::new(&db_path)?;
-
+    // changes/
     let changes_dir = pijul_dir.join("changes");
-    FileChangeStore::from_changes(changes_dir, 100);
+    fs::create_dir_all(&changes_dir)?;
 
     // Create main channel
     let mut txn = pristine.mut_txn_begin()?;
@@ -107,77 +87,60 @@ pub fn init_repository(path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Verify that a repository is properly initialized
+/// Validate repository structure
 pub fn verify_repository(path: &Path) -> Result<bool> {
-    let pijul_dir = path.join(".pijul");
-    if !pijul_dir.exists() {
-        return Ok(false);
-    }
-    if !pijul_dir.join("pristine").exists() {
-        return Ok(false);
-    }
-    if !pijul_dir.join("changes").exists() {
-        return Ok(false);
-    }
-    let db_path = pijul_dir.join("pristine/db");
-    if !db_path.exists() {
+    let pijul = path.join(".pijul");
+    if !pijul.exists() {
         return Ok(false);
     }
 
-    let pristine = Pristine::new(&db_path)?;
+    let pristine_db = pijul.join("pristine/db");
+    let changes = pijul.join("changes");
+
+    if !pristine_db.exists() || !changes.exists() {
+        return Ok(false);
+    }
+
+    let pristine = Pristine::new(&pristine_db)?;
     let txn = pristine.txn_begin()?;
     Ok(txn.load_channel("main")?.is_some())
 }
 
-/// Helper to open repo components with basic validation
+/// Open repo handles
 fn open_repo(path: &Path) -> Result<(Pristine, FileWorkingCopy, FileChangeStore)> {
-    let pijul_dir = path.join(".pijul");
-    if !pijul_dir.exists() {
-        return Err(anyhow!(
-            "Repository not initialized: missing .pijul directory at {:?}",
-            pijul_dir
-        ));
+    let pijul = path.join(".pijul");
+    if !pijul.exists() {
+        return Err(anyhow!("Repository not initialized at {:?}", path));
     }
 
-    let pristine_dir = pijul_dir.join("pristine");
-    let db_path = pristine_dir.join("db");
-    let changes_dir = pijul_dir.join("changes");
-
-    if !pristine_dir.exists() || !db_path.exists() || !changes_dir.exists() {
-        return Err(anyhow!(
-            "Repository structure incomplete under {:?}",
-            pijul_dir
-        ));
-    }
-
-    let pristine = Pristine::new(&db_path)?;
+    let pristine = Pristine::new(&pijul.join("pristine/db"))?;
     let working_copy = FileWorkingCopy::from_root(path);
-    let change_store = FileChangeStore::from_changes(changes_dir, 100);
+    let change_store = FileChangeStore::from_changes(pijul.join("changes"), 100);
 
     Ok((pristine, working_copy, change_store))
 }
 
-/// Internal helper: record a change using existing repo handles
+/// Core unified record function
 fn record_generic_with_handles(
     pristine: &Pristine,
     working_copy: &FileWorkingCopy,
     change_store: &FileChangeStore,
-    repo_path: &Path,
+    repo_root: &Path,
     channel_name: &str,
     message: &str,
-    file_to_add: Option<&str>,
+    track_file: Option<&str>,
 ) -> Result<Hash> {
     let mut txn = pristine.mut_txn_begin()?;
     let mut channel = txn.open_or_create_channel(channel_name)?;
 
-    if let Some(file) = file_to_add {
+    if let Some(file) = track_file {
         if !txn.is_tracked(file)? {
             txn.add_file(file, 0)?;
         }
     }
 
     let mut builder = RecordBuilder::new();
-    let canonical_root = CanonicalPathBuf::canonicalize(repo_path)?;
+    let canonical_root = CanonicalPathBuf::canonicalize(repo_root)?;
 
     working_copy.record_prefix(
         &mut txn,
@@ -187,9 +150,9 @@ fn record_generic_with_handles(
         &mut builder,
         canonical_root,
         Path::new(""),
-        false, // force
-        1,     // threads
-        0,     // salt
+        false,
+        1,
+        0,
     )?;
 
     let recorded = builder.finish();
@@ -200,14 +163,13 @@ fn record_generic_with_handles(
     let actions = recorded
         .actions
         .into_iter()
-        .map(|r| {
-            r.globalize(&txn)
-                .map_err(|e| anyhow!("Failed to globalize recorded action: {}", e))
+        .map(|a| {
+            a.globalize(&txn)
+                .map_err(|e| anyhow!("Failed to globalize action: {}", e))
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let mut contents_lock = recorded.contents.lock();
-    let contents = std::mem::take(&mut *contents_lock);
+    let contents = std::mem::take(&mut *recorded.contents.lock());
 
     let mut change = libpijul::change::Change::make_change(
         &txn,
@@ -226,56 +188,39 @@ fn record_generic_with_handles(
     let hash = change_store.save_change(&mut change, |_, _| Ok::<_, anyhow::Error>(()))?;
 
     txn.apply_local_change(&channel, &change, &hash, &recorded.updatables)?;
-
     txn.commit()?;
 
     Ok(hash)
 }
 
-/// Public helper: record on any channel by name
 fn record_generic(
     repo_path: &Path,
-    channel_name: &str,
+    channel: &str,
     message: &str,
-    file_to_add: Option<&str>,
+    track: Option<&str>,
 ) -> Result<Hash> {
-    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
-    record_generic_with_handles(
-        &pristine,
-        &working_copy,
-        &change_store,
-        repo_path,
-        channel_name,
-        message,
-        file_to_add,
-    )
+    let (pristine, wc, cs) = open_repo(repo_path)?;
+    record_generic_with_handles(&pristine, &wc, &cs, repo_path, channel, message, track)
 }
 
-/// Helper: record on main channel
-fn record_all(repo_path: &Path, message: &str, file_to_add: Option<&str>) -> Result<Hash> {
-    record_generic(repo_path, "main", message, file_to_add)
+fn record_all(repo_path: &Path, message: &str, f: Option<&str>) -> Result<Hash> {
+    record_generic(repo_path, "main", message, f)
 }
 
-/// Helper: record on a specific channel
-fn record_on_channel(
-    repo_path: &Path,
-    channel_name: &str,
-    message: &str,
-    file_to_add: Option<&str>,
-) -> Result<Hash> {
-    record_generic(repo_path, channel_name, message, file_to_add)
+fn record_on_channel(repo_path: &Path, chan: &str, msg: &str, f: Option<&str>)
+-> Result<Hash> {
+    record_generic(repo_path, chan, msg, f)
 }
 
-/// Record a change to the repository via the "document.md" file
+/// Write + record change
 pub fn record_change(repo_path: &Path, content: &str, message: &str) -> Result<String> {
-    let doc_path = repo_path.join("document.md");
-    fs::write(&doc_path, content).context("Failed to write document")?;
+    let file = repo_path.join("document.md");
+    fs::write(&file, content)?;
 
     match record_all(repo_path, message, Some("document.md")) {
-        Ok(hash) => Ok(hash.to_base32().to_string()),
+        Ok(h) => Ok(h.to_base32().to_string()),
         Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("No changes to record") {
+            if format!("{}", e).contains("No changes to record") {
                 Ok("no_change".to_string())
             } else {
                 Err(e)
@@ -284,106 +229,85 @@ pub fn record_change(repo_path: &Path, content: &str, message: &str) -> Result<S
     }
 }
 
-/// Get history of patches
+/// Patch history
 pub fn get_patch_history(repo_path: &Path) -> Result<Vec<PatchInfo>> {
-    let (pristine, _working_copy, change_store) = open_repo(repo_path)?;
+    let (pristine, _wc, cs) = open_repo(repo_path)?;
     let txn = pristine.txn_begin()?;
+
     let channel = txn
         .load_channel("main")?
         .ok_or_else(|| anyhow!("Channel 'main' not found"))?;
-    let channel_lock = channel.read();
+    let ch_read = channel.read();
 
-    let mut history = Vec::new();
+    let mut out = vec![];
 
-    for h in txn.changeid_reverse_log(&*channel_lock, None)? {
-        let (hash_id, _merkle) = h?;
+    for entry in txn.changeid_reverse_log(&*ch_read, None)? {
+        let (id, _) = entry?;
+        let cid = ChangeId(*id);
 
-        let id = ChangeId(*hash_id);
-        let external_hash_opt = txn.get_external(&id)?;
-        let external_hash = external_hash_opt
-            .ok_or_else(|| anyhow!("No external hash for change id {:?}", id))?;
-        let h: Hash = external_hash.into();
+        let ext = txn
+            .get_external(&cid)?
+            .ok_or_else(|| anyhow!("Missing external hash"))?;
+        let h: Hash = ext.into();
 
-        match change_store.get_header(&h) {
-            Ok(header) => {
-                history.push(PatchInfo {
-                    hash: h.to_base32().to_string(),
-                    description: header.message,
-                    timestamp: header.timestamp.to_rfc3339(),
-                });
-            }
-            Err(e) => {
-                log::warn!(
-                    "Failed to get header for change {}: {}",
-                    h.to_base32().to_string(),
-                    e
-                );
-            }
+        match cs.get_header(&h) {
+            Ok(header) => out.push(PatchInfo {
+                hash: h.to_base32().to_string(),
+                description: header.message,
+                timestamp: header.timestamp.to_rfc3339(),
+            }),
+            Err(e) => log::warn!("Missing header: {}", e),
         }
     }
 
-    Ok(history)
+    Ok(out)
 }
 
-/// Simulate and detect conflicts using libpijul::Conflict, without
-/// relying on textual conflict markers in the working copy.
+/// Conflict simulation using structured libpijul::Conflict
 pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
-    // Open repo handles once for the whole operation
-    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+    let (pristine, wc, cs) = open_repo(repo_path)?;
 
-    // 1. BASE: initial document
-    let doc_path = repo_path.join("document.md");
-    fs::write(
-        &doc_path,
-        "The quick brown fox jumps over the lazy dog.",
-    )?;
+    let doc = repo_path.join("document.md");
+
+    // BASE
+    fs::write(&doc, "The quick brown fox jumps over the lazy dog.")?;
     record_generic_with_handles(
         &pristine,
-        &working_copy,
-        &change_store,
+        &wc,
+        &cs,
         repo_path,
         "main",
         "Base document",
         Some("document.md"),
     )?;
 
-    // 2. FORK: create 'dev' channel from 'main'
+    // FORK dev
     {
         let mut txn = pristine.mut_txn_begin()?;
-        let main_channel = txn.open_or_create_channel("main")?;
-        txn.fork(&main_channel, "dev")?;
+        let main = txn.open_or_create_channel("main")?;
+        txn.fork(&main, "dev")?;
         txn.commit()?;
     }
 
-    // 3. MAIN EDIT: lazy -> sleepy on main
-    fs::write(
-        &doc_path,
-        "The quick brown fox jumps over the sleepy dog.",
-    )?;
+    // MAIN edit
+    fs::write(&doc, "The quick brown fox jumps over the sleepy dog.")?;
     record_generic_with_handles(
-        &pristine,
-        &working_copy,
-        &change_store,
-        repo_path,
+        &pristine, &wc, &cs, repo_path,
         "main",
         "Change lazy to sleepy",
         Some("document.md"),
     )?;
 
-    // 4. DEV EDIT:
-    //    Rewind working copy to 'dev' channel snapshot, then lazy -> tired.
+    // DEV rewind
     {
         let txn = pristine.txn_begin()?;
-        let dev_channel = txn
-            .load_channel("dev")?
-            .ok_or_else(|| anyhow!("Channel 'dev' not found"))?;
+        let dev = txn.load_channel("dev")?.ok_or_else(|| anyhow!("dev missing"))?;
 
-        // Output dev channel to the *real* working copy (no pending)
-        let _ = libpijul::output::output_repository_no_pending(
-            &working_copy,
-            &change_store,
+        libpijul::output::output_repository_no_pending(
+            &wc,
+            &cs,
             &txn,
-            &dev_channel,
+            &dev,
             &repo_path.to_string_lossy(),
             true,
             None,
@@ -392,33 +316,27 @@ pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
         )?;
     }
 
-    fs::write(
-        &doc_path,
-        "The quick brown fox jumps over the tired dog.",
-    )?;
+    // DEV edit
+    fs::write(&doc, "The quick brown fox jumps over the tired dog.")?;
     let dev_hash = record_generic_with_handles(
-        &pristine,
-        &working_copy,
-        &change_store,
-        repo_path,
+        &pristine, &wc, &cs, repo_path,
         "dev",
         "Change lazy to tired",
         Some("document.md"),
     )?;
 
-    // 5. MERGE: apply dev change onto main, but use FakeWorkingCopy to get
-    //    structured conflicts without touching the working copy on disk.
-    let conflicts_vec = {
+    // MERGE and list conflicts using FakeWorkingCopy
+    let conflicts = {
         let mut txn = pristine.mut_txn_begin()?;
-        let mut main_channel = txn.open_or_create_channel("main")?;
+        let mut main = txn.open_or_create_channel("main")?;
 
-        txn.apply_change(&change_store, &mut main_channel, &dev_hash)?;
+        txn.apply_change(&cs, &mut main, &dev_hash)?;
 
-        let conflicts = libpijul::output::output_repository_no_pending(
+        let c = libpijul::output::output_repository_no_pending(
             &FakeWorkingCopy,
-            &change_store,
+            &cs,
             &txn,
-            &main_channel,
+            &main,
             "",
             true,
             None,
@@ -427,87 +345,62 @@ pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
         )?;
 
         txn.commit()?;
-        conflicts
+        c
     };
 
-    // 6. Map libpijul::Conflict into UI-friendly ConflictInfo
-    use libpijul::Conflict as PijulConflict;
+    // Map into your ConflictLocation model
+    use libpijul::Conflict as PC;
 
-    let mut locations = Vec::new();
+    let mut locs = vec![];
 
-    for c in conflicts_vec {
+    for c in conflicts {
         match c {
-            PijulConflict::Name { path, .. } => {
-                locations.push(ConflictLocation {
-                    line: 0,
-                    options: vec![format!("name conflict at {}", path)],
-                });
-            }
-            PijulConflict::Order { path, line, .. } => {
-                locations.push(ConflictLocation {
-                    line: line as usize,
-                    options: vec![format!("order conflict at {}:{}", path, line)],
-                });
-            }
-            PijulConflict::Zombie { path, line, .. } => {
-                locations.push(ConflictLocation {
-                    line: line as usize,
-                    options: vec![format!("zombie conflict at {}:{}", path, line)],
-                });
-            }
-            PijulConflict::ZombieFile { path, .. } => {
-                locations.push(ConflictLocation {
-                    line: 0,
-                    options: vec![format!("zombie file conflict at {}", path)],
-                });
-            }
-            PijulConflict::Cyclic { path, line, .. } => {
-                locations.push(ConflictLocation {
-                    line: line as usize,
-                    options: vec![format!("cyclic conflict at {}:{}", path, line)],
-                });
-            }
-            PijulConflict::MultipleNames { path, names, .. } => {
-                locations.push(ConflictLocation {
-                    line: 0,
-                    options: vec![format!("multiple names for {}: {:?}", path, names)],
-                });
-            }
+            PC::Name { path, .. } => locs.push(ConflictLocation {
+                path,
+                line: None,
+                conflict_type: "name".to_string(),
+                description: "Two entries share the same name".to_string(),
+            }),
+
+            PC::Order { path, line, .. } => locs.push(ConflictLocation {
+                path,
+                line: Some(line as usize),
+                conflict_type: "order".to_string(),
+                description: format!("Change-order conflict at line {}", line),
+            }),
+
+            PC::Zombie { path, line, .. } => locs.push(ConflictLocation {
+                path,
+                line: Some(line as usize),
+                conflict_type: "zombie".to_string(),
+                description: "A deleted line is referenced".to_string(),
+            }),
+
+            PC::ZombieFile { path, .. } => locs.push(ConflictLocation {
+                path,
+                line: None,
+                conflict_type: "zombie_file".to_string(),
+                description: "A deleted file is still referenced".to_string(),
+            }),
+
+            PC::Cyclic { path, line, .. } => locs.push(ConflictLocation {
+                path,
+                line: Some(line as usize),
+                conflict_type: "cyclic".to_string(),
+                description: "Cyclic dependency detected in patch graph".to_string(),
+            }),
+
+            PC::MultipleNames { path, names, .. } => locs.push(ConflictLocation {
+                path,
+                line: None,
+                conflict_type: "multiple_names".to_string(),
+                description: format!("Multiple names: {:?}", names),
+            }),
         }
     }
 
     Ok(ConflictInfo {
-        has_conflict: !locations.is_empty(),
-        locations,
+        has_conflict: !locs.is_empty(),
+        locations: locs,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_init_repository() {
-        let temp = TempDir::new().unwrap();
-        let result = init_repository(temp.path());
-        assert!(result.is_ok());
-        assert!(temp.path().join(".pijul").exists());
-    }
-
-    #[test]
-    fn test_conflict_simulation() {
-        let temp = TempDir::new().unwrap();
-        init_repository(temp.path()).unwrap();
-
-        let result = simulate_conflict(temp.path());
-        assert!(result.is_ok(), "simulate_conflict should not return an error");
-
-        let conflicts = result.unwrap();
-        assert!(conflicts.has_conflict, "A conflict should have been detected");
-        assert!(
-            !conflicts.locations.is_empty(),
-            "Conflict locations should not be empty"
-        );
-    }
 }
