@@ -14,6 +14,7 @@ import { prosemirrorCtx } from "@milkdown/prose";
 import { invoke } from "@tauri-apps/api/tauri";
 import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
+import { stepToSemanticPatch } from "./patch-extractor.js";
 
 async function setupEditor() {
   const mount = document.getElementById("editor");
@@ -38,35 +39,35 @@ async function setupEditor() {
     const state = view.state;
 
     const patchLoggerPlugin = new Plugin({
-      appendTransaction(transactions, oldState, newState) {
-        if (!transactions.length) return;
+        appendTransaction(transactions, oldState, newState) {
+            if (!transactions.length) return;
 
-        // Aggregate info for now. Later we can inspect steps in detail.
-        const stepsCount = transactions.reduce(
-          (acc, tr) => acc + tr.steps.length,
-          0
-        );
+            // Process each Step in each transaction
+            const semanticPatches = [];
 
-        if (stepsCount === 0) return;
+            for (const tr of transactions) {
+                for (const step of tr.steps) {
+                    const semantic = stepToSemanticPatch(step, oldState, newState);
+                    semanticPatches.push(semantic);
+                }
+            }
 
-        const patch = {
-          timestamp: Date.now(),
-          author: "local", // TODO: later: real identity
-          kind: "transaction",
-          data: {
-            steps: stepsCount,
-            docSizeBefore: oldState.doc.content.size,
-            docSizeAfter: newState.doc.content.size,
-          },
-        };
+            if (semanticPatches.length === 0) return;
 
-        // Fire & forget
-        invoke("record_patch", { patch }).catch((err) => {
-          console.error("Failed to record patch:", err);
-        });
+            // Send to backend
+            const patchRecord = {
+                timestamp: Date.now(),
+                author: "local",
+                kind: "semantic", // you can change this later
+                data: semanticPatches,
+            };
 
-        return null; // do not modify the transaction
-      },
+            invoke("record_patch", { patch: patchRecord }).catch((err) => {
+                console.error("Failed to record semantic patch:", err);
+            });
+
+            return null;
+        },
     });
 
     const newState = state.reconfigure({
