@@ -210,66 +210,114 @@ pub fn get_patch_history(repo_path: &Path) -> Result<Vec<PatchInfo>> {
 
 /// Simulate and detect conflicts
 pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
-    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+    // Re-open repo components to ensure fresh state for each step.
+    let (pristine, _, _) = open_repo(repo_path)?;
 
-    // 1. Setup
-    let doc_path = repo_path.join("conflict.md");
-    fs::write(&doc_path, "Base content\n")?;
-    record_all(repo_path, "Base", Some("conflict.md"))?;
+    // 1. BASE: Define the initial state of the document.
+    let doc_path = repo_path.join("document.md");
+    fs::write(&doc_path, "The quick brown fox jumps over the lazy dog.")?;
+    record_all(repo_path, "Base document", Some("document.md"))?;
 
-    // 2. Fork
+    // 2. FORK: Create a new channel 'dev' from 'main'.
     {
         let mut txn = pristine.mut_txn_begin()?;
-        let main = txn.open_or_create_channel("main")?;
-        txn.fork(&main, "dev")?;
+        let main_channel = txn.open_or_create_channel("main")?;
+        // Forking creates a new channel with the same history as 'main'.
+        txn.fork(&main_channel, "dev")?;
         txn.commit()?;
     }
 
-    // 3. Edit Main
-    fs::write(&doc_path, "Main content\n")?;
-    record_all(repo_path, "Main edit", Some("conflict.md"))?;
+    // 3. MAIN EDIT: On the 'main' channel, change 'lazy' to 'sleepy'.
+    fs::write(&doc_path, "The quick brown fox jumps over the sleepy dog.")?;
+    // This change is recorded on the 'main' channel.
+    record_all(repo_path, "Change lazy to sleepy", Some("document.md"))?;
 
-    // 4. Edit Dev
-    let dev_hash = record_on_channel(repo_path, "dev", "Dev edit", Some("conflict.md"))?;
+    // Before making the dev edit, we must revert the working copy to the base state of the 'dev' channel.
+    // This is crucial because Pijul's recording mechanism works relative to the current files on disk.
+    // First, output the state of the 'dev' channel to the working copy.
+    {
+        let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+        let txn = pristine.txn_begin()?;
+        let dev_channel = txn.load_channel("dev")?.ok_or_else(|| anyhow!("Channel 'dev' not found"))?;
+        libpijul::output::output_repository_no_pending(
+            &working_copy,
+            &change_store,
+            &txn,
+            &dev_channel,
+            &repo_path.to_string_lossy(),
+            true,
+            None,
+            1,
+            0,
+        )?;
+    }
 
-    // 5. Merge Dev -> Main
-    let mut txn = pristine.mut_txn_begin()?;
-    let mut channel_main = txn.open_or_create_channel("main")?;
+    // 4. DEV EDIT: On the 'dev' channel, change 'lazy' to 'tired'.
+    // This edit is made to the same line as the 'main' edit, creating a conflict.
+    fs::write(&doc_path, "The quick brown fox jumps over the tired dog.")?;
+    // Record this change specifically on the 'dev' channel.
+    let dev_hash = record_on_channel(repo_path, "dev", "Change lazy to tired", Some("document.md"))?;
 
-    txn.apply_change(
-        &change_store,
-        &mut channel_main,
-        &dev_hash,
-    )?;
+    // 5. MERGE: Apply the change from 'dev' onto 'main'.
+    let conflicts = {
+        let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+        let mut txn = pristine.mut_txn_begin()?;
+        let mut main_channel = txn.open_or_create_channel("main")?;
 
-    // 6. Detect Conflicts
-    let conflicts = libpijul::output::output_repository_no_pending(
-        &working_copy,
-        &change_store,
-        &txn,
-        &channel_main,
-        "",
-        true,
-        None,
-        1,
-        0,
-    )?;
+        // Applying the change from 'dev' to 'main'. Pijul will detect the conflict here.
+        txn.apply_change(&change_store, &mut main_channel, &dev_hash)?;
 
-    txn.commit()?;
+        // After applying, we output the state of the 'main' channel to get the conflict markers.
+        libpijul::output::output_repository_no_pending(
+            &working_copy,
+            &change_store,
+            &txn,
+            &main_channel,
+            &repo_path.to_string_lossy(),
+            true,
+            None,
+            1,
+            0,
+        )?;
 
-    let has_conflict = !conflicts.is_empty();
-    let mut conflict_locs = Vec::new();
+        txn.commit()?;
 
-    for conflict in conflicts {
-        conflict_locs.push(ConflictLocation {
-            line: 0,
-            options: vec![format!("{:?}", conflict)],
-        });
+        // The conflict information is now present in the working copy file.
+        fs::read_to_string(&doc_path)?
+    };
+
+    // 6. PARSE CONFLICTS: Instead of inspecting the API, we parse the conflict markers from the file.
+    let mut locations = Vec::new();
+    let has_conflict = conflicts.contains("<<<<<<<");
+
+    if has_conflict {
+        // Simple parser for Git-style conflict markers.
+        let mut current_options = Vec::new();
+        let mut in_conflict = false;
+        let mut line_number = 0;
+
+        for line in conflicts.lines() {
+            line_number += 1;
+            if line.starts_with("<<<<<<<") {
+                in_conflict = true;
+            } else if line.starts_with("=======") {
+                // Separator between conflict options.
+            } else if line.starts_with(">>>>>>>") {
+                in_conflict = false;
+                locations.push(ConflictLocation {
+                    line: line_number - current_options.len(), // Approximate line number.
+                    options: current_options.clone(),
+                });
+                current_options.clear();
+            } else if in_conflict {
+                current_options.push(line.to_string());
+            }
+        }
     }
 
     Ok(ConflictInfo {
         has_conflict,
-        locations: conflict_locs,
+        locations,
     })
 }
 
@@ -352,5 +400,36 @@ mod tests {
         let result = init_repository(temp.path());
         assert!(result.is_ok());
         assert!(temp.path().join(".pijul").exists());
+    }
+
+    #[test]
+    fn test_conflict_simulation() {
+        // Using a temporary directory for an isolated test environment.
+        let temp = TempDir::new().unwrap();
+        // 1. Initialize a new repository in the temporary directory.
+        init_repository(temp.path()).unwrap();
+
+        // 2. Run the conflict simulation logic.
+        let result = simulate_conflict(temp.path());
+
+        // 3. Assert that the operation completed without panicking.
+        assert!(result.is_ok(), "simulate_conflict should not return an error");
+
+        // 4. Unwrap the result to get the conflict information.
+        let conflicts = result.unwrap();
+
+        // 5. Assert that a conflict was actually detected.
+        // This is the core success criterion for Day 3.
+        assert!(conflicts.has_conflict, "A conflict should have been detected");
+
+        // 6. Assert that at least one conflict location was reported.
+        assert!(!conflicts.locations.is_empty(), "Conflict locations should not be empty");
+
+        // 7. Assert that the conflict location has at least two options to choose from.
+        let location = &conflicts.locations[0];
+        assert!(location.options.len() >= 2, "Conflict should have at least two options");
+
+        // 8. Assert that the options are not the same, meaning a real conflict was found.
+        assert_ne!(location.options[0], location.options[1], "Conflict options should be different");
     }
 }
