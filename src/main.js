@@ -1,20 +1,49 @@
 const { invoke } = window.__TAURI__.tauri;
 
+// Utility: normalize details (Error, object, string) for display
+function stringifyDetails(details) {
+    if (!details) return null;
+    if (typeof details === "string") return details;
+    if (details instanceof Error) {
+        return details.stack || details.message || String(details);
+    }
+    try {
+        return JSON.stringify(details, null, 2);
+    } catch (_) {
+        return String(details);
+    }
+}
+
 // Utility: Show result message
 function showResult(elementId, success, message, details = null) {
     const element = document.getElementById(elementId);
+    if (!element) return;
+
+    const normalizedDetails = stringifyDetails(details);
+
+    element.style.display = "block";
     element.className = `result ${success ? 'success' : 'error'}`;
     element.innerHTML = `
         <strong>${success ? '✅ Success' : '❌ Failed'}</strong>
         <p>${message}</p>
-        ${details ? `<pre style="margin-top: 8px; font-size: 0.9em; white-space: pre-wrap;">${details}</pre>` : ''}
+        ${
+            normalizedDetails
+                ? `<pre style="margin-top: 8px; font-size: 0.9em; white-space: pre-wrap;">${normalizedDetails}</pre>`
+                : ''
+        }
     `;
 }
+
 
 // Clear a result display
 function clearResult(elementId) {
     const element = document.getElementById(elementId);
+    if (!element) return;
+
+    // Do not permanently hide; just reset content and classes.
     element.style.display = 'none';
+    element.className = 'result';
+    element.innerHTML = '';
 }
 
 // DAY 1: Test Pijul Initialization (PRIMARY TEST)
@@ -92,7 +121,7 @@ document.getElementById('reset-repo').addEventListener('click', async () => {
     }
 });
 
-// DAY 2: Record a change (PLACEHOLDER - will return mock data)
+// DAY 2: Record a change
 document.getElementById('record-change').addEventListener('click', async () => {
     const content = document.getElementById('content').value;
     const message = document.getElementById('message').value;
@@ -105,7 +134,7 @@ document.getElementById('record-change').addEventListener('click', async () => {
     }
 });
 
-// DAY 2: Show patch history (PLACEHOLDER - will return empty list)
+// DAY 2: Show patch history
 document.getElementById('show-history').addEventListener('click', async () => {
     try {
         const history = await invoke('get_history');
@@ -114,7 +143,13 @@ document.getElementById('show-history').addEventListener('click', async () => {
         if (history.length === 0) {
             historyElement.textContent = '📝 No patches yet.\n\nDay 2 implementation needed to record actual changes.';
         } else {
-            historyElement.textContent = JSON.stringify(history, null, 2);
+            // Simple, human-friendly rendering of history
+            historyElement.textContent = history
+                .map(
+                    (p) =>
+                        `${p.timestamp} – ${p.description} (${p.hash.slice(0, 8)}…)`
+                )
+                .join('\n');
         }
 
         historyElement.classList.add('show');
@@ -123,7 +158,7 @@ document.getElementById('show-history').addEventListener('click', async () => {
     }
 });
 
-// DAY 3: Test conflict detection (PLACEHOLDER)
+// DAY 3: Test conflict detection
 document.getElementById('test-conflict').addEventListener('click', async () => {
     try {
         const conflicts = await invoke('test_conflict_detection');
@@ -136,7 +171,7 @@ document.getElementById('test-conflict').addEventListener('click', async () => {
             'conflict-result',
             conflicts.has_conflict,
             message,
-            JSON.stringify(conflicts, null, 2)
+            conflicts
         );
     } catch (error) {
         showResult('conflict-result', false, 'Error testing conflicts', error);

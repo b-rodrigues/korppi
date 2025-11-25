@@ -50,8 +50,7 @@ pub fn test_pijul_init() -> Result<TestResult, String> {
 /// Record a change
 #[tauri::command]
 pub fn record_edit(content: String, message: String) -> Result<TestResult, String> {
-    let repo_path = get_test_repo_path()
-        .map_err(|e| e.to_string())?;
+    let repo_path = get_test_repo_path().map_err(|e| e.to_string())?;
 
     if !repo_path.join(".pijul").exists() {
         return Ok(TestResult {
@@ -62,6 +61,14 @@ pub fn record_edit(content: String, message: String) -> Result<TestResult, Strin
     }
 
     match record_change(&repo_path, &content, &message) {
+        Ok(hash) if hash == "no_change" => Ok(TestResult {
+            success: true,
+            message: "No changes to record".to_string(),
+            details: Some(
+                "The content is identical to the last recorded version; nothing to record."
+                    .to_string(),
+            ),
+        }),
         Ok(hash) => Ok(TestResult {
             success: true,
             message: "Change recorded successfully".to_string(),
@@ -148,7 +155,22 @@ pub fn get_repo_status() -> Result<String, String> {
     status.push_str(&format!("  pristine/db - {}\n", if pijul_dir.join("pristine/db").exists() { "✅" } else { "❌" }));
 
     match verify_repository(&repo_path) {
-        Ok(true) => status.push_str("\n✅ Repository is valid and functional"),
+        Ok(true) => {
+            status.push_str("\n✅ Repository is valid and functional");
+
+            // Try to open the pristine environment to list channels
+            let db_path = pijul_dir.join("pristine/db");
+            if let Ok(pristine) = libpijul::pristine::sanakirja::Pristine::new(&db_path) {
+                if let Ok(txn) = pristine.txn_begin() {
+                    if let Ok(channels) = txn.list_channels() {
+                        status.push_str("\n\nChannels:\n");
+                        for ch in channels {
+                            status.push_str(&format!("  - {}\n", ch.0));
+                        }
+                    }
+                }
+            }
+        },
         Ok(false) => status.push_str("\n⚠️ Repository structure incomplete"),
         Err(e) => status.push_str(&format!("\n❌ Verification error: {}", e)),
     }

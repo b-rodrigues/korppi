@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use std::path::{Path, PathBuf};
 use std::fs;
+use log;
 use chrono::Utc;
 
 use libpijul::{
@@ -19,6 +20,10 @@ use canonical_path::CanonicalPathBuf;
 use crate::models::*;
 
 /// Get or create a test repository path
+// NOTE: This uses a fixed path in the system's temp directory.
+// This is simple for a prototype, but means that multiple instances of the app
+// (or concurrent tests) will interfere with each other. A real application
+// would use a unique path per session or per user.
 pub fn get_test_repo_path() -> Result<PathBuf> {
     let temp_dir = std::env::temp_dir();
     let repo_path = temp_dir.join("korppi-test-repo");
@@ -121,9 +126,14 @@ fn record_all(
         return Err(anyhow!("No changes to record"));
     }
 
-    let actions = recorded.actions.into_iter()
-        .map(|r| r.globalize(&txn).unwrap())
-        .collect();
+    let actions = recorded
+        .actions
+        .into_iter()
+        .map(|r| {
+            r.globalize(&txn)
+                .map_err(|e| anyhow!("Failed to globalize recorded action: {}", e))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     let mut contents_lock = recorded.contents.lock();
     let contents = std::mem::take(&mut *contents_lock);
@@ -186,9 +196,10 @@ pub fn get_patch_history(repo_path: &Path) -> Result<Vec<PatchInfo>> {
 
     for h in txn.changeid_reverse_log(&*channel_lock, None)? {
         let (hash_id, _merkle) = h?;
-
         let id = ChangeId(*hash_id);
-        let external_hash = txn.get_external(&id)?.unwrap();
+        let external_hash = txn
+            .get_external(&id)?
+            .ok_or_else(|| anyhow!("No external hash for change id {:?}", id))?;
         let h: Hash = external_hash.into();
 
         match change_store.get_header(&h) {
@@ -200,7 +211,11 @@ pub fn get_patch_history(repo_path: &Path) -> Result<Vec<PatchInfo>> {
                 });
             },
             Err(e) => {
-                eprintln!("Warning: Failed to get header for {}: {}", h.to_base32().to_string(), e);
+                log::warn!(
+                    "Failed to get header for change {}: {}",
+                    h.to_base32().to_string(),
+                    e
+                );
             }
         }
     }
