@@ -97,3 +97,29 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
 
     Ok(patches)
 }
+
+#[tauri::command]
+pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
+    let conn = get_conn(&app)?;
+    let mut stmt = conn
+        .prepare("SELECT id, timestamp, author, kind, data FROM patches WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let patch = stmt
+        .query_row([id], |row| {
+            let data_str: String = row.get(4)?;
+            let data: serde_json::Value =
+                serde_json::from_str(&data_str).unwrap_or(serde_json::Value::Null);
+
+            Ok(Patch {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                author: row.get(2)?,
+                kind: row.get(3)?,
+                data,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    Ok(patch)
+}

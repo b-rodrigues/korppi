@@ -1,15 +1,27 @@
 import "./editor.js";
-import { showHistory, hideHistory } from "./history.js";
+import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails } from "./timeline.js";
 
-window.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById("history-toggle");
-    const sidebar = document.getElementById("history-sidebar");
+window.addEventListener("DOMContentLoaded", async () => {
+    const toggle = document.getElementById("timeline-toggle");
+    const container = document.getElementById("timeline-container");
+    const list = document.getElementById("timeline-list");
 
-    btn.addEventListener("click", () => {
-        if (sidebar.style.display === "none") {
-            showHistory();
+    toggle.addEventListener("click", async () => {
+        if (container.style.display === "none") {
+            container.style.display = "block";
+            const patches = await fetchPatchList();
+            renderPatchList(patches);
         } else {
-            hideHistory();
+            container.style.display = "none";
         }
+    });
+
+    list.addEventListener("click", async (event) => {
+        const item = event.target.closest(".timeline-item");
+        if (!item) return;
+
+        const id = parseInt(item.dataset.id);
+        const patch = await fetchPatch(id);
+        if (patch) renderPatchDetails(patch);
     });
 });
