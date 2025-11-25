@@ -14,6 +14,30 @@
         </header>
         <div id="editor"></div>
     </div>
-    <script type="module" src="./editor.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <button id="timeline-toggle">Timeline</button>
+
+    <div id="timeline-container" style="
+        display:none;
+        position:fixed;
+        top:0;
+        right:0;
+        width:400px;
+        height:100%;
+        background:#fafafa;
+        border-left:1px solid #ccc;
+        overflow-y:auto;
+        padding:10px;
+    ">
+        <h2>Timeline</h2>
+
+        <div id="timeline-list" style="
+            border-bottom:1px solid #ddd;
+            margin-bottom:10px;
+            padding-bottom:10px;
+        "></div>
+
+        <div id="timeline-details"></div>
+    </div>
 </body>
 </html>
