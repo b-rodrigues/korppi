@@ -306,9 +306,7 @@ pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
     let has_conflict = conflicts.contains("<<<<<<<");
 
     if has_conflict {
-        // NOTE: This parser assumes libpijul writes Git-style conflict markers
-        // (<<<<<<<, =======, >>>>>>>) into the working copy. If that changes,
-        // this logic must be updated.
+        // Simple parser for Git-style conflict markers.
         let mut current_options = Vec::new();
         let mut in_conflict = false;
         let mut line_number = 0;
