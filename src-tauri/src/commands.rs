@@ -19,24 +19,13 @@ pub fn test_pijul_init() -> Result<TestResult, String> {
             .map_err(|e| format!("Failed to clean old repo: {}", e))?;
     }
 
-    // Create repository
     match init_repository(&repo_path) {
         Ok(_) => {
-            // Verify it worked
             match verify_repository(&repo_path) {
                 Ok(true) => Ok(TestResult {
                     success: true,
                     message: "✅ Pijul repository initialized successfully!".to_string(),
-                    details: Some(format!(
-                        "Repository created at: {:?}\n\
-                         \nStructure:\n\
-                         - .pijul/ directory created\n\
-                         - pristine/ database initialized\n\
-                         - main channel created\n\
-                         - changes/ directory ready\n\
-                         \n✨ Day 1 validation complete!",
-                        repo_path
-                    )),
+                    details: Some(format!("Repository created at: {:?}", repo_path)),
                 }),
                 Ok(false) => Ok(TestResult {
                     success: false,
@@ -58,13 +47,12 @@ pub fn test_pijul_init() -> Result<TestResult, String> {
     }
 }
 
-/// Record a change (Day 2 - Not Yet Implemented)
+/// Record a change
 #[tauri::command]
 pub fn record_edit(content: String, message: String) -> Result<TestResult, String> {
     let repo_path = get_test_repo_path()
         .map_err(|e| e.to_string())?;
 
-    // Check if repository exists
     if !repo_path.join(".pijul").exists() {
         return Ok(TestResult {
             success: false,
@@ -76,16 +64,8 @@ pub fn record_edit(content: String, message: String) -> Result<TestResult, Strin
     match record_change(&repo_path, &content, &message) {
         Ok(hash) => Ok(TestResult {
             success: true,
-            message: "⚠️ Mock implementation - Day 2 not complete".to_string(),
-            details: Some(format!(
-                "Returned mock hash: {}\n\
-                 \nNote: This is a placeholder.\n\
-                 Day 2 implementation requires:\n\
-                 - Writing file to working copy\n\
-                 - Recording changes with Pijul\n\
-                 - Generating real patch hash",
-                hash
-            )),
+            message: "Change recorded successfully".to_string(),
+            details: Some(format!("Patch hash: {}", hash)),
         }),
         Err(e) => Ok(TestResult {
             success: false,
@@ -95,13 +75,12 @@ pub fn record_edit(content: String, message: String) -> Result<TestResult, Strin
     }
 }
 
-/// Get patch history (Day 2 - Not Yet Implemented)
+/// Get patch history
 #[tauri::command]
 pub fn get_history() -> Result<Vec<PatchInfo>, String> {
     let repo_path = get_test_repo_path()
         .map_err(|e| e.to_string())?;
 
-    // Check if repository exists
     if !repo_path.join(".pijul").exists() {
         return Err("Repository not initialized. Run 'Test Pijul Init' first.".to_string());
     }
@@ -110,13 +89,12 @@ pub fn get_history() -> Result<Vec<PatchInfo>, String> {
         .map_err(|e| format!("Failed to get history: {}", e))
 }
 
-/// Test conflict detection (Day 3 - Not Yet Implemented)
+/// Test conflict detection
 #[tauri::command]
 pub fn test_conflict_detection() -> Result<ConflictInfo, String> {
     let repo_path = get_test_repo_path()
         .map_err(|e| e.to_string())?;
 
-    // Check if repository exists
     if !repo_path.join(".pijul").exists() {
         return Err("Repository not initialized. Run 'Test Pijul Init' first.".to_string());
     }
@@ -163,14 +141,12 @@ pub fn get_repo_status() -> Result<String, String> {
 
     let mut status = format!("📁 Repository Status\n\nPath: {:?}\n\n", repo_path);
 
-    // Check structure
     status.push_str("Structure:\n");
     status.push_str(&format!("  .pijul/ - {}\n", if pijul_dir.exists() { "✅" } else { "❌" }));
     status.push_str(&format!("  pristine/ - {}\n", if pijul_dir.join("pristine").exists() { "✅" } else { "❌" }));
     status.push_str(&format!("  changes/ - {}\n", if pijul_dir.join("changes").exists() { "✅" } else { "❌" }));
     status.push_str(&format!("  pristine/db - {}\n", if pijul_dir.join("pristine/db").exists() { "✅" } else { "❌" }));
 
-    // Try to verify
     match verify_repository(&repo_path) {
         Ok(true) => status.push_str("\n✅ Repository is valid and functional"),
         Ok(false) => status.push_str("\n⚠️ Repository structure incomplete"),

@@ -356,15 +356,15 @@ textarea:disabled, input:disabled {
     body {
         padding: 10px;
     }
-    
+
     header h1 {
         font-size: 2rem;
     }
-    
+
     .button-group {
         flex-direction: column;
     }
-    
+
     button {
         width: 100%;
     }

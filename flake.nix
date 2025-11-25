@@ -17,9 +17,9 @@
 
         # Use stable Rust toolchain
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ 
-            "rust-src" 
-            "rust-analyzer" 
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
             "clippy"
           ];
           targets = [
@@ -52,12 +52,12 @@
           dbus
           openssl
           librsvg
-          
+
           # Additional UI libraries
           pango
           atk
           libsoup
-          
+
           # Development tools
           pkg-config
         ];
@@ -66,33 +66,33 @@
         commonDeps = with pkgs; [
           # Rust toolchain
           rustToolchain
-          
+
           # Cargo tools
           cargo-watch          # Auto-rebuild on file changes
           cargo-edit           # cargo add, cargo rm, cargo upgrade
           cargo-outdated       # Check for outdated dependencies
           cargo-audit          # Security vulnerability scanning
           cargo-flamegraph     # Performance profiling
-          
+
           # Node.js ecosystem for frontend
           nodejs_20
           nodePackages.npm
-          
+
           # System libraries
           openssl
           zlib
-          
+
           # Build tools
           pkg-config
           cmake
-          
+
           # Development utilities
           just                 # Command runner (Makefile alternative)
           watchexec            # File watcher
-          
+
           # Git for version control
           git
-          
+
           # Testing and debugging
           lldb                 # Debugger
         ];
@@ -103,17 +103,17 @@
             echo "🦀 Starting Korppi development server..."
             npm run tauri dev
           '';
-          
+
           build = pkgs.writeShellScriptBin "korppi-build" ''
             echo "🏗️  Building Korppi for production..."
             npm run tauri build
           '';
-          
+
           test = pkgs.writeShellScriptBin "korppi-test" ''
             echo "🧪 Running Rust tests..."
             cd src-tauri && cargo test --all-features
           '';
-          
+
           check = pkgs.writeShellScriptBin "korppi-check" ''
             echo "🔍 Running code checks..."
             cd src-tauri
@@ -121,20 +121,20 @@
             cargo clippy -- -D warnings
             cargo test
           '';
-          
+
           clean = pkgs.writeShellScriptBin "korppi-clean" ''
             echo "🧹 Cleaning build artifacts..."
             rm -rf target src-tauri/target node_modules
             echo "✨ Clean complete!"
           '';
-          
+
           update = pkgs.writeShellScriptBin "korppi-update" ''
             echo "📦 Updating dependencies..."
             cd src-tauri && cargo update
             npm update
             echo "✅ Dependencies updated!"
           '';
-          
+
           validate = pkgs.writeShellScriptBin "korppi-validate" ''
             echo "✅ Running 3-day validation suite..."
             echo ""
@@ -166,19 +166,19 @@
             # Set up environment
             export RUST_BACKTRACE=1
             export RUST_LOG=info
-            
+
             # Ensure openssl can be found
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
             export OPENSSL_DIR="${pkgs.openssl.dev}"
             export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
             export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
-            
+
             # Set up Tauri on Linux
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath linuxDeps}:$LD_LIBRARY_PATH"
               export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
             ''}
-            
+
             # Pretty welcome message
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -214,13 +214,13 @@
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-            
+
             # Check if this is first run
             if [ ! -f "package.json" ]; then
               echo "⚠️  No package.json found. Run 'npm init' or copy from prototype."
               echo ""
             fi
-            
+
             if [ ! -d "node_modules" ]; then
               echo "💡 Tip: Run 'npm install' to install JavaScript dependencies"
               echo ""
@@ -229,13 +229,13 @@
 
           # Environment variables for development
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
-          
+
           # Improve build times
           CARGO_BUILD_JOBS = "8";
-          
+
           # Better error messages
           RUST_BACKTRACE = "1";
-          
+
           # Enable incremental compilation
           CARGO_INCREMENTAL = "1";
         };
@@ -243,24 +243,24 @@
         # Package definitions for building Korppi
         packages = {
           default = self.packages.${system}.korppi;
-          
+
           korppi = pkgs.rustPlatform.buildRustPackage {
             pname = "korppi";
             version = "0.1.0";
-            
+
             src = ./.;
-            
+
             cargoLock = {
               lockFile = ./src-tauri/Cargo.lock;
             };
-            
+
             nativeBuildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
-            
+
             buildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
-            
+
             # Skip tests during build (run separately)
             doCheck = false;
-            
+
             meta = with pkgs.lib; {
               description = "Local-first collaborative writing tool";
               homepage = "https://github.com/yourusername/korppi";
@@ -273,17 +273,17 @@
         # CI/CD apps
         apps = {
           default = self.apps.${system}.korppi-dev;
-          
+
           korppi-dev = {
             type = "app";
             program = "${scripts.dev}/bin/korppi-dev";
           };
-          
+
           korppi-test = {
             type = "app";
             program = "${scripts.test}/bin/korppi-test";
           };
-          
+
           korppi-check = {
             type = "app";
             program = "${scripts.check}/bin/korppi-check";

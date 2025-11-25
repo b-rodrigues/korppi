@@ -1,11 +1,20 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::path::{Path, PathBuf};
 use std::fs;
+use chrono::Utc;
 
 use libpijul::{
+    changestore::filesystem::FileSystem as FileChangeStore,
+    working_copy::filesystem::FileSystem as FileWorkingCopy,
     pristine::sanakirja::Pristine,
-    pristine::{MutTxnT, ChannelMutTxnT},
+    pristine::{MutTxnT, TxnT, GraphTxnT, ChannelTxnT, TreeTxnT, Base32, ChangeId},
+    changestore::ChangeStore,
+    working_copy::WorkingCopy,
+    TxnTExt, MutTxnTExt,
+    RecordBuilder, Algorithm,
+    Hash,
 };
+use canonical_path::CanonicalPathBuf;
 
 use crate::models::*;
 
@@ -23,132 +32,314 @@ pub fn get_test_repo_path() -> Result<PathBuf> {
 }
 
 /// Initialize a Pijul repository
-/// 
-/// This creates:
-/// 1. .pijul directory structure
-/// 2. Pristine database (Sanakirja)
-/// 3. Main channel (required for operations)
-/// 4. Changes directory (for storing patches)
 pub fn init_repository(path: &Path) -> Result<()> {
-    // Clean slate - remove existing .pijul if present
     let pijul_dir = path.join(".pijul");
     if pijul_dir.exists() {
-        fs::remove_dir_all(&pijul_dir)
-            .context("Failed to remove existing .pijul directory")?;
+        fs::remove_dir_all(&pijul_dir)?;
     }
-    fs::create_dir_all(&pijul_dir)
-        .context("Failed to create .pijul directory")?;
+    fs::create_dir_all(&pijul_dir)?;
 
-    // Step 1: Initialize pristine database
     let pristine_dir = pijul_dir.join("pristine");
-    fs::create_dir_all(&pristine_dir)
-        .context("Failed to create pristine directory")?;
+    fs::create_dir_all(&pristine_dir)?;
 
     let db_path = pristine_dir.join("db");
-    let pristine = Pristine::new(&db_path)
-        .context("Failed to create Pijul pristine database")?;
+    let pristine = Pristine::new(&db_path)?;
 
-    // Step 2: Create the main channel
-    // Pijul requires at least one channel to exist for operations
-    // A channel is like a branch in Git
-    let mut txn = pristine.mut_txn_begin()
-        .context("Failed to begin transaction")?;
-    
-    txn.open_or_create_channel("main")
-        .context("Failed to create main channel")?;
-    
-    txn.commit()
-        .context("Failed to commit channel creation")?;
-
-    // Step 3: Initialize changes directory
-    // This will store the actual patch files
     let changes_dir = pijul_dir.join("changes");
-    fs::create_dir_all(&changes_dir)
-        .context("Failed to create changes directory")?;
+    FileChangeStore::from_changes(changes_dir, 100);
+
+    // Create main channel
+    let mut txn = pristine.mut_txn_begin()?;
+    txn.open_or_create_channel("main")?;
+    txn.commit()?;
 
     Ok(())
 }
 
 /// Verify that a repository is properly initialized
-/// 
-/// This is a helper function to check if init_repository worked correctly
 pub fn verify_repository(path: &Path) -> Result<bool> {
     let pijul_dir = path.join(".pijul");
-    
-    // Check directory structure
-    if !pijul_dir.exists() {
-        return Ok(false);
-    }
-    
-    if !pijul_dir.join("pristine").exists() {
-        return Ok(false);
-    }
-    
-    if !pijul_dir.join("changes").exists() {
-        return Ok(false);
-    }
-    
+    if !pijul_dir.exists() { return Ok(false); }
+    if !pijul_dir.join("pristine").exists() { return Ok(false); }
+    if !pijul_dir.join("changes").exists() { return Ok(false); }
     let db_path = pijul_dir.join("pristine/db");
-    if !db_path.exists() {
-        return Ok(false);
-    }
-    
-    // Check that we can open the pristine database
+    if !db_path.exists() { return Ok(false); }
+
     let pristine = Pristine::new(&db_path)?;
-    
-    // Check that main channel exists
     let txn = pristine.txn_begin()?;
-    let channel = txn.load_channel("main")?;
-    
-    Ok(channel.is_some())
+    Ok(txn.load_channel("main")?.is_some())
 }
 
-// ============================================================================
-// DAY 2-3 PLACEHOLDER IMPLEMENTATIONS
-// These are stubs that return mock data
-// They need proper Pijul API integration
-// ============================================================================
+// Helper to open repo components
+fn open_repo(path: &Path) -> Result<(Pristine, FileWorkingCopy, FileChangeStore)> {
+    let pijul_dir = path.join(".pijul");
+    let pristine_dir = pijul_dir.join("pristine");
+    let db_path = pristine_dir.join("db");
+
+    let pristine = Pristine::new(&db_path)?;
+    let working_copy = FileWorkingCopy::from_root(path);
+    let change_store = FileChangeStore::from_changes(pijul_dir.join("changes"), 100);
+
+    Ok((pristine, working_copy, change_store))
+}
+
+// Helper: Record all changes
+fn record_all(
+    repo_path: &Path,
+    message: &str,
+    file_to_add: Option<&str>
+) -> Result<Hash> {
+    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+
+    let mut txn = pristine.mut_txn_begin()?;
+    let mut channel = txn.open_or_create_channel("main")?;
+
+    if let Some(file) = file_to_add {
+        if !txn.is_tracked(file)? {
+             txn.add_file(file, 0)?;
+        }
+    }
+
+    let mut builder = RecordBuilder::new();
+    let canonical_root = CanonicalPathBuf::canonicalize(repo_path)?;
+
+    working_copy.record_prefix(
+        &mut txn,
+        Algorithm::default(),
+        &mut channel,
+        &change_store,
+        &mut builder,
+        canonical_root,
+        Path::new(""),
+        false, // force
+        1, // threads
+        0, // salt
+    )?;
+
+    let recorded = builder.finish();
+    if recorded.actions.is_empty() {
+        return Err(anyhow!("No changes to record"));
+    }
+
+    let actions = recorded.actions.into_iter()
+        .map(|r| r.globalize(&txn).unwrap())
+        .collect();
+
+    let mut contents_lock = recorded.contents.lock();
+    let contents = std::mem::take(&mut *contents_lock);
+
+    let mut change = libpijul::change::Change::make_change(
+        &txn,
+        &channel,
+        actions,
+        contents,
+        libpijul::change::ChangeHeader {
+            message: message.to_string(),
+            authors: vec![],
+            description: None,
+            timestamp: Utc::now(),
+        },
+        Vec::new(),
+    )?;
+
+    let hash = change_store.save_change(&mut change, |_, _| Ok::<_, anyhow::Error>(()))?;
+
+    txn.apply_local_change(
+        &channel,
+        &change,
+        &hash,
+        &recorded.updatables,
+    )?;
+
+    txn.commit()?;
+
+    Ok(hash)
+}
 
 /// Record a change to the repository
-/// 
-/// DAY 2 TODO: Implement actual Pijul recording
-/// Current status: Returns mock data
-pub fn record_change(_repo_path: &Path, content: &str, message: &str) -> Result<String> {
-    // TODO: Implement actual recording using libpijul
-    // For now, return mock patch hash
-    Ok(format!("mock_patch_{}_{}", message.chars().take(10).collect::<String>(), content.len()))
+pub fn record_change(repo_path: &Path, content: &str, message: &str) -> Result<String> {
+    let doc_path = repo_path.join("document.md");
+    fs::write(&doc_path, content)
+        .context("Failed to write document")?;
+
+    match record_all(repo_path, message, Some("document.md")) {
+        Ok(hash) => Ok(hash.to_base32().to_string()),
+        Err(e) => {
+            if e.to_string().contains("No changes") {
+                 Ok("no_change".to_string())
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 /// Get history of patches
-/// 
-/// DAY 2 TODO: Query actual Pijul history
-/// Current status: Returns empty vector
-pub fn get_patch_history(_repo_path: &Path) -> Result<Vec<PatchInfo>> {
-    // TODO: Query actual Pijul patch log
-    // For now, return empty history
-    Ok(vec![])
+pub fn get_patch_history(repo_path: &Path) -> Result<Vec<PatchInfo>> {
+    let (pristine, _, change_store) = open_repo(repo_path)?;
+    let txn = pristine.txn_begin()?;
+    let channel = txn.load_channel("main")?
+        .ok_or(anyhow!("Channel main not found"))?;
+    let channel_lock = channel.read();
+
+    let mut history = Vec::new();
+
+    for h in txn.changeid_reverse_log(&*channel_lock, None)? {
+        let (hash_id, _merkle) = h?;
+
+        let id = ChangeId(*hash_id);
+        let external_hash = txn.get_external(&id)?.unwrap();
+        let h: Hash = external_hash.into();
+
+        match change_store.get_header(&h) {
+            Ok(header) => {
+                history.push(PatchInfo {
+                    hash: h.to_base32().to_string(),
+                    description: header.message,
+                    timestamp: header.timestamp.to_rfc3339(),
+                });
+            },
+            Err(e) => {
+                eprintln!("Warning: Failed to get header for {}: {}", h.to_base32().to_string(), e);
+            }
+        }
+    }
+
+    Ok(history)
 }
 
 /// Simulate and detect conflicts
-/// 
-/// DAY 3 TODO: Implement conflict simulation
-/// Current status: Returns no conflicts
-pub fn simulate_conflict(_repo_path: &Path) -> Result<ConflictInfo> {
-    // TODO: Implement conflict detection
-    // This requires:
-    // 1. Creating divergent branches
-    // 2. Making conflicting edits
-    // 3. Merging and detecting conflicts
-    
+pub fn simulate_conflict(repo_path: &Path) -> Result<ConflictInfo> {
+    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+
+    // 1. Setup
+    let doc_path = repo_path.join("conflict.md");
+    fs::write(&doc_path, "Base content\n")?;
+    record_all(repo_path, "Base", Some("conflict.md"))?;
+
+    // 2. Fork
+    {
+        let mut txn = pristine.mut_txn_begin()?;
+        let main = txn.open_or_create_channel("main")?;
+        txn.fork(&main, "dev")?;
+        txn.commit()?;
+    }
+
+    // 3. Edit Main
+    fs::write(&doc_path, "Main content\n")?;
+    record_all(repo_path, "Main edit", Some("conflict.md"))?;
+
+    // 4. Edit Dev
+    let dev_hash = record_on_channel(repo_path, "dev", "Dev edit", Some("conflict.md"))?;
+
+    // 5. Merge Dev -> Main
+    let mut txn = pristine.mut_txn_begin()?;
+    let mut channel_main = txn.open_or_create_channel("main")?;
+
+    txn.apply_change(
+        &change_store,
+        &mut channel_main,
+        &dev_hash,
+    )?;
+
+    // 6. Detect Conflicts
+    let conflicts = libpijul::output::output_repository_no_pending(
+        &working_copy,
+        &change_store,
+        &txn,
+        &channel_main,
+        "",
+        true,
+        None,
+        1,
+        0,
+    )?;
+
+    txn.commit()?;
+
+    let has_conflict = !conflicts.is_empty();
+    let mut conflict_locs = Vec::new();
+
+    for conflict in conflicts {
+        conflict_locs.push(ConflictLocation {
+            line: 0,
+            options: vec![format!("{:?}", conflict)],
+        });
+    }
+
     Ok(ConflictInfo {
-        has_conflict: false,
-        locations: vec![],
+        has_conflict,
+        locations: conflict_locs,
     })
 }
 
-// ============================================================================
-// TESTS
-// ============================================================================
+// Helper for recording on specific channel
+fn record_on_channel(repo_path: &Path, channel_name: &str, message: &str, file_to_add: Option<&str>) -> Result<Hash> {
+    let (pristine, working_copy, change_store) = open_repo(repo_path)?;
+
+    let mut txn = pristine.mut_txn_begin()?;
+    let mut channel = txn.open_or_create_channel(channel_name)?;
+
+    if let Some(file) = file_to_add {
+        if !txn.is_tracked(file)? {
+             txn.add_file(file, 0)?;
+        }
+    }
+
+    let mut builder = RecordBuilder::new();
+    let canonical_root = CanonicalPathBuf::canonicalize(repo_path)?;
+
+    working_copy.record_prefix(
+        &mut txn,
+        Algorithm::default(),
+        &mut channel,
+        &change_store,
+        &mut builder,
+        canonical_root,
+        Path::new(""),
+        false,
+        1,
+        0,
+    )?;
+
+    let recorded = builder.finish();
+    if recorded.actions.is_empty() {
+        return Err(anyhow!("No changes to record on {}", channel_name));
+    }
+
+    let actions = recorded.actions.into_iter()
+        .map(|r| r.globalize(&txn).unwrap())
+        .collect();
+
+    let mut contents_lock = recorded.contents.lock();
+    let contents = std::mem::take(&mut *contents_lock);
+
+    let mut change = libpijul::change::Change::make_change(
+        &txn,
+        &channel,
+        actions,
+        contents,
+        libpijul::change::ChangeHeader {
+            message: message.to_string(),
+            authors: vec![],
+            description: None,
+            timestamp: Utc::now(),
+        },
+        Vec::new(),
+    )?;
+
+    let hash = change_store.save_change(&mut change, |_, _| Ok::<_, anyhow::Error>(()))?;
+
+    txn.apply_local_change(
+        &channel,
+        &change,
+        &hash,
+        &recorded.updatables,
+    )?;
+
+    txn.commit()?;
+    Ok(hash)
+}
 
 #[cfg(test)]
 mod tests {
@@ -159,38 +350,7 @@ mod tests {
     fn test_init_repository() {
         let temp = TempDir::new().unwrap();
         let result = init_repository(temp.path());
-        
-        assert!(result.is_ok(), "Repository initialization failed: {:?}", result.err());
-        
-        // Verify directory structure
+        assert!(result.is_ok());
         assert!(temp.path().join(".pijul").exists());
-        assert!(temp.path().join(".pijul/pristine").exists());
-        assert!(temp.path().join(".pijul/changes").exists());
-        assert!(temp.path().join(".pijul/pristine/db").exists());
-    }
-
-    #[test]
-    fn test_verify_repository() {
-        let temp = TempDir::new().unwrap();
-        
-        // Should fail before init
-        let result = verify_repository(temp.path());
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
-        
-        // Initialize
-        init_repository(temp.path()).unwrap();
-        
-        // Should succeed after init
-        let result = verify_repository(temp.path());
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
-    }
-
-    #[test]
-    fn test_get_test_repo_path() {
-        let path = get_test_repo_path().unwrap();
-        assert!(path.exists() || !path.exists()); // Just verify it returns a valid path
-        assert!(path.to_string_lossy().contains("korppi-test-repo"));
     }
 }

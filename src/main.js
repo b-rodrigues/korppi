@@ -22,13 +22,13 @@ document.getElementById('test-init').addEventListener('click', async () => {
     const button = document.getElementById('test-init');
     button.disabled = true;
     button.textContent = '⏳ Initializing...';
-    
+
     clearResult('init-result');
-    
+
     try {
         const result = await invoke('test_pijul_init');
         showResult('init-result', result.success, result.message, result.details);
-        
+
         if (result.success) {
             // Celebrate Day 1 completion!
             setTimeout(() => {
@@ -36,7 +36,7 @@ document.getElementById('test-init').addEventListener('click', async () => {
                 celebration.className = 'celebration';
                 celebration.textContent = '🎉 Day 1 Complete! 🎉';
                 document.querySelector('.priority').appendChild(celebration);
-                
+
                 setTimeout(() => celebration.remove(), 3000);
             }, 500);
         }
@@ -52,9 +52,9 @@ document.getElementById('test-init').addEventListener('click', async () => {
 document.getElementById('repo-status').addEventListener('click', async () => {
     const button = document.getElementById('repo-status');
     button.disabled = true;
-    
+
     clearResult('status-result');
-    
+
     try {
         const status = await invoke('get_repo_status');
         showResult('status-result', true, 'Repository Status', status);
@@ -70,20 +70,20 @@ document.getElementById('reset-repo').addEventListener('click', async () => {
     if (!confirm('This will delete the test repository. Continue?')) {
         return;
     }
-    
+
     const button = document.getElementById('reset-repo');
     button.disabled = true;
-    
+
     try {
         const result = await invoke('reset_test_repo');
-        
+
         // Clear all result displays
         clearResult('init-result');
         clearResult('status-result');
         clearResult('record-result');
         clearResult('conflict-result');
         document.getElementById('history').classList.remove('show');
-        
+
         alert('✅ ' + result.message);
     } catch (error) {
         alert('❌ Error resetting repository: ' + error);
@@ -147,10 +147,10 @@ document.getElementById('test-conflict').addEventListener('click', async () => {
 document.getElementById('show-debug').addEventListener('click', async () => {
     const debugOutput = document.getElementById('debug-output');
     debugOutput.style.display = 'block';
-    
+
     try {
         const status = await invoke('get_repo_status');
-        
+
         debugOutput.textContent = `
 Debug Information
 =================

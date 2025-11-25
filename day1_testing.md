@@ -101,13 +101,13 @@ A window should appear showing:
 - Details show:
   ```
   Repository created at: /tmp/korppi-test-repo
-  
+
   Structure:
   - .pijul/ directory created
   - pristine/ database initialized
   - main channel created
   - changes/ directory ready
-  
+
   ✨ Day 1 validation complete!
   ```
 - Celebration animation: "🎉 Day 1 Complete! 🎉"

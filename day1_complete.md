@@ -175,18 +175,18 @@ pub fn init_repository(path: &Path) -> Result<()> {
     // 1. Create directory structure
     let pijul_dir = path.join(".pijul");
     fs::create_dir_all(&pijul_dir)?;
-    
+
     // 2. Initialize pristine database
     let pristine = Pristine::new(&db_path)?;
-    
+
     // 3. Create main channel (CRITICAL!)
     let mut txn = pristine.mut_txn_begin()?;
     txn.open_or_create_channel("main")?;
     txn.commit()?;
-    
+
     // 4. Create changes directory
     fs::create_dir_all(&changes_dir)?;
-    
+
     Ok(())
 }
 ```
@@ -260,8 +260,8 @@ You have **three options** for how to proceed:
 
 ### Option A: Implement Day 2 (Recording)
 
-**Time estimate:** 4-8 hours  
-**Difficulty:** Hard  
+**Time estimate:** 4-8 hours
+**Difficulty:** Hard
 **Risk:** Medium-High
 
 **What you need to do:**
@@ -280,8 +280,8 @@ You have **three options** for how to proceed:
 
 ### Option B: Pivot to Alternative Backend
 
-**Time estimate:** 2-4 hours  
-**Difficulty:** Medium  
+**Time estimate:** 2-4 hours
+**Difficulty:** Medium
 **Risk:** Low
 
 **Alternative options:**
@@ -302,8 +302,8 @@ You have **three options** for how to proceed:
 
 ### Option C: Report Current Status & Plan
 
-**Time estimate:** 1 hour  
-**Difficulty:** Easy  
+**Time estimate:** 1 hour
+**Difficulty:** Easy
 **Risk:** None
 
 **What to do:**
@@ -323,7 +323,7 @@ You have **three options** for how to proceed:
 
 1. **Today:** Celebrate Day 1 success! 🎉
 2. **Tomorrow morning:** Attempt Day 2 for 4 hours max
-3. **Tomorrow afternoon:** 
+3. **Tomorrow afternoon:**
    - If Day 2 works: Continue with Day 3
    - If Day 2 blocked: Team discussion about pivoting
 
