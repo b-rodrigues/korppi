@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use tauri::AppHandle;
-use tauri::Manager; // needed for app path access
+use tauri::Manager;
 
 const FILENAME: &str = "document.yjs";
 
@@ -20,19 +20,18 @@ pub fn load_doc(app: AppHandle) -> Result<Vec<u8>, String> {
     if path.exists() {
         fs::read(path).map_err(|e| e.to_string())
     } else {
-        Ok(Vec::new()) // empty document
+        Ok(Vec::new())
     }
 }
 
 #[tauri::command]
-pub fn store_update(app: AppHandle, update: Vec<u8>) -> Result<(), String> {
+pub fn store_update(app: AppHandle, full_state: Vec<u8>) -> Result<(), String> {
     let path = doc_path(&app);
-
-    // Append updates — future-proof for sync/merging
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .and_then(|mut file| std::io::Write::write_all(&mut file, &update))
+    
+    // Write atomically using a temporary file
+    let temp_path = path.with_extension("yjs.tmp");
+    
+    fs::write(&temp_path, &full_state)
+        .and_then(|_| fs::rename(&temp_path, &path))
         .map_err(|e| e.to_string())
 }
