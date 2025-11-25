@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korppi Prototype - Day 1</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🦀 Korppi Prototype</h1>
+            <p>Pijul Validation Tests - Day 1 Focus</p>
+        </header>
+
+        <!-- DAY 1: Initialization Test (PRIORITY) -->
+        <section class="test-section priority">
+            <h2>🎯 Day 1: Initialization Test (Current Focus)</h2>
+            <p>This test verifies that Pijul can create a repository structure in Tauri.</p>
+
+            <div class="button-group">
+                <button id="test-init" class="primary">▶️ Test Pijul Init</button>
+                <button id="repo-status">📊 Check Repository Status</button>
+                <button id="reset-repo" class="danger">🗑️ Reset Repository</button>
+            </div>
+
+            <div id="init-result" class="result"></div>
+            <div id="status-result" class="result"></div>
+        </section>
+
+        <!-- Success Criteria -->
+        <section class="info-section">
+            <h3>✅ Day 1 Success Criteria</h3>
+            <ul>
+                <li><strong>Repository structure created:</strong> .pijul/ directory with pristine/ and changes/</li>
+                <li><strong>Database initialized:</strong> pristine/db file exists</li>
+                <li><strong>Main channel created:</strong> Can open the repository without errors</li>
+                <li><strong>No compilation errors:</strong> Rust code compiles and runs</li>
+            </ul>
+        </section>
+
+        <!-- DAY 2: Recording Changes (Placeholder) -->
+        <section class="test-section disabled">
+            <h2>⏳ Day 2: Recording Changes (Not Yet Implemented)</h2>
+            <p>This section will test change recording once Day 1 is complete.</p>
+
+            <textarea id="content" placeholder="Type some text..." disabled>Hello, world!</textarea>
+            <input type="text" id="message" placeholder="Commit message" value="Test commit" disabled>
+
+            <div class="button-group">
+                <button id="record-change" disabled>Record Change (Day 2)</button>
+                <button id="show-history" disabled>Show History (Day 2)</button>
+            </div>
+
+            <div id="record-result" class="result"></div>
+            <pre id="history" class="history"></pre>
+
+            <div class="info-box">
+                <strong>📝 Day 2 TODO:</strong>
+                <ul>
+                    <li>Implement file writing to working copy</li>
+                    <li>Call Pijul recording API</li>
+                    <li>Generate real patch hashes</li>
+                    <li>Query patch history</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- DAY 3: Conflict Detection (Placeholder) -->
+        <section class="test-section disabled">
+            <h2>⏳ Day 3: Conflict Detection (Not Yet Implemented)</h2>
+            <p>This section will test conflict detection once Day 2 is complete.</p>
+
+            <button id="test-conflict" disabled>Simulate Conflict (Day 3)</button>
+            <div id="conflict-result" class="result"></div>
+
+            <div class="info-box">
+                <strong>📝 Day 3 TODO:</strong>
+                <ul>
+                    <li>Create divergent branches</li>
+                    <li>Make conflicting edits</li>
+                    <li>Merge and detect conflicts</li>
+                    <li>Parse conflict format</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Debug Information -->
+        <section class="debug-section">
+            <h3>🔍 Debug Information</h3>
+            <p>Use this to troubleshoot issues</p>
+            <button id="show-debug">Show Debug Info</button>
+            <pre id="debug-output" class="debug-output"></pre>
+        </section>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
