@@ -1,7 +1,7 @@
 {
   "name": "korppi-prototype",
   "version": "0.1.0",
-  "description": "Korppi Pijul validation prototype",
+  "description": "Korppi validation prototype",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
@@ -12,6 +12,7 @@
     "@milkdown/prose": "^7.0.0",
     "@milkdown/preset-commonmark": "^7.0.0",
     "@milkdown/theme-nord": "^7.0.0",
+    "@tauri-apps/api": "^1.5.0",
     "yjs": "^13.6.0",
     "y-prosemirror": "^1.0.20"
   },
