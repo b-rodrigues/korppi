@@ -1,6 +1,7 @@
 // src/patch-grouper.js
 
 const TIME_WINDOW_MS = 600; // grouping horizon in ms
+const MAX_GROUP_SIZE = 100; // prevent unbounded growth
 
 let currentGroup = null;
 
@@ -34,8 +35,8 @@ export function addSemanticPatches(patches, author = "local") {
 
     const timeGap = now - currentGroup.lastTimestamp;
 
-    // Simple rule: if we paused too long, start a new group
-    if (timeGap > TIME_WINDOW_MS) {
+    // Flush if: time gap too large OR group too large
+    if (timeGap > TIME_WINDOW_MS || currentGroup.patches.length >= MAX_GROUP_SIZE) {
       recordToFlush = buildRecord(currentGroup);
       currentGroup = {
         author,
@@ -53,9 +54,29 @@ export function addSemanticPatches(patches, author = "local") {
 }
 
 // Force-flush any open group (e.g. on blur/beforeunload).
+// Returns null if no group exists.
 export function flushGroup(author = "local") {
   if (!currentGroup) return null;
-  const record = buildRecord(currentGroup);
-  currentGroup = null;
-  return record;
+  
+  try {
+    const record = buildRecord(currentGroup);
+    return record;
+  } finally {
+    // Always clear the group, even if building the record fails
+    currentGroup = null;
+  }
+}
+
+// Get current group stats (for debugging)
+export function getGroupStats() {
+  if (!currentGroup) {
+    return { active: false };
+  }
+  
+  return {
+    active: true,
+    patchCount: currentGroup.patches.length,
+    ageMs: Date.now() - currentGroup.startTimestamp,
+    author: currentGroup.author,
+  };
 }
