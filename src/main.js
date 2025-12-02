@@ -1,8 +1,12 @@
 import "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
+import { initProfileSettings } from "./profile-settings.js";
 
 window.addEventListener("DOMContentLoaded", async () => {
+    // Initialize profile settings UI
+    initProfileSettings();
+
     // Initialize conflict UI
     initConflictUI();
 

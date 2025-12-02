@@ -11,6 +11,7 @@
     <div class="container">
         <header>
             <h1>🦀 Korppi Collaborative Editor</h1>
+            <button id="settings-btn" class="header-btn">⚙️ Settings</button>
         </header>
         <div id="editor"></div>
     </div>
@@ -38,6 +39,40 @@
         "></div>
 
         <div id="timeline-details"></div>
+    </div>
+
+    <!-- Profile Settings Modal -->
+    <div id="profile-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Profile Settings</h2>
+                <button id="profile-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="profile-name">Name <span class="required">*</span></label>
+                    <input type="text" id="profile-name" placeholder="Your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="profile-email">Email (optional)</label>
+                    <input type="email" id="profile-email" placeholder="your.email@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="profile-color">Author Highlight Color</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="profile-color" value="#3498db">
+                        <span id="profile-color-value">#3498db</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Profile ID</label>
+                    <span id="profile-id" class="profile-id-display"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="profile-save-btn" class="primary">Save Profile</button>
+            </div>
+        </div>
     </div>
 </body>
 </html>

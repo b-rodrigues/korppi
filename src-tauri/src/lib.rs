@@ -4,10 +4,12 @@ pub mod models;
 pub mod conflict_detector;
 pub mod conflict_store;
 pub mod conflict_commands;
+pub mod profile;
 
 use patch_log::{list_patches, record_patch, get_patch};
 use yjs_store::{load_doc, store_update};
 use conflict_commands::{detect_conflicts, get_conflicts, resolve_conflict, get_conflict_count};
+use profile::{get_profile, save_profile, get_profile_path};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,6 +29,9 @@ pub fn run() {
             get_conflicts,
             resolve_conflict,
             get_conflict_count,
+            get_profile,
+            save_profile,
+            get_profile_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
