@@ -1,5 +1,5 @@
 {
-  description = "Korppi - Local-first collaborative writing tool with Pijul version control";
+  description = "Korppi - Local-first collaborative markdown editor with CRDT sync and patch history";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
