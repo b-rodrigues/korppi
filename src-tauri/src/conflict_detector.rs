@@ -50,8 +50,6 @@ impl ConflictDetector {
         for patch in patches.iter().skip(1) {
             if patch.timestamp - group_start <= self.concurrency_window {
                 current_group.push(patch);
-                // Update group_start to allow chaining (sliding window)
-                group_start = patch.timestamp;
             } else {
                 if !current_group.is_empty() {
                     groups.push(current_group);
@@ -184,7 +182,7 @@ impl ConflictDetector {
         };
 
         Conflict {
-            id: format!("{}-{}-{}", local.timestamp, remote.timestamp, local.start),
+            id: format!("{}-{}-{}-{}", local.timestamp, remote.timestamp, local.start, local.author),
             conflict_type,
             base_version: TextSpan {
                 start: local.start.min(remote.start),
