@@ -1,7 +1,12 @@
 import "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails } from "./timeline.js";
+import { initConflictUI } from "./conflict-ui.js";
 
 window.addEventListener("DOMContentLoaded", async () => {
+    // Initialize conflict UI
+    initConflictUI();
+
+    // Timeline code...
     const toggle = document.getElementById("timeline-toggle");
     const container = document.getElementById("timeline-container");
     const list = document.getElementById("timeline-list");
