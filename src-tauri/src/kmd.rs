@@ -251,9 +251,6 @@ pub fn export_kmd(app: AppHandle, path: String) -> Result<DocumentMeta, String> 
     let yjs_path = get_yjs_path(&app);
     let history_path = get_history_path(&app);
 
-    // Create temporary directory for building the archive
-    let temp_dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-
     // Load or create document metadata
     let mut meta = load_or_create_meta(&app)?;
 
@@ -334,39 +331,58 @@ pub fn export_kmd(app: AppHandle, path: String) -> Result<DocumentMeta, String> 
     // Save updated metadata
     save_meta(&app, &meta)?;
 
-    // Clean up temp directory (automatic on drop)
-    drop(temp_dir);
-
     Ok(meta)
 }
 
 /// Check if the KMD version is compatible
 fn check_version_compatibility(format_info: &FormatInfo) -> Result<(), String> {
-    // Simple version check: parse as semver-like
-    let min_version: Vec<u32> = format_info
-        .min_reader_version
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
-
-    let our_version: Vec<u32> = KMD_VERSION
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
-
-    if min_version.len() < 3 || our_version.len() < 3 {
-        return Err("Invalid version format".to_string());
+    // Simple version check: parse as semver-like (handles 0.1.0, 1.0, 2.0.0-beta.1, etc.)
+    // Extract major.minor.patch numbers, treating missing parts as 0
+    fn parse_version(v: &str) -> (u32, u32, u32) {
+        let parts: Vec<u32> = v
+            .split('.')
+            .take(3)
+            .map(|s| {
+                // Handle prerelease suffixes like "0-beta" by taking only the numeric part
+                s.split('-')
+                    .next()
+                    .unwrap_or("0")
+                    .parse()
+                    .unwrap_or(0)
+            })
+            .collect();
+        (
+            *parts.first().unwrap_or(&0),
+            *parts.get(1).unwrap_or(&0),
+            *parts.get(2).unwrap_or(&0),
+        )
     }
 
+    let min_version = parse_version(&format_info.min_reader_version);
+    let our_version = parse_version(KMD_VERSION);
+
     // Check major.minor.patch compatibility
-    if min_version[0] > our_version[0] {
+    // Major version must match or be higher
+    if min_version.0 > our_version.0 {
         return Err(format!(
             "KMD version {} requires reader version {} or higher. Current: {}",
             format_info.kmd_version, format_info.min_reader_version, KMD_VERSION
         ));
     }
 
-    if min_version[0] == our_version[0] && min_version[1] > our_version[1] {
+    // If major matches, check minor
+    if min_version.0 == our_version.0 && min_version.1 > our_version.1 {
+        return Err(format!(
+            "KMD version {} requires reader version {} or higher. Current: {}",
+            format_info.kmd_version, format_info.min_reader_version, KMD_VERSION
+        ));
+    }
+
+    // If major.minor matches, check patch
+    if min_version.0 == our_version.0
+        && min_version.1 == our_version.1
+        && min_version.2 > our_version.2
+    {
         return Err(format!(
             "KMD version {} requires reader version {} or higher. Current: {}",
             format_info.kmd_version, format_info.min_reader_version, KMD_VERSION
@@ -601,6 +617,36 @@ mod tests {
         let format = FormatInfo {
             kmd_version: "0.1.0".to_string(),
             min_reader_version: "0.1.0".to_string(),
+            created_by: CreatedBy {
+                app: "test".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            compression: "deflate".to_string(),
+        };
+        assert!(check_version_compatibility(&format).is_ok());
+    }
+
+    #[test]
+    fn test_version_compatibility_short_version() {
+        // Test with short version like "0.1" instead of "0.1.0"
+        let format = FormatInfo {
+            kmd_version: "0.1".to_string(),
+            min_reader_version: "0.1".to_string(),
+            created_by: CreatedBy {
+                app: "test".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            compression: "deflate".to_string(),
+        };
+        assert!(check_version_compatibility(&format).is_ok());
+    }
+
+    #[test]
+    fn test_version_compatibility_prerelease() {
+        // Test with prerelease version like "0.1.0-beta.1"
+        let format = FormatInfo {
+            kmd_version: "0.1.0-beta.1".to_string(),
+            min_reader_version: "0.1.0-beta.1".to_string(),
             created_by: CreatedBy {
                 app: "test".to_string(),
                 version: "1.0.0".to_string(),

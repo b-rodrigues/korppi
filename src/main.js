@@ -46,7 +46,11 @@ window.addEventListener("DOMContentLoaded", async () => {
                 const meta = await importDocument();
                 if (meta) {
                     console.log("Imported document:", meta.title);
-                    // Reload to apply the imported state
+                    // Reload to apply the imported Yjs state.
+                    // TODO: In the future, consider implementing a more graceful
+                    // refresh mechanism that reinitializes Yjs without full page reload.
+                    // This would preserve UI state better, but requires careful handling
+                    // of the Yjs document merge and editor re-sync.
                     location.reload();
                 }
             } catch (err) {
