@@ -1977,6 +1977,7 @@ dependencies = [
  "anyhow",
  "canonical-path",
  "chrono",
+ "dirs",
  "env_logger",
  "ignore",
  "log",
@@ -1989,6 +1990,8 @@ dependencies = [
  "tauri-plugin-opener",
  "tempfile",
  "thiserror 1.0.69",
+ "toml 0.8.2",
+ "uuid",
 ]
 
 [[package]]

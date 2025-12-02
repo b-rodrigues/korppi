@@ -1,5 +1,7 @@
 // src/patch-grouper.js
 
+import { getAuthorId } from "./profile-service.js";
+
 const TIME_WINDOW_MS = 600; // grouping horizon in ms
 const MAX_GROUP_SIZE = 100; // prevent unbounded growth
 
@@ -16,16 +18,18 @@ function buildRecord(group) {
 
 // Add one or more semantic patches (from one transaction).
 // Returns a patchRecord if a group was flushed, or null otherwise.
-export function addSemanticPatches(patches, author = "local") {
+export function addSemanticPatches(patches, author = null) {
   if (!patches || patches.length === 0) return null;
 
+  // Use the cached profile author ID if not provided
+  const authorId = author !== null ? author : getAuthorId();
   const now = Date.now();
   let recordToFlush = null;
 
   for (const p of patches) {
     if (!currentGroup) {
       currentGroup = {
-        author,
+        author: authorId,
         startTimestamp: now,
         lastTimestamp: now,
         patches: [p],
@@ -39,7 +43,7 @@ export function addSemanticPatches(patches, author = "local") {
     if (timeGap > TIME_WINDOW_MS || currentGroup.patches.length >= MAX_GROUP_SIZE) {
       recordToFlush = buildRecord(currentGroup);
       currentGroup = {
-        author,
+        author: authorId,
         startTimestamp: now,
         lastTimestamp: now,
         patches: [p],
@@ -55,10 +59,14 @@ export function addSemanticPatches(patches, author = "local") {
 
 // Force-flush any open group (e.g. on blur/beforeunload).
 // Returns null if no group exists.
-export function flushGroup(author = "local") {
+export function flushGroup(author = null) {
   if (!currentGroup) return null;
   
   try {
+    // Update author if provided (for backwards compatibility)
+    if (author !== null) {
+      currentGroup.author = author;
+    }
     const record = buildRecord(currentGroup);
     return record;
   } finally {

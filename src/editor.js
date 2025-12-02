@@ -14,10 +14,16 @@ import {
     addSemanticPatches,
     flushGroup
 } from "./patch-grouper.js";
+import { initProfile } from "./profile-service.js";
 
 // ---------------------------------------------------------------------------
-//  Initialize Yjs document state before creating the editor.
+//  Initialize profile and Yjs document state before creating the editor.
 // ---------------------------------------------------------------------------
+try {
+    await initProfile();
+} catch (err) {
+    console.warn("Failed to initialize profile, using defaults:", err);
+}
 await loadInitialDoc();
 enablePersistence();
 
@@ -66,8 +72,8 @@ editor.action((ctx) => {
 
             if (semanticPatches.length === 0) return;
 
-            // Feed semantic patches into the grouper
-            const groupedRecord = addSemanticPatches(semanticPatches, "local");
+            // Feed semantic patches into the grouper (author is now pulled from profile)
+            const groupedRecord = addSemanticPatches(semanticPatches);
 
             // Only when the grouper flushes do we persist to SQLite
             if (groupedRecord) {
@@ -99,7 +105,7 @@ editor.action((ctx) => {
 
 // On window blur: flush semantic group + force Yjs save
 window.addEventListener("blur", () => {
-    const record = flushGroup("local");
+    const record = flushGroup();
     if (record) {
         invoke("record_patch", { patch: record }).catch((err) => {
             console.error("Failed to record grouped patch on blur:", err);
@@ -111,7 +117,7 @@ window.addEventListener("blur", () => {
 // On tab hide (user switches tab)
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-        const record = flushGroup("local");
+        const record = flushGroup();
         if (record) {
             invoke("record_patch", { patch: record }).catch(() => {});
         }
@@ -121,7 +127,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Last resort: before page unload.
 window.addEventListener("beforeunload", () => {
-    const record = flushGroup("local");
+    const record = flushGroup();
     if (record) {
         // Fire and forget — cannot guarantee async execution
         invoke("record_patch", { patch: record }).catch(() => {});
