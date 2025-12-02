@@ -2,13 +2,12 @@
 use std::fs;
 use std::path::PathBuf;
 
-use tauri::AppHandle;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 
 const FILENAME: &str = "document.yjs";
 
 fn doc_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path_resolver().app_data_dir().unwrap();
+    let mut path = app.path().app_data_dir().unwrap();
     fs::create_dir_all(&path).ok();
     path.push(FILENAME);
     path

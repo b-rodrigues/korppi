@@ -12,11 +12,13 @@
     "@milkdown/prose": "^7.0.0",
     "@milkdown/preset-commonmark": "^7.0.0",
     "@milkdown/theme-nord": "^7.0.0",
-    "@tauri-apps/api": "^1.5.0",
+    "@milkdown/plugin-listener": "^7.0.0",
+    "@milkdown/kit": "^7.0.0",
+    "@tauri-apps/api": "^2.0.0",
     "yjs": "^13.6.0",
     "y-prosemirror": "^1.0.20"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^1.5.9"
+    "@tauri-apps/cli": "^2.0.0"
   }
 }

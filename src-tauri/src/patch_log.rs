@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 fn db_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path_resolver().app_data_dir().unwrap();
+    let mut path = app.path().app_data_dir().unwrap();
     std::fs::create_dir_all(&path).ok();
     path.push("korppi_history.db");
     path

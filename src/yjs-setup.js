@@ -1,6 +1,6 @@
 // src/yjs-setup.js
 import * as Y from "yjs";
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke } from "@tauri-apps/api/core";
 
 export const ydoc = new Y.Doc();
 export const yXmlFragment = ydoc.getXmlFragment("prosemirror");
