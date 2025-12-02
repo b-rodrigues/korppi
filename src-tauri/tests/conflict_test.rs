@@ -1,0 +1,114 @@
+use korppi_prototype::conflict_detector::ConflictDetector;
+use korppi_prototype::patch_log::Patch;
+use serde_json::json;
+use korppi_prototype::models::ConflictType;
+
+#[test]
+fn test_overlapping_edit_detection() {
+    let detector = ConflictDetector::new(5000);
+
+    let patches = vec![
+        Patch {
+            id: 1,
+            timestamp: 1000,
+            author: "alice".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "replace_text",
+                "range": [10, 20],
+                "deletedText": "old text",
+                "insertedText": "alice's edit"
+            }]),
+        },
+        Patch {
+            id: 2,
+            timestamp: 1500, // Within 5s window
+            author: "bob".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "replace_text",
+                "range": [15, 25],
+                "deletedText": "xt here",
+                "insertedText": "bob's edit"
+            }]),
+        },
+    ];
+
+    let conflicts = detector.detect_conflicts(&patches);
+
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].local_version.author, "alice");
+    assert_eq!(conflicts[0].remote_version.author, "bob");
+}
+
+#[test]
+fn test_no_conflict_different_regions() {
+    let detector = ConflictDetector::new(5000);
+
+    let patches = vec![
+        Patch {
+            id: 1,
+            timestamp: 1000,
+            author: "alice".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "insert_text",
+                "at": 10,
+                "insertedText": "hello"
+            }]),
+        },
+        Patch {
+            id: 2,
+            timestamp: 1500,
+            author: "bob".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "insert_text",
+                "at": 100, // Different position
+                "insertedText": "world"
+            }]),
+        },
+    ];
+
+    let conflicts = detector.detect_conflicts(&patches);
+
+    assert_eq!(conflicts.len(), 0);
+}
+
+#[test]
+fn test_concurrent_insert_same_position() {
+    let detector = ConflictDetector::new(5000);
+
+    let patches = vec![
+        Patch {
+            id: 1,
+            timestamp: 1000,
+            author: "alice".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "insert_text",
+                "at": 50,
+                "insertedText": "alice first"
+            }]),
+        },
+        Patch {
+            id: 2,
+            timestamp: 1200,
+            author: "bob".to_string(),
+            kind: "semantic_group".to_string(),
+            data: json!([{
+                "kind": "insert_text",
+                "at": 50, // Same position!
+                "insertedText": "bob first"
+            }]),
+        },
+    ];
+
+    let conflicts = detector.detect_conflicts(&patches);
+
+    assert_eq!(conflicts.len(), 1);
+    match conflicts[0].conflict_type {
+        ConflictType::ConcurrentInsert => {}
+        _ => panic!("Expected ConcurrentInsert conflict type"),
+    }
+}
