@@ -19,7 +19,11 @@ import { initProfile } from "./profile-service.js";
 // ---------------------------------------------------------------------------
 //  Initialize profile and Yjs document state before creating the editor.
 // ---------------------------------------------------------------------------
-await initProfile();
+try {
+    await initProfile();
+} catch (err) {
+    console.warn("Failed to initialize profile, using defaults:", err);
+}
 await loadInitialDoc();
 enablePersistence();
 

@@ -254,6 +254,13 @@ textarea {
     color: #fff;
 }
 
+.modal-close:focus,
+.modal-close:focus-visible {
+    color: #fff;
+    outline: 2px solid #4fc3f7;
+    outline-offset: 2px;
+}
+
 .modal-body {
     padding: 24px;
 }
