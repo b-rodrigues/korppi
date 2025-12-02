@@ -44,7 +44,7 @@
 
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
           # Tauri dependencies
-          webkitgtk
+          webkitgtk_6_0
           gtk3
           cairo
           gdk-pixbuf
@@ -56,7 +56,7 @@
           # Additional UI libraries
           pango
           atk
-          libsoup
+          libsoup_3
 
           # Development tools
           pkg-config
