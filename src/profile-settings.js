@@ -66,9 +66,11 @@ async function checkFirstRun() {
     const profile = getCachedProfile();
     if (profile && !profile.name) {
         // First run - open settings modal to prompt for name
+        // Brief delay to allow the UI to fully render before showing modal
+        const FIRST_RUN_DELAY_MS = 500;
         setTimeout(() => {
             openModal();
-        }, 500);
+        }, FIRST_RUN_DELAY_MS);
     }
 }
 
@@ -116,12 +118,13 @@ async function handleSave() {
         return;
     }
 
-    // Get current profile to preserve ID
+    // Get current profile to preserve ID (backend generates UUID by default)
     const currentProfile = getCachedProfile() || {};
     
     // Build updated profile
+    // Note: ID should already be set by backend; fallback is for edge cases only
     const profile = {
-        id: currentProfile.id || crypto.randomUUID?.() || generateUUID(),
+        id: currentProfile.id,
         name: name,
         email: emailInput.value.trim() || null,
         avatar_path: currentProfile.avatar_path || null,
@@ -135,15 +138,4 @@ async function handleSave() {
         console.error("Failed to save profile:", err);
         alert("Failed to save profile: " + err);
     }
-}
-
-/**
- * Fallback UUID generator for older browsers
- */
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
 }

@@ -46,12 +46,16 @@ export function getCachedProfile() {
 /**
  * Get the author ID for patch attribution.
  * Returns the profile ID if available, otherwise a temporary ID.
+ * Note: The profile should be initialized via initProfile() before calling this.
  * @returns {string} The author ID
  */
 export function getAuthorId() {
     if (cachedProfile && cachedProfile.id) {
         return cachedProfile.id;
     }
+    // Fallback to "local" if profile hasn't been loaded yet
+    // This ensures backwards compatibility and prevents errors
+    console.warn("Profile not loaded yet, using 'local' as author ID");
     return "local";
 }
 
