@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct PatchInfo {
     pub hash: String,
     pub description: String,
@@ -8,12 +9,14 @@ pub struct PatchInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ConflictInfo {
     pub has_conflict: bool,
     pub locations: Vec<ConflictLocation>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct ConflictLocation {
     pub path: String,
     pub line: Option<usize>,
@@ -22,6 +25,7 @@ pub struct ConflictLocation {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct TestResult {
     pub success: bool,
     pub message: String,

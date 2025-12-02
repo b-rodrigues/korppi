@@ -50,6 +50,8 @@ impl ConflictDetector {
         for patch in patches.iter().skip(1) {
             if patch.timestamp - group_start <= self.concurrency_window {
                 current_group.push(patch);
+                // Update group_start to allow chaining (sliding window)
+                group_start = patch.timestamp;
             } else {
                 if !current_group.is_empty() {
                     groups.push(current_group);
@@ -72,7 +74,7 @@ impl ConflictDetector {
         // Extract ranges from patch data
         let edits: Vec<EditInfo> = patches
             .iter()
-            .filter_map(|p| self.extract_edit_info(p))
+            .flat_map(|p| self.extract_all_edit_infos(p))
             .collect();
 
         // Compare all pairs
@@ -92,67 +94,74 @@ impl ConflictDetector {
         conflicts
     }
 
-    fn extract_edit_info(&self, patch: &Patch) -> Option<EditInfo> {
+    fn extract_all_edit_infos(&self, patch: &Patch) -> Vec<EditInfo> {
+        let mut edits = Vec::new();
         let data = &patch.data;
 
         // Handle semantic_group patches (array of operations)
         if let Some(ops) = data.as_array() {
             for op in ops {
-                if let Some(kind) = op.get("kind").and_then(|k| k.as_str()) {
-                    match kind {
-                        "insert_text" => {
-                            let at = op.get("at").and_then(|v| v.as_u64())? as usize;
-                            let text = op.get("insertedText").and_then(|v| v.as_str())?;
-                            return Some(EditInfo {
-                                start: at,
-                                end: at,
-                                content: text.to_string(),
-                                author: patch.author.clone(),
-                                timestamp: patch.timestamp,
-                                edit_type: EditType::Insert,
-                            });
-                        }
-                        "delete_text" => {
-                            let range = op.get("range").and_then(|v| v.as_array())?;
-                            let start = range.get(0).and_then(|v| v.as_u64())? as usize;
-                            let end = range.get(1).and_then(|v| v.as_u64())? as usize;
-                            let deleted = op.get("deletedText")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            return Some(EditInfo {
-                                start,
-                                end,
-                                content: deleted,
-                                author: patch.author.clone(),
-                                timestamp: patch.timestamp,
-                                edit_type: EditType::Delete,
-                            });
-                        }
-                        "replace_text" => {
-                            let range = op.get("range").and_then(|v| v.as_array())?;
-                            let start = range.get(0).and_then(|v| v.as_u64())? as usize;
-                            let end = range.get(1).and_then(|v| v.as_u64())? as usize;
-                            let inserted = op.get("insertedText")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            return Some(EditInfo {
-                                start,
-                                end,
-                                content: inserted,
-                                author: patch.author.clone(),
-                                timestamp: patch.timestamp,
-                                edit_type: EditType::Replace,
-                            });
-                        }
-                        _ => continue,
-                    }
+                if let Some(edit) = self.parse_single_operation(op, patch) {
+                    edits.push(edit);
                 }
             }
         }
 
-        None
+        edits
+    }
+
+    fn parse_single_operation(&self, op: &serde_json::Value, patch: &Patch) -> Option<EditInfo> {
+        let kind = op.get("kind").and_then(|k| k.as_str())?;
+
+        match kind {
+            "insert_text" => {
+                let at = op.get("at").and_then(|v| v.as_u64())? as usize;
+                let text = op.get("insertedText").and_then(|v| v.as_str())?;
+                Some(EditInfo {
+                    start: at,
+                    end: at,
+                    content: text.to_string(),
+                    author: patch.author.clone(),
+                    timestamp: patch.timestamp,
+                    edit_type: EditType::Insert,
+                })
+            }
+            "delete_text" => {
+                let range = op.get("range").and_then(|v| v.as_array())?;
+                let start = range.get(0).and_then(|v| v.as_u64())? as usize;
+                let end = range.get(1).and_then(|v| v.as_u64())? as usize;
+                let deleted = op.get("deletedText")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Some(EditInfo {
+                    start,
+                    end,
+                    content: deleted,
+                    author: patch.author.clone(),
+                    timestamp: patch.timestamp,
+                    edit_type: EditType::Delete,
+                })
+            }
+            "replace_text" => {
+                let range = op.get("range").and_then(|v| v.as_array())?;
+                let start = range.get(0).and_then(|v| v.as_u64())? as usize;
+                let end = range.get(1).and_then(|v| v.as_u64())? as usize;
+                let inserted = op.get("insertedText")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Some(EditInfo {
+                    start,
+                    end,
+                    content: inserted,
+                    author: patch.author.clone(),
+                    timestamp: patch.timestamp,
+                    edit_type: EditType::Replace,
+                })
+            }
+            _ => None,
+        }
     }
 
     fn ranges_overlap(&self, a: &EditInfo, b: &EditInfo) -> bool {
