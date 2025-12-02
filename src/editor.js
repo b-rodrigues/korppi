@@ -1,194 +1,74 @@
-// src/editor.js
-import {
-  ydoc,
-  yXmlFragment,
-  loadInitialDoc,
-  enablePersistence,
-  beginApplyingDiskUpdates,
-  endApplyingDiskUpdates,
-  forceSave
-} from "./yjs-setup.js";
+// editor.js — Clean unified version
 
 import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
-import { nord } from "@milkdown/theme-nord";
+import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
-import { prosemirrorCtx } from "@milkdown/prose";
-import { invoke } from "@tauri-apps/api/tauri";
-import { Plugin } from "@milkdown/prose/state";
-import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
+import { invoke } from "@tauri-apps/api/core";
+
+import { ydoc, yXmlFragment, loadInitialDoc, forceSave } from "./yjs-setup.js";
 import { stepToSemanticPatch } from "./patch-extractor.js";
-import { addSemanticPatches, flushGroup } from "./patch-grouper.js";
+import {
+    addSemanticPatches,
+    flushGroup
+} from "./patch-grouper.js";
 
-async function setupEditor() {
-  const mount = document.getElementById("editor");
+// ---------------------------------------------------------------------------
+//  Initialize Yjs document state before creating the editor.
+// ---------------------------------------------------------------------------
+await loadInitialDoc();
 
-  // Ensure proper sequencing with try/finally
-  beginApplyingDiskUpdates();
-  try {
-    await loadInitialDoc();
-  } finally {
-    endApplyingDiskUpdates();
-  }
-
-  // Only enable persistence after loading is complete
-  enablePersistence();
-
-  const editor = await Editor.make()
+// ---------------------------------------------------------------------------
+//  Create the Milkdown editor with Yjs + semantic patch logging.
+// ---------------------------------------------------------------------------
+export const editor = await Editor.make()
     .config((ctx) => {
-      ctx.set(rootCtx, mount);
-      ctx.set(defaultValueCtx, "");
+        ctx.set(rootCtx, document.getElementById("editor"));
+        ctx.set(defaultValueCtx, "");
+
+        ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
+            // This ensures Markdown export stays in sync.
+            const event = new CustomEvent("markdown-updated", {
+                detail: { markdown, prevMarkdown },
+            });
+            window.dispatchEvent(event);
+        });
     })
-    .use(nord)
     .use(commonmark)
+    .use(listener)
     .create();
 
-  editor.action((ctx) => {
-    const view = ctx.get(prosemirrorCtx);
-    const state = view.state;
+// ---------------------------------------------------------------------------
+//  Lifecycle integration — ensure we flush + save on loss of focus.
+// ---------------------------------------------------------------------------
 
-    const patchLoggerPlugin = new Plugin({
-      appendTransaction(transactions, oldState, newState) {
-        if (!transactions.length) return;
-
-        const semanticPatches = [];
-
-        for (const tr of transactions) {
-          // Skip transactions from Yjs sync to avoid logging remote changes twice
-          if (tr.getMeta('y-sync$')) continue;
-
-          for (const step of tr.steps) {
-            const semantic = stepToSemanticPatch(step, oldState, newState);
-            semanticPatches.push(semantic);
-          }
-        }
-
-        if (semanticPatches.length === 0) return;
-
-        const groupedRecord = addSemanticPatches(semanticPatches, "local");
-
-        if (groupedRecord) {
-          invoke("record_patch", { patch: groupedRecord }).catch((err) => {
-            console.error("Failed to record grouped patch:", err);
-          });
-        }
-
-        return null;
-      },
-    });
-
-    const newState = state.reconfigure({
-      ...state,
-      plugins: [
-        ...state.plugins,
-        ySyncPlugin(yXmlFragment),
-        yUndoPlugin(),
-        patchLoggerPlugin,
-      ],
-    });
-
-    view.updateState(newState);
-  });
-}
-
-setupEditor();
-
-// Handle window blur - flush pending groups and save
-window.addEventListener("blur", async () => {
-  const record = flushGroup("local");
-  if (record) {
-    await invoke("record_patch", { patch: record }).catch((err) => {
-      console.error("Failed to record grouped patch on blur:", err);
-    });
-  }
-  
-  // Also force save Yjs state
-  await forceSave().catch((err) => {
-    console.error("Failed to save on blur:", err);
-  });
-});
-
-// Use visibilitychange instead of beforeunload (more reliable)
-document.addEventListener("visibilitychange", async () => {
-  if (document.hidden) {
+// On window blur: flush semantic group + force Yjs save
+window.addEventListener("blur", () => {
     const record = flushGroup("local");
     if (record) {
-      await invoke("record_patch", { patch: record }).catch(() => {});
+        invoke("record_patch", { patch: record }).catch((err) => {
+            console.error("Failed to record grouped patch on blur:", err);
+        });
     }
-    await forceSave().catch(() => {});
-  }
+    forceSave();
 });
 
-// Still keep beforeunload as fallback, but use navigator.sendBeacon pattern
-window.addEventListener("beforeunload", (event) => {
-  // Flush group synchronously
-  const record = flushGroup("local");
-  if (record) {
-    // Use keepalive fetch if available
-    const blob = new Blob([JSON.stringify(record)], { type: 'application/json' });
-    // Note: This won't work with Tauri IPC, but shows the pattern
-    // In Tauri, rely on visibilitychange instead
-  }
-});
-  editor.action((ctx) => {
-    const view = ctx.get(prosemirrorCtx);
-    const state = view.state;
-
-    const patchLoggerPlugin = new Plugin({
-        appendTransaction(transactions, oldState, newState) {
-            if (!transactions.length) return;
-
-            const semanticPatches = [];
-
-            for (const tr of transactions) {
-                for (const step of tr.steps) {
-                    const semantic = stepToSemanticPatch(step, oldState, newState);
-                    semanticPatches.push(semantic);
-                }
-            }
-
-            if (semanticPatches.length === 0) return;
-
-            // Feed the new semantic patches into the grouper
-            const groupedRecord = addSemanticPatches(semanticPatches, "local");
-
-            // Only write to SQLite when a group is flushed
-            if (groupedRecord) {
-              invoke("record_patch", { patch: groupedRecord }).catch((err) => {
-                console.error("Failed to record grouped patch:", err);
-              });
-            }
-
-            return null;
-        },
-    });
-
-    const newState = state.reconfigure({
-      ...state,
-      plugins: [
-        ...state.plugins,
-        ySyncPlugin(yXmlFragment),
-        yUndoPlugin(),
-        patchLoggerPlugin,
-      ],
-    });
-
-    view.updateState(newState);
-  });
-}
-
-setupEditor();
-
-window.addEventListener("blur", () => {
-  const record = flushGroup("local");
-  if (!record) return;
-  invoke("record_patch", { patch: record }).catch((err) => {
-    console.error("Failed to record grouped patch on blur:", err);
-  });
+// On tab hide (user switches tab)
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        const record = flushGroup("local");
+        if (record) {
+            invoke("record_patch", { patch: record }).catch(() => {});
+        }
+        forceSave();
+    }
 });
 
-window.addEventListener("beforeunload", (event) => {
-  const record = flushGroup("local");
-  if (!record) return;
-  // We can't reliably await here; just fire and forget.
-  invoke("record_patch", { patch: record }).catch(() => {});
+// Last resort: before page unload.
+window.addEventListener("beforeunload", () => {
+    const record = flushGroup("local");
+    if (record) {
+        // Fire and forget — cannot guarantee async execution
+        invoke("record_patch", { patch: record }).catch(() => {});
+    }
+    forceSave();
 });

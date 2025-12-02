@@ -23,7 +23,7 @@
             "clippy"
           ];
           targets = [
-            "wasm32-unknown-unknown"  # In case we want to experiment with WASM later
+            "wasm32-unknown-unknown"
           ];
         };
 
@@ -42,9 +42,10 @@
           libiconv
         ];
 
+        # Tauri 2.x dependencies for Linux
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
-          # Tauri dependencies
-          webkitgtk
+          # Tauri 2.x dependencies (GTK4 + WebKit 4.1 + libsoup 3)
+          webkitgtk_4_1
           gtk3
           cairo
           gdk-pixbuf
@@ -56,7 +57,7 @@
           # Additional UI libraries
           pango
           atk
-          libsoup
+          libsoup_3
 
           # Development tools
           pkg-config
@@ -68,11 +69,11 @@
           rustToolchain
 
           # Cargo tools
-          cargo-watch          # Auto-rebuild on file changes
-          cargo-edit           # cargo add, cargo rm, cargo upgrade
-          cargo-outdated       # Check for outdated dependencies
-          cargo-audit          # Security vulnerability scanning
-          cargo-flamegraph     # Performance profiling
+          cargo-watch
+          cargo-edit
+          cargo-outdated
+          cargo-audit
+          cargo-flamegraph
 
           # Node.js ecosystem for frontend
           nodejs_20
@@ -87,14 +88,14 @@
           cmake
 
           # Development utilities
-          just                 # Command runner (Makefile alternative)
-          watchexec            # File watcher
+          just
+          watchexec
 
           # Git for version control
           git
 
           # Testing and debugging
-          lldb                 # Debugger
+          lldb
         ];
 
         # Development scripts
@@ -134,19 +135,6 @@
             npm update
             echo "✅ Dependencies updated!"
           '';
-
-          validate = pkgs.writeShellScriptBin "korppi-validate" ''
-            echo "✅ Running 3-day validation suite..."
-            echo ""
-            echo "Day 1: Testing Pijul initialization..."
-            cd src-tauri && cargo run --bin korppi-prototype -- init
-            echo ""
-            echo "Day 2: Testing change recording..."
-            cd src-tauri && cargo run --bin korppi-prototype -- record
-            echo ""
-            echo "Day 3: Testing conflict detection..."
-            cd src-tauri && cargo run --bin korppi-prototype -- conflict
-          '';
         };
 
       in
@@ -159,7 +147,6 @@
             scripts.check
             scripts.clean
             scripts.update
-            scripts.validate
           ];
 
           shellHook = ''
@@ -179,10 +166,9 @@
               export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
             ''}
 
-            # Pretty welcome message
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "🦀 Korppi Development Environment"
+            echo "🦀 Korppi Development Environment (Tauri 2.x)"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
             echo "📋 System Info:"
@@ -197,29 +183,15 @@
             echo "   korppi-build     - Build for production"
             echo "   korppi-test      - Run Rust tests"
             echo "   korppi-check     - Run format/lint/test checks"
-            echo "   korppi-validate  - Run 3-day validation suite"
             echo "   korppi-clean     - Clean all build artifacts"
             echo "   korppi-update    - Update all dependencies"
             echo ""
-            echo "📚 Documentation:"
-            echo "   Tauri:  https://tauri.app/v1/guides/"
-            echo "   Pijul:  https://pijul.org/manual/introduction.html"
-            echo ""
             echo "🔧 Setup (first time):"
-            echo "   1. npm install                    # Install Node dependencies"
-            echo "   2. korppi-dev                     # Start development"
-            echo ""
-            echo "🧪 For validation prototype:"
-            echo "   cd src-tauri && cargo run         # Run CLI tests"
+            echo "   1. npm install"
+            echo "   2. korppi-dev"
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-
-            # Check if this is first run
-            if [ ! -f "package.json" ]; then
-              echo "⚠️  No package.json found. Run 'npm init' or copy from prototype."
-              echo ""
-            fi
 
             if [ ! -d "node_modules" ]; then
               echo "💡 Tip: Run 'npm install' to install JavaScript dependencies"
@@ -227,70 +199,12 @@
             fi
           '';
 
-          # Environment variables for development
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
-
-          # Improve build times
           CARGO_BUILD_JOBS = "8";
-
-          # Better error messages
           RUST_BACKTRACE = "1";
-
-          # Enable incremental compilation
           CARGO_INCREMENTAL = "1";
         };
 
-        # Package definitions for building Korppi
-        packages = {
-          default = self.packages.${system}.korppi;
-
-          korppi = pkgs.rustPlatform.buildRustPackage {
-            pname = "korppi";
-            version = "0.1.0";
-
-            src = ./.;
-
-            cargoLock = {
-              lockFile = ./src-tauri/Cargo.lock;
-            };
-
-            nativeBuildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
-
-            buildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
-
-            # Skip tests during build (run separately)
-            doCheck = false;
-
-            meta = with pkgs.lib; {
-              description = "Local-first collaborative writing tool";
-              homepage = "https://github.com/yourusername/korppi";
-              license = licenses.mit;
-              maintainers = [ ];
-            };
-          };
-        };
-
-        # CI/CD apps
-        apps = {
-          default = self.apps.${system}.korppi-dev;
-
-          korppi-dev = {
-            type = "app";
-            program = "${scripts.dev}/bin/korppi-dev";
-          };
-
-          korppi-test = {
-            type = "app";
-            program = "${scripts.test}/bin/korppi-test";
-          };
-
-          korppi-check = {
-            type = "app";
-            program = "${scripts.check}/bin/korppi-check";
-          };
-        };
-
-        # Formatter for `nix fmt`
         formatter = pkgs.nixpkgs-fmt;
       }
     );

@@ -235,5 +235,3 @@ fn test_json_data_integrity() {
     assert!(parsed["patches"].is_array());
     assert_eq!(parsed["patches"].as_array().unwrap().len(), 3);
 }
-
-// Run all tests with: cargo test
