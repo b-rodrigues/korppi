@@ -22,7 +22,7 @@ body {
 /* HEADER */
 header {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     position: relative;
     margin-bottom: 40px;
@@ -42,14 +42,25 @@ header p {
     margin-top: 6px;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .header-btn {
-    position: absolute;
-    right: 0;
     padding: 8px 16px;
     font-size: 0.9rem;
     background: #333;
     color: #e0e0e0;
     border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.header-btn:hover {
+    background: #444;
 }
 
 /* SECTIONS */
@@ -195,10 +206,10 @@ textarea {
     button {
         width: 100%;
     }
-}
-
-.header-btn:hover {
-    background: #444;
+    
+    .header-actions {
+        flex-wrap: wrap;
+    }
 }
 
 /* MODAL */
