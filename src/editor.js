@@ -4,10 +4,11 @@ import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { prosemirrorCtx } from "@milkdown/kit/internal";
+import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke } from "@tauri-apps/api/core";
 
-import { ydoc, yXmlFragment, loadInitialDoc, forceSave } from "./yjs-setup.js";
+import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence } from "./yjs-setup.js";
 import { stepToSemanticPatch } from "./patch-extractor.js";
 import {
     addSemanticPatches,
@@ -18,6 +19,7 @@ import {
 //  Initialize Yjs document state before creating the editor.
 // ---------------------------------------------------------------------------
 await loadInitialDoc();
+enablePersistence();
 
 // ---------------------------------------------------------------------------
 //  Create the Milkdown editor with Yjs + semantic patch logging.
@@ -46,7 +48,7 @@ editor.action((ctx) => {
     const view = ctx.get(prosemirrorCtx);
     const state = view.state;
 
-    const patchLoggerPlugin = new view.state.Plugin({
+    const patchLoggerPlugin = new Plugin({
         appendTransaction(transactions, oldState, newState) {
             if (!transactions.length) return;
 
@@ -80,7 +82,6 @@ editor.action((ctx) => {
 
     // Inject the correct plugin list
     const newState = state.reconfigure({
-        ...state,
         plugins: [
             ...state.plugins,
             ySyncPlugin(yXmlFragment),

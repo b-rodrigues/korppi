@@ -178,7 +178,7 @@ async function showConflictDetail(conflictId) {
     document.getElementById("remote-content").textContent =
         conflict.remote_version.content || "(empty)";
     document.getElementById("merge-content").value =
-        conflict.local_version.content + "\n" + conflict.remote_version.content;
+        (conflict.local_version.content || "") + "\n" + (conflict.remote_version.content || "");
 
     document.getElementById("conflict-list").style.display = "none";
     document.getElementById("conflict-detail").style.display = "block";
