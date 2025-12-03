@@ -6,10 +6,23 @@ import { getActiveDocumentId } from "./document-manager.js";
 let restoredPatchId = null;
 
 export async function fetchPatchList() {
+    const docId = getActiveDocumentId();
+    if (docId) {
+        // Use document-specific patches
+        return await invoke("list_document_patches", { id: docId }).catch(() => []);
+    }
+    // Fallback to global patches for legacy single-document mode
     return await invoke("list_patches").catch(() => []);
 }
 
 export async function fetchPatch(id) {
+    const docId = getActiveDocumentId();
+    if (docId) {
+        // Use document-specific patches and filter by ID
+        const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
+        return patches.find(patch => patch.id === id) || null;
+    }
+    // Fallback to global patch for legacy single-document mode
     return await invoke("get_patch", { id }).catch(() => null);
 }
 
