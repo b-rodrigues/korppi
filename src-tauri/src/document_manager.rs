@@ -580,6 +580,16 @@ pub fn record_document_patch(
             kind        TEXT    NOT NULL,
             data        TEXT    NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            patch_id    INTEGER NOT NULL,
+            state       BLOB    NOT NULL,
+            FOREIGN KEY (patch_id) REFERENCES patches(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
         "#,
     ).map_err(|e| e.to_string())?;
     
@@ -642,6 +652,117 @@ pub fn list_document_patches(
 #[tauri::command]
 pub fn get_initial_file() -> Option<String> {
     std::env::var("KORPPI_OPEN_FILE").ok()
+}
+
+/// Maximum allowed snapshot size (100 MB)
+const MAX_SNAPSHOT_SIZE: usize = 100 * 1024 * 1024;
+
+/// Save a Yjs state snapshot for a specific document at a given patch ID
+#[tauri::command]
+pub fn save_document_snapshot(
+    manager: State<'_, Mutex<DocumentManager>>,
+    id: String,
+    patch_id: i64,
+    state: Vec<u8>,
+) -> Result<(), String> {
+    // Validate input
+    if state.is_empty() {
+        return Err("Snapshot state cannot be empty".to_string());
+    }
+    if state.len() > MAX_SNAPSHOT_SIZE {
+        return Err(format!("Snapshot size exceeds maximum allowed ({} bytes)", MAX_SNAPSHOT_SIZE));
+    }
+
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&id)
+        .ok_or_else(|| format!("Document not found: {}", id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Ensure tables exist
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            patch_id    INTEGER NOT NULL,
+            state       BLOB    NOT NULL,
+            FOREIGN KEY (patch_id) REFERENCES patches(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
+        "#,
+    ).map_err(|e| e.to_string())?;
+    
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as i64;
+    
+    conn.execute(
+        "INSERT INTO snapshots (timestamp, patch_id, state) VALUES (?1, ?2, ?3)",
+        params![timestamp, patch_id, state],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+/// Result of a restore operation for a document
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DocumentRestoreResult {
+    pub snapshot_content: Option<String>,
+    pub patch_id: i64,
+}
+
+/// Restore a document to a specific patch - returns the snapshot content (text) for that patch
+#[tauri::command]
+pub fn restore_document_to_patch(
+    manager: State<'_, Mutex<DocumentManager>>,
+    id: String,
+    patch_id: i64,
+) -> Result<DocumentRestoreResult, String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&id)
+        .ok_or_else(|| format!("Document not found: {}", id))?;
+    
+    if !doc.history_path.exists() {
+        return Ok(DocumentRestoreResult {
+            snapshot_content: None,
+            patch_id,
+        });
+    }
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Try to get the patch to extract the snapshot field from data
+    let mut stmt = conn
+        .prepare("SELECT data FROM patches WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+    
+    let data_str: Option<String> = stmt
+        .query_row([patch_id], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?;
+    
+    if let Some(data_str) = data_str {
+        // Parse the JSON data and extract the snapshot field if present
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&data_str) {
+            if let Some(snapshot) = data.get("snapshot").and_then(|s| s.as_str()) {
+                return Ok(DocumentRestoreResult {
+                    snapshot_content: Some(snapshot.to_string()),
+                    patch_id,
+                });
+            }
+        }
+    }
+    
+    // No snapshot content available
+    Ok(DocumentRestoreResult {
+        snapshot_content: None,
+        patch_id,
+    })
 }
 
 #[cfg(test)]

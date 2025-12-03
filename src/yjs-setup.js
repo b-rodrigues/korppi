@@ -152,3 +152,60 @@ export async function switchDocument(docId) {
     // Load new document state into the fresh doc
     await loadDocumentState(docId);
 }
+
+/**
+ * Restore the document state from a text snapshot.
+ * This replaces the current Yjs document content with the provided text.
+ * @param {string} textContent - The text content to restore
+ */
+export function restoreDocumentState(textContent) {
+    if (!textContent || typeof textContent !== 'string') {
+        console.warn("restoreDocumentState: No valid text content provided");
+        return false;
+    }
+
+    applyingCounter++;
+
+    try {
+        // Get the XML fragment and clear it
+        const xmlFragment = ydoc.getXmlFragment("prosemirror");
+        
+        // Use a transaction to make the change atomic
+        ydoc.transact(() => {
+            // Delete all existing content
+            while (xmlFragment.length > 0) {
+                xmlFragment.delete(0, 1);
+            }
+
+            // Create a paragraph node with the restored text
+            // Split by newlines to create separate paragraphs
+            const paragraphs = textContent.split('\n');
+            
+            for (const para of paragraphs) {
+                const paragraph = new Y.XmlElement('paragraph');
+                const textNode = new Y.XmlText();
+                textNode.insert(0, para);
+                paragraph.insert(0, [textNode]);
+                xmlFragment.push([paragraph]);
+            }
+        });
+
+        // Mark the document as modified
+        const docId = currentDocId || getActiveDocumentId();
+        if (docId) {
+            markDocumentModified(docId, true).catch(err => {
+                console.warn('Failed to mark document as modified:', err);
+            });
+        }
+
+        // Notify the editor that content was restored
+        window.dispatchEvent(new CustomEvent('yjs-content-restored'));
+
+        return true;
+    } catch (err) {
+        console.error("Failed to restore document state:", err);
+        return false;
+    } finally {
+        applyingCounter--;
+    }
+}
