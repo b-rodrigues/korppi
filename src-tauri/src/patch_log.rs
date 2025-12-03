@@ -1,7 +1,7 @@
 // src-tauri/patch_log.rs
 use std::path::PathBuf;
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
