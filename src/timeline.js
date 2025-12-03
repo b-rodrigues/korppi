@@ -18,8 +18,9 @@ export async function fetchPatch(id) {
  */
 function hasSnapshotContent(patch) {
     if (!patch || !patch.data) return false;
-    // The snapshot field contains the text content
-    return typeof patch.data.snapshot === 'string' && patch.data.snapshot.length > 0;
+    // The snapshot field contains the text content - use optional chaining for safety
+    const snapshot = patch.data?.snapshot;
+    return typeof snapshot === 'string' && snapshot.length > 0;
 }
 
 /**
@@ -83,11 +84,11 @@ export async function restoreToPatch(patchId) {
             }
         }
 
-        alert("No snapshot content available for this patch. Restoration not possible.");
+        alert("This version cannot be restored because no snapshot data is available. Try selecting a different version.");
         return false;
     } catch (err) {
         console.error("Failed to restore to patch:", err);
-        alert("Failed to restore: " + err);
+        alert("Failed to restore: " + (err.message || err));
         return false;
     } finally {
         setRestoreInProgress(false);

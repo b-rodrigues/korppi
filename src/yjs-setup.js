@@ -193,7 +193,9 @@ export function restoreDocumentState(textContent) {
         // Mark the document as modified
         const docId = currentDocId || getActiveDocumentId();
         if (docId) {
-            markDocumentModified(docId, true).catch(() => { });
+            markDocumentModified(docId, true).catch(err => {
+                console.warn('Failed to mark document as modified:', err);
+            });
         }
 
         // Notify the editor that content was restored

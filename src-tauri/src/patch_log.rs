@@ -142,9 +142,20 @@ pub struct Snapshot {
     pub state: Vec<u8>,
 }
 
+/// Maximum allowed snapshot size (100 MB)
+const MAX_SNAPSHOT_SIZE: usize = 100 * 1024 * 1024;
+
 /// Save a Yjs state snapshot at a specific patch ID
 #[tauri::command]
 pub fn save_snapshot(app: AppHandle, patch_id: i64, state: Vec<u8>) -> Result<(), String> {
+    // Validate input
+    if state.is_empty() {
+        return Err("Snapshot state cannot be empty".to_string());
+    }
+    if state.len() > MAX_SNAPSHOT_SIZE {
+        return Err(format!("Snapshot size exceeds maximum allowed ({} bytes)", MAX_SNAPSHOT_SIZE));
+    }
+
     let conn = get_conn(&app)?;
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
