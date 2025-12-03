@@ -45,7 +45,7 @@
         # Tauri 2.x dependencies for Linux
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
           # Tauri dependencies
-          webkitgtk_6_0
+          webkitgtk_4_1
           gtk3
           cairo
           gdk-pixbuf

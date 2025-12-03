@@ -35,7 +35,7 @@ export function initProfileSettings() {
     settingsBtn.addEventListener("click", openModal);
     closeBtn.addEventListener("click", closeModal);
     saveBtn.addEventListener("click", handleSave);
-    
+
     // Update color value display when color changes
     colorInput.addEventListener("input", () => {
         colorValue.textContent = colorInput.value;
@@ -63,14 +63,18 @@ export function initProfileSettings() {
  * Check if this is the first run and prompt for profile setup
  */
 async function checkFirstRun() {
-    const profile = getCachedProfile();
-    if (profile && !profile.name) {
-        // First run - open settings modal to prompt for name
-        // Brief delay to allow the UI to fully render before showing modal
-        const FIRST_RUN_DELAY_MS = 500;
-        setTimeout(() => {
-            openModal();
-        }, FIRST_RUN_DELAY_MS);
+    try {
+        const profile = await getProfile();
+        if (profile && !profile.name) {
+            // First run - open settings modal to prompt for name
+            // Brief delay to allow the UI to fully render before showing modal
+            const FIRST_RUN_DELAY_MS = 500;
+            setTimeout(() => {
+                openModal();
+            }, FIRST_RUN_DELAY_MS);
+        }
+    } catch (err) {
+        console.error("Failed to check first run:", err);
     }
 }
 
@@ -82,7 +86,7 @@ async function openModal() {
 
     // Load current profile
     const profile = await getProfile();
-    
+
     // Populate form
     nameInput.value = profile.name || "";
     emailInput.value = profile.email || "";
@@ -92,7 +96,7 @@ async function openModal() {
 
     // Show modal
     modal.style.display = "flex";
-    
+
     // Focus name input
     nameInput.focus();
 }
@@ -110,7 +114,7 @@ function closeModal() {
  */
 async function handleSave() {
     const name = nameInput.value.trim();
-    
+
     // Validate required fields
     if (!name) {
         alert("Name is required");
@@ -120,7 +124,7 @@ async function handleSave() {
 
     // Get current profile to preserve ID (backend generates UUID by default)
     const currentProfile = getCachedProfile() || {};
-    
+
     // Build updated profile
     // Note: ID should already be set by backend; fallback is for edge cases only
     const profile = {

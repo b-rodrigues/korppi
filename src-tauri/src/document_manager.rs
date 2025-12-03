@@ -326,7 +326,7 @@ pub async fn open_document(
     
     let state = DocumentState {
         handle: handle.clone(),
-        yjs_state,
+        yjs_state: yjs_state.clone(),
         history_path,
         meta,
     };

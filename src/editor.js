@@ -3,7 +3,7 @@
 import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
-import { prosemirrorCtx } from "@milkdown/kit/internal";
+import { editorViewCtx } from "@milkdown/core";
 import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
@@ -20,106 +20,144 @@ import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 // ---------------------------------------------------------------------------
 //  Initialize profile and Yjs document state before creating the editor.
 // ---------------------------------------------------------------------------
-try {
-    await initProfile();
-} catch (err) {
-    console.warn("Failed to initialize profile, using defaults:", err);
-}
 
-// Try to load document state from active document, fall back to legacy
-const activeId = getActiveDocumentId();
-if (activeId) {
+export let editor;
+
+export async function initEditor() {
     try {
-        await loadDocumentState(activeId);
+        await initProfile();
     } catch (err) {
-        console.warn("Failed to load active document, trying legacy:", err);
-        await loadInitialDoc();
+        console.warn("Failed to initialize profile, using defaults:", err);
     }
-} else {
-    await loadInitialDoc();
-}
-enablePersistence();
 
-// ---------------------------------------------------------------------------
-//  Create the Milkdown editor with Yjs + semantic patch logging.
-// ---------------------------------------------------------------------------
-export const editor = await Editor.make()
-    .config((ctx) => {
-        ctx.set(rootCtx, document.getElementById("editor"));
-        ctx.set(defaultValueCtx, "");
+    // Initial load is handled by the activeChange listener in main.js/editor.js
+    // or by checking active document if listener hasn't fired yet.
+    // However, to avoid race conditions with the listener, we should rely on the listener
+    // or explicitly check if we need to load ONLY if not already loaded.
+    // For now, we'll let the listener handle it to avoid double-loading.
 
-        ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
-            // This ensures Markdown export stays in sync.
-            const event = new CustomEvent("markdown-updated", {
-                detail: { markdown, prevMarkdown },
-            });
-            window.dispatchEvent(event);
+    enablePersistence();
+
+    // ---------------------------------------------------------------------------
+    //  Create the Milkdown editor with Yjs + semantic patch logging.
+    // ---------------------------------------------------------------------------
+    console.log("Editor: Starting initialization...");
+    try {
+        editor = await Editor.make()
+            .config((ctx) => {
+                ctx.set(rootCtx, document.getElementById("editor"));
+                ctx.set(defaultValueCtx, "");
+
+                ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
+                    // This ensures Markdown export stays in sync.
+                    const event = new CustomEvent("markdown-updated", {
+                        detail: { markdown, prevMarkdown },
+                    });
+                    window.dispatchEvent(event);
+                });
+            })
+            .use(commonmark)
+            .use(listener)
+            .create();
+        console.log("Editor: Created successfully");
+    } catch (err) {
+        console.error("Editor: Failed to create", err);
+        return;
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Patch logger plugin (semantic patches + grouping).
+    // ---------------------------------------------------------------------------
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const state = view.state;
+
+        const patchLoggerPlugin = new Plugin({
+            appendTransaction(transactions, oldState, newState) {
+                if (!transactions.length) return;
+
+                const semanticPatches = [];
+
+                for (const tr of transactions) {
+                    // Skip Yjs-generated transactions (mirror updates)
+                    if (tr.getMeta("y-sync$")) {
+                        // console.log("Skipping Yjs transaction");
+                        continue;
+                    }
+
+                    for (const step of tr.steps) {
+                        const semantic = stepToSemanticPatch(step, oldState, newState);
+                        semanticPatches.push(semantic);
+                    }
+                }
+
+                if (semanticPatches.length === 0) return;
+
+                // Feed semantic patches into the grouper (author is now pulled from profile)
+                const groupedRecord = addSemanticPatches(semanticPatches);
+
+                // Only when the grouper flushes do we persist to SQLite
+                if (groupedRecord) {
+                    // Try to record to active document, fall back to global
+                    const docId = getActiveDocumentId();
+                    if (docId) {
+                        invoke("record_document_patch", { id: docId, patch: groupedRecord }).catch((err) => {
+                            console.error("Failed to record document patch:", err);
+                            // Fall back to global patch log
+                            invoke("record_patch", { patch: groupedRecord }).catch(() => { });
+                        });
+                    } else {
+                        invoke("record_patch", { patch: groupedRecord }).catch((err) => {
+                            console.error("Failed to record grouped patch:", err);
+                        });
+                    }
+                }
+
+                return null;
+            },
         });
-    })
-    .use(commonmark)
-    .use(listener)
-    .create();
 
-// ---------------------------------------------------------------------------
-//  Patch logger plugin (semantic patches + grouping).
-// ---------------------------------------------------------------------------
-editor.action((ctx) => {
-    const view = ctx.get(prosemirrorCtx);
-    const state = view.state;
+        // Inject the correct plugin list
+        const newState = state.reconfigure({
+            plugins: [
+                ...state.plugins,
+                ySyncPlugin(yXmlFragment),
+                yUndoPlugin(),
+                patchLoggerPlugin,
+            ],
+        });
 
-    const patchLoggerPlugin = new Plugin({
-        appendTransaction(transactions, oldState, newState) {
-            if (!transactions.length) return;
-
-            const semanticPatches = [];
-
-            for (const tr of transactions) {
-                // Skip Yjs-generated transactions (mirror updates)
-                if (tr.getMeta("y-sync$")) continue;
-
-                for (const step of tr.steps) {
-                    const semantic = stepToSemanticPatch(step, oldState, newState);
-                    semanticPatches.push(semantic);
-                }
-            }
-
-            if (semanticPatches.length === 0) return;
-
-            // Feed semantic patches into the grouper (author is now pulled from profile)
-            const groupedRecord = addSemanticPatches(semanticPatches);
-
-            // Only when the grouper flushes do we persist to SQLite
-            if (groupedRecord) {
-                // Try to record to active document, fall back to global
-                const docId = getActiveDocumentId();
-                if (docId) {
-                    invoke("record_document_patch", { id: docId, patch: groupedRecord }).catch((err) => {
-                        console.error("Failed to record document patch:", err);
-                        // Fall back to global patch log
-                        invoke("record_patch", { patch: groupedRecord }).catch(() => {});
-                    });
-                } else {
-                    invoke("record_patch", { patch: groupedRecord }).catch((err) => {
-                        console.error("Failed to record grouped patch:", err);
-                    });
-                }
-            }
-
-            return null;
-        },
+        view.updateState(newState);
     });
+}
 
-    // Inject the correct plugin list
-    const newState = state.reconfigure({
-        plugins: [
-            ...state.plugins,
-            ySyncPlugin(yXmlFragment),
-            yUndoPlugin(),
-            patchLoggerPlugin,
-        ],
+// Listen for Yjs document replacement (when switching docs)
+window.addEventListener('yjs-doc-replaced', () => {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const state = view.state;
+
+        // Filter out existing Yjs plugins to avoid duplication/stale references
+        // ySyncPlugin has key "y-sync$", yUndoPlugin has key "y-undo$"
+        const cleanPlugins = state.plugins.filter(p =>
+            !p.key.startsWith("y-sync$") &&
+            !p.key.startsWith("y-undo$")
+        );
+
+        // Re-inject plugins with the NEW yXmlFragment
+        // Note: yXmlFragment is a live binding from yjs-setup.js
+        const newState = state.reconfigure({
+            plugins: [
+                ...cleanPlugins,
+                ySyncPlugin(yXmlFragment),
+                yUndoPlugin(),
+            ],
+        });
+
+        view.updateState(newState);
     });
-
-    view.updateState(newState);
 });
 
 // ---------------------------------------------------------------------------
@@ -145,7 +183,7 @@ window.addEventListener("blur", () => {
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
-            invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+            invoke("record_document_patch", { id: docId, patch: record }).catch(() => { });
         } else {
             invoke("record_patch", { patch: record }).catch((err) => {
                 console.error("Failed to record grouped patch on blur:", err);
@@ -162,9 +200,9 @@ document.addEventListener("visibilitychange", () => {
         if (record) {
             const docId = getActiveDocumentId();
             if (docId) {
-                invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+                invoke("record_document_patch", { id: docId, patch: record }).catch(() => { });
             } else {
-                invoke("record_patch", { patch: record }).catch(() => {});
+                invoke("record_patch", { patch: record }).catch(() => { });
             }
         }
         forceSave();
@@ -177,10 +215,10 @@ window.addEventListener("beforeunload", () => {
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
-            invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+            invoke("record_document_patch", { id: docId, patch: record }).catch(() => { });
         } else {
             // Fire and forget — cannot guarantee async execution
-            invoke("record_patch", { patch: record }).catch(() => {});
+            invoke("record_patch", { patch: record }).catch(() => { });
         }
     }
     forceSave();
