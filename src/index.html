@@ -8,16 +8,34 @@
 </head>
 
 <body>
+    <!-- Document Tabs -->
+    <div id="document-tabs" class="document-tabs">
+        <!-- Tabs will be dynamically inserted here -->
+    </div>
+    
     <div class="container">
         <header>
             <h1>🦀 Korppi Collaborative Editor</h1>
             <div class="header-actions">
-                <button id="export-kmd-btn" class="header-btn" title="Export as KMD">📦 Export</button>
-                <button id="import-kmd-btn" class="header-btn" title="Import KMD">📂 Import</button>
+                <button id="new-doc-btn" class="header-btn" title="New Document (Ctrl+N)">📄 New</button>
+                <button id="open-doc-btn" class="header-btn" title="Open Document (Ctrl+O)">📂 Open</button>
+                <button id="save-doc-btn" class="header-btn" title="Save Document (Ctrl+S)">💾 Save</button>
                 <button id="export-md-btn" class="header-btn" title="Export as Markdown">📝 Export MD</button>
                 <button id="settings-btn" class="header-btn">⚙️ Settings</button>
             </div>
         </header>
+        
+        <!-- Recent Documents Panel (shown when no documents are open) -->
+        <div id="recent-documents" class="recent-documents" style="display: none;">
+            <h2>Recent Documents</h2>
+            <ul id="recent-list"></ul>
+            <div class="recent-actions">
+                <button id="new-document-btn" class="primary">📄 New Document</button>
+                <button id="open-document-btn">📂 Open Document</button>
+                <button id="clear-recent-btn" class="danger">Clear Recent</button>
+            </div>
+        </div>
+        
         <div id="editor"></div>
     </div>
     <script type="module" src="./main.js"></script>

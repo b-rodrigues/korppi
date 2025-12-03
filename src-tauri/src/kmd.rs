@@ -217,7 +217,7 @@ fn extract_authors_from_history(history_path: &PathBuf) -> Result<Vec<AuthorRef>
 }
 
 /// Validate a path component for safety (prevent path traversal)
-fn is_path_safe(path: &str) -> bool {
+pub fn is_path_safe(path: &str) -> bool {
     // Check for explicit parent directory patterns (works cross-platform)
     if path.contains("..") {
         return false;
@@ -335,7 +335,7 @@ pub fn export_kmd(app: AppHandle, path: String) -> Result<DocumentMeta, String> 
 }
 
 /// Check if the KMD version is compatible
-fn check_version_compatibility(format_info: &FormatInfo) -> Result<(), String> {
+pub fn check_version_compatibility(format_info: &FormatInfo) -> Result<(), String> {
     // Simple version check: parse as semver-like (handles 0.1.0, 1.0, 2.0.0-beta.1, etc.)
     // Extract major.minor.patch numbers, treating missing parts as 0
     fn parse_version(v: &str) -> (u32, u32, u32) {
@@ -393,7 +393,7 @@ fn check_version_compatibility(format_info: &FormatInfo) -> Result<(), String> {
 }
 
 /// Merge patches from imported database, avoiding duplicates
-fn merge_history(
+pub fn merge_history(
     local_path: &PathBuf,
     imported_data: &[u8],
     temp_dir: &std::path::Path,
