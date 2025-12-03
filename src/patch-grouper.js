@@ -13,12 +13,13 @@ function buildRecord(group) {
     author: group.author,
     kind: "semantic_group",
     data: group.patches,
+    snapshot: group.snapshot || ""
   };
 }
 
 // Add one or more semantic patches (from one transaction).
 // Returns a patchRecord if a group was flushed, or null otherwise.
-export function addSemanticPatches(patches, author = null) {
+export function addSemanticPatches(patches, snapshot, author = null) {
   if (!patches || patches.length === 0) return null;
 
   // Use the cached profile author ID if not provided
@@ -33,6 +34,7 @@ export function addSemanticPatches(patches, author = null) {
         startTimestamp: now,
         lastTimestamp: now,
         patches: [p],
+        snapshot: snapshot // Store the latest snapshot
       };
       continue;
     }
@@ -47,10 +49,12 @@ export function addSemanticPatches(patches, author = null) {
         startTimestamp: now,
         lastTimestamp: now,
         patches: [p],
+        snapshot: snapshot
       };
     } else {
       currentGroup.lastTimestamp = now;
       currentGroup.patches.push(p);
+      currentGroup.snapshot = snapshot; // Update snapshot to latest
     }
   }
 
@@ -59,14 +63,19 @@ export function addSemanticPatches(patches, author = null) {
 
 // Force-flush any open group (e.g. on blur/beforeunload).
 // Returns null if no group exists.
-export function flushGroup(author = null) {
+export function flushGroup(snapshot = null, author = null) {
   if (!currentGroup) return null;
-  
+
   try {
     // Update author if provided (for backwards compatibility)
     if (author !== null) {
       currentGroup.author = author;
     }
+    // Update snapshot if provided
+    if (snapshot !== null) {
+      currentGroup.snapshot = snapshot;
+    }
+
     const record = buildRecord(currentGroup);
     return record;
   } finally {
@@ -80,7 +89,7 @@ export function getGroupStats() {
   if (!currentGroup) {
     return { active: false };
   }
-  
+
   return {
     active: true,
     patchCount: currentGroup.patches.length,

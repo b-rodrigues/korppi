@@ -1,9 +1,11 @@
 // editor.js — Clean unified version
 
-import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
+import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
-import { editorViewCtx } from "@milkdown/core";
+// Re-export editorViewCtx so other modules can use it with the editor instance
+export { editorViewCtx };
+
 import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
@@ -22,6 +24,17 @@ import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 // ---------------------------------------------------------------------------
 
 export let editor;
+
+export function getEditorContent() {
+    let content = "";
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            content = view.state.doc.textContent;
+        });
+    }
+    return content;
+}
 
 export async function initEditor() {
     try {
@@ -94,7 +107,8 @@ export async function initEditor() {
                 if (semanticPatches.length === 0) return;
 
                 // Feed semantic patches into the grouper (author is now pulled from profile)
-                const groupedRecord = addSemanticPatches(semanticPatches);
+                const currentText = newState.doc.textContent;
+                const groupedRecord = addSemanticPatches(semanticPatches, currentText);
 
                 // Only when the grouper flushes do we persist to SQLite
                 if (groupedRecord) {
@@ -179,7 +193,7 @@ onDocumentChange(async (event, doc) => {
 
 // On window blur: flush semantic group + force Yjs save
 window.addEventListener("blur", () => {
-    const record = flushGroup();
+    const record = flushGroup(getEditorContent());
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
@@ -196,7 +210,7 @@ window.addEventListener("blur", () => {
 // On tab hide (user switches tab)
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-        const record = flushGroup();
+        const record = flushGroup(getEditorContent());
         if (record) {
             const docId = getActiveDocumentId();
             if (docId) {
@@ -211,7 +225,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Last resort: before page unload.
 window.addEventListener("beforeunload", () => {
-    const record = flushGroup();
+    const record = flushGroup(getEditorContent());
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
