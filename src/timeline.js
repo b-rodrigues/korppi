@@ -192,15 +192,62 @@ async function viewPatchContent(patchId) {
     }
 
     const content = patch.data?.snapshot || "No content available";
-    showContentModal(patchId, content);
+
+    // Get previous patch for diff
+    const patches = await fetchPatchList();
+    const currentIndex = patches.findIndex(p => p.id === patchId);
+    let diff = null;
+
+    if (currentIndex > 0) {
+        const previousPatch = patches[currentIndex - 1];
+        const previousContent = previousPatch.data?.snapshot || "";
+        diff = calculateDiff(previousContent, content);
+    } else {
+        diff = "No previous version to compare with";
+    }
+
+    showContentModal(patchId, content, diff);
+}
+
+/**
+ * Calculate a simple diff between two text strings
+ * @param {string} oldText - Previous text
+ * @param {string} newText - Current text
+ * @returns {string} Diff output
+ */
+function calculateDiff(oldText, newText) {
+    const oldLines = oldText.split('\n');
+    const newLines = newText.split('\n');
+    const diff = [];
+
+    const maxLength = Math.max(oldLines.length, newLines.length);
+
+    for (let i = 0; i < maxLength; i++) {
+        const oldLine = oldLines[i];
+        const newLine = newLines[i];
+
+        if (oldLine === undefined) {
+            diff.push(`+ ${newLine}`);
+        } else if (newLine === undefined) {
+            diff.push(`- ${oldLine}`);
+        } else if (oldLine !== newLine) {
+            diff.push(`- ${oldLine}`);
+            diff.push(`+ ${newLine}`);
+        } else {
+            diff.push(`  ${oldLine}`);
+        }
+    }
+
+    return diff.join('\n');
 }
 
 /**
  * Show a modal with patch content
  * @param {number} patchId - Patch ID
  * @param {string} content - Content to display
+ * @param {string} diff - Diff to display
  */
-function showContentModal(patchId, content) {
+function showContentModal(patchId, content, diff) {
     let modal = document.getElementById("patch-content-modal");
 
     if (!modal) {
@@ -216,8 +263,13 @@ function showContentModal(patchId, content) {
                     <span class="modal-close" style="color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer;">&times;</span>
                     <h2 style="margin:0;">Patch Content</h2>
                 </div>
+                <div class="modal-tabs" style="display:flex;background:#e1e1e1;border-bottom:1px solid #ccc;">
+                    <button class="tab-btn active" data-tab="content" style="flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-weight:bold;">Content</button>
+                    <button class="tab-btn" data-tab="diff" style="flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-weight:bold;">Diff</button>
+                </div>
                 <div class="modal-body" style="padding:20px;max-height:60vh;overflow-y:auto;">
-                    <pre id="patch-content" style="background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;"></pre>
+                    <pre id="patch-content" class="tab-content" style="display:block;background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;"></pre>
+                    <pre id="patch-diff" class="tab-content" style="display:none;background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;"></pre>
                 </div>
                 <div class="modal-footer" style="padding:15px;background-color:#f1f1f1;border-top:1px solid #ddd;text-align:right;">
                     <button class="modal-close-btn" style="padding:8px 16px;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
@@ -238,14 +290,58 @@ function showContentModal(patchId, content) {
                 closeModal();
             }
         };
+
+        // Tab switching
+        modal.querySelectorAll(".tab-btn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const tab = e.target.dataset.tab;
+
+                // Update button states
+                modal.querySelectorAll(".tab-btn").forEach(b => {
+                    b.classList.remove("active");
+                    b.style.backgroundColor = "transparent";
+                });
+                e.target.classList.add("active");
+                e.target.style.backgroundColor = "#f1f1f1";
+
+                // Show/hide content
+                modal.querySelectorAll(".tab-content").forEach(content => {
+                    content.style.display = "none";
+                });
+
+                if (tab === "content") {
+                    modal.querySelector("#patch-content").style.display = "block";
+                } else if (tab === "diff") {
+                    modal.querySelector("#patch-diff").style.display = "block";
+                }
+            });
+        });
     }
 
     // Update content
     const contentEl = modal.querySelector("#patch-content");
+    const diffEl = modal.querySelector("#patch-diff");
     const headerEl = modal.querySelector(".modal-header h2");
 
     if (contentEl) contentEl.textContent = content;
-    if (headerEl) headerEl.textContent = `Patch #${patchId} Content`;
+    if (diffEl) diffEl.textContent = diff || "No diff available";
+    if (headerEl) headerEl.textContent = `Patch #${patchId}`;
+
+    // Reset to content tab
+    modal.querySelectorAll(".tab-btn").forEach(b => {
+        b.classList.remove("active");
+        b.style.backgroundColor = "transparent";
+    });
+    const contentBtn = modal.querySelector('[data-tab="content"]');
+    if (contentBtn) {
+        contentBtn.classList.add("active");
+        contentBtn.style.backgroundColor = "#f1f1f1";
+    }
+
+    modal.querySelectorAll(".tab-content").forEach(content => {
+        content.style.display = "none";
+    });
+    modal.querySelector("#patch-content").style.display = "block";
 
     // Show modal
     modal.style.display = "block";

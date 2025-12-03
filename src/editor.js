@@ -30,7 +30,9 @@ export function getEditorContent() {
     if (editor) {
         editor.action((ctx) => {
             const view = ctx.get(editorViewCtx);
-            content = view.state.doc.textContent;
+            // Use textBetween instead of textContent to preserve newlines
+            const doc = view.state.doc;
+            content = doc.textBetween(0, doc.content.size, "\n", "\n");
         });
     }
     return content;
