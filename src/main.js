@@ -2,7 +2,19 @@ import "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 import { initProfileSettings } from "./profile-settings.js";
-import { exportDocument, importDocument, exportAsMarkdown } from "./kmd-service.js";
+import { exportAsMarkdown } from "./kmd-service.js";
+import { 
+    initDocumentManager, 
+    newDocument, 
+    openDocument, 
+    saveDocument,
+    getRecentDocuments,
+    clearRecentDocuments,
+    getOpenDocuments,
+    onDocumentChange
+} from "./document-manager.js";
+import { initDocumentTabs } from "./document-tabs.js";
+import { initKeyboardShortcuts } from "./keyboard-shortcuts.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -12,50 +24,141 @@ window.addEventListener("markdown-updated", (event) => {
     currentMarkdown = event.detail.markdown || "";
 });
 
+/**
+ * Show recent documents panel
+ */
+async function showRecentDocuments() {
+    const recentPanel = document.getElementById("recent-documents");
+    const recentList = document.getElementById("recent-list");
+    const editor = document.getElementById("editor");
+    
+    if (!recentPanel || !recentList) return;
+    
+    try {
+        const recent = await getRecentDocuments();
+        recentList.innerHTML = "";
+        
+        if (recent.length === 0) {
+            recentList.innerHTML = '<li class="empty-message">No recent documents</li>';
+        } else {
+            for (const doc of recent) {
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    <div>
+                        <span class="doc-title">${doc.title}</span>
+                        <span class="doc-path">${doc.path}</span>
+                    </div>
+                    <span class="doc-date">${new Date(doc.last_opened).toLocaleDateString()}</span>
+                `;
+                li.addEventListener("click", async () => {
+                    try {
+                        await openDocument(doc.path);
+                        hideRecentDocuments();
+                    } catch (err) {
+                        console.error("Failed to open recent document:", err);
+                        alert("Failed to open document: " + err);
+                    }
+                });
+                recentList.appendChild(li);
+            }
+        }
+        
+        recentPanel.style.display = "block";
+        if (editor) editor.style.display = "none";
+    } catch (err) {
+        console.error("Failed to load recent documents:", err);
+    }
+}
+
+/**
+ * Hide recent documents panel
+ */
+function hideRecentDocuments() {
+    const recentPanel = document.getElementById("recent-documents");
+    const editor = document.getElementById("editor");
+    
+    if (recentPanel) recentPanel.style.display = "none";
+    if (editor) editor.style.display = "block";
+}
+
+/**
+ * Update UI based on open documents
+ */
+function updateDocumentUI() {
+    const docs = getOpenDocuments();
+    if (docs.size === 0) {
+        showRecentDocuments();
+    } else {
+        hideRecentDocuments();
+    }
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
     // Initialize profile settings UI
     initProfileSettings();
 
     // Initialize conflict UI
     initConflictUI();
+    
+    // Initialize keyboard shortcuts
+    initKeyboardShortcuts();
+    
+    // Initialize document tabs
+    initDocumentTabs();
+    
+    // Initialize document manager
+    try {
+        await initDocumentManager();
+        updateDocumentUI();
+    } catch (err) {
+        console.error("Failed to initialize document manager:", err);
+        showRecentDocuments();
+    }
+    
+    // Listen for document changes
+    onDocumentChange((event, doc) => {
+        updateDocumentUI();
+    });
 
-    // KMD file operations
-    const exportKmdBtn = document.getElementById("export-kmd-btn");
-    const importKmdBtn = document.getElementById("import-kmd-btn");
+    // Document operation buttons
+    const newDocBtn = document.getElementById("new-doc-btn");
+    const openDocBtn = document.getElementById("open-doc-btn");
+    const saveDocBtn = document.getElementById("save-doc-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
 
-    if (exportKmdBtn) {
-        exportKmdBtn.addEventListener("click", async () => {
+    if (newDocBtn) {
+        newDocBtn.addEventListener("click", async () => {
             try {
-                const result = await exportDocument();
-                if (result) {
-                    console.log("Exported to:", result.path);
-                    console.log("Document metadata:", result.meta);
-                    // Could show success notification here
-                }
+                await newDocument();
             } catch (err) {
-                console.error("Export failed:", err);
-                alert("Export failed: " + err);
+                console.error("Failed to create new document:", err);
+                alert("Failed to create new document: " + err);
             }
         });
     }
-
-    if (importKmdBtn) {
-        importKmdBtn.addEventListener("click", async () => {
+    
+    if (openDocBtn) {
+        openDocBtn.addEventListener("click", async () => {
             try {
-                const meta = await importDocument();
-                if (meta) {
-                    console.log("Imported document:", meta.title);
-                    // Reload to apply the imported Yjs state.
-                    // TODO: In the future, consider implementing a more graceful
-                    // refresh mechanism that reinitializes Yjs without full page reload.
-                    // This would preserve UI state better, but requires careful handling
-                    // of the Yjs document merge and editor re-sync.
-                    location.reload();
-                }
+                await openDocument();
             } catch (err) {
-                console.error("Import failed:", err);
-                alert("Import failed: " + err);
+                if (!err.toString().includes("No file selected")) {
+                    console.error("Failed to open document:", err);
+                    alert("Failed to open document: " + err);
+                }
+            }
+        });
+    }
+    
+    if (saveDocBtn) {
+        saveDocBtn.addEventListener("click", async () => {
+            try {
+                await saveDocument();
+            } catch (err) {
+                if (!err.toString().includes("cancelled")) {
+                    console.error("Failed to save document:", err);
+                    alert("Failed to save document: " + err);
+                }
             }
         });
     }
@@ -66,11 +169,48 @@ window.addEventListener("DOMContentLoaded", async () => {
                 const path = await exportAsMarkdown(currentMarkdown);
                 if (path) {
                     console.log("Exported Markdown to:", path);
-                    // Could show success notification here
                 }
             } catch (err) {
                 console.error("Markdown export failed:", err);
                 alert("Markdown export failed: " + err);
+            }
+        });
+    }
+    
+    // Recent documents panel buttons
+    const newDocumentBtn = document.getElementById("new-document-btn");
+    const openDocumentBtn = document.getElementById("open-document-btn");
+    const clearRecentBtn = document.getElementById("clear-recent-btn");
+    
+    if (newDocumentBtn) {
+        newDocumentBtn.addEventListener("click", async () => {
+            try {
+                await newDocument();
+            } catch (err) {
+                console.error("Failed to create new document:", err);
+            }
+        });
+    }
+    
+    if (openDocumentBtn) {
+        openDocumentBtn.addEventListener("click", async () => {
+            try {
+                await openDocument();
+            } catch (err) {
+                if (!err.toString().includes("No file selected")) {
+                    console.error("Failed to open document:", err);
+                }
+            }
+        });
+    }
+    
+    if (clearRecentBtn) {
+        clearRecentBtn.addEventListener("click", async () => {
+            try {
+                await clearRecentDocuments();
+                await showRecentDocuments();
+            } catch (err) {
+                console.error("Failed to clear recent documents:", err);
             }
         });
     }

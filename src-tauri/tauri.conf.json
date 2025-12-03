@@ -26,7 +26,14 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": []
+    "icon": [],
+    "fileAssociations": [
+      {
+        "ext": ["kmd"],
+        "mimeType": "application/vnd.korppi.document+zip",
+        "description": "Korppi Markdown Document"
+      }
+    ]
   },
   "plugins": {}
 }

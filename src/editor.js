@@ -8,13 +8,14 @@ import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
 
-import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence } from "./yjs-setup.js";
+import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence, switchDocument, loadDocumentState } from "./yjs-setup.js";
 import { stepToSemanticPatch } from "./patch-extractor.js";
 import {
     addSemanticPatches,
     flushGroup
 } from "./patch-grouper.js";
 import { initProfile } from "./profile-service.js";
+import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 
 // ---------------------------------------------------------------------------
 //  Initialize profile and Yjs document state before creating the editor.
@@ -24,7 +25,19 @@ try {
 } catch (err) {
     console.warn("Failed to initialize profile, using defaults:", err);
 }
-await loadInitialDoc();
+
+// Try to load document state from active document, fall back to legacy
+const activeId = getActiveDocumentId();
+if (activeId) {
+    try {
+        await loadDocumentState(activeId);
+    } catch (err) {
+        console.warn("Failed to load active document, trying legacy:", err);
+        await loadInitialDoc();
+    }
+} else {
+    await loadInitialDoc();
+}
 enablePersistence();
 
 // ---------------------------------------------------------------------------
@@ -77,9 +90,19 @@ editor.action((ctx) => {
 
             // Only when the grouper flushes do we persist to SQLite
             if (groupedRecord) {
-                invoke("record_patch", { patch: groupedRecord }).catch((err) => {
-                    console.error("Failed to record grouped patch:", err);
-                });
+                // Try to record to active document, fall back to global
+                const docId = getActiveDocumentId();
+                if (docId) {
+                    invoke("record_document_patch", { id: docId, patch: groupedRecord }).catch((err) => {
+                        console.error("Failed to record document patch:", err);
+                        // Fall back to global patch log
+                        invoke("record_patch", { patch: groupedRecord }).catch(() => {});
+                    });
+                } else {
+                    invoke("record_patch", { patch: groupedRecord }).catch((err) => {
+                        console.error("Failed to record grouped patch:", err);
+                    });
+                }
             }
 
             return null;
@@ -100,6 +123,19 @@ editor.action((ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+//  Handle document switching
+// ---------------------------------------------------------------------------
+onDocumentChange(async (event, doc) => {
+    if (event === "activeChange" && doc) {
+        try {
+            await switchDocument(doc.id);
+        } catch (err) {
+            console.error("Failed to switch document:", err);
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
 //  Lifecycle integration — ensure we flush + save on loss of focus.
 // ---------------------------------------------------------------------------
 
@@ -107,9 +143,14 @@ editor.action((ctx) => {
 window.addEventListener("blur", () => {
     const record = flushGroup();
     if (record) {
-        invoke("record_patch", { patch: record }).catch((err) => {
-            console.error("Failed to record grouped patch on blur:", err);
-        });
+        const docId = getActiveDocumentId();
+        if (docId) {
+            invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+        } else {
+            invoke("record_patch", { patch: record }).catch((err) => {
+                console.error("Failed to record grouped patch on blur:", err);
+            });
+        }
     }
     forceSave();
 });
@@ -119,7 +160,12 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
         const record = flushGroup();
         if (record) {
-            invoke("record_patch", { patch: record }).catch(() => {});
+            const docId = getActiveDocumentId();
+            if (docId) {
+                invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+            } else {
+                invoke("record_patch", { patch: record }).catch(() => {});
+            }
         }
         forceSave();
     }
@@ -129,8 +175,13 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("beforeunload", () => {
     const record = flushGroup();
     if (record) {
-        // Fire and forget — cannot guarantee async execution
-        invoke("record_patch", { patch: record }).catch(() => {});
+        const docId = getActiveDocumentId();
+        if (docId) {
+            invoke("record_document_patch", { id: docId, patch: record }).catch(() => {});
+        } else {
+            // Fire and forget — cannot guarantee async execution
+            invoke("record_patch", { patch: record }).catch(() => {});
+        }
     }
     forceSave();
 });

@@ -10,13 +10,160 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
     background: #1e1e1e;
     color: #e0e0e0;
-    padding: 24px;
+    padding: 0;
     line-height: 1.6;
 }
 
 .container {
     max-width: 900px;
     margin: 0 auto;
+    padding: 24px;
+}
+
+/* DOCUMENT TABS */
+.document-tabs {
+    display: flex;
+    background: #252525;
+    border-bottom: 1px solid #333;
+    padding: 4px 4px 0;
+    overflow-x: auto;
+    min-height: 42px;
+}
+
+.document-tab {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: #333;
+    border: 1px solid #444;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    margin-right: 2px;
+    cursor: pointer;
+    max-width: 200px;
+    color: #aaa;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.document-tab:hover {
+    background: #3a3a3a;
+}
+
+.document-tab.active {
+    background: #1e1e1e;
+    border-bottom: 1px solid #1e1e1e;
+    margin-bottom: -1px;
+    color: #e0e0e0;
+}
+
+.document-tab .tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.document-tab .tab-modified {
+    color: #e74c3c;
+    margin-left: 4px;
+    font-weight: bold;
+}
+
+.document-tab .tab-close {
+    margin-left: 8px;
+    opacity: 0.6;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.document-tab .tab-close:hover {
+    opacity: 1;
+    color: #e74c3c;
+}
+
+.new-tab-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #888;
+    transition: color 0.2s;
+}
+
+.new-tab-btn:hover {
+    color: #4fc3f7;
+    background: transparent;
+}
+
+/* RECENT DOCUMENTS */
+.recent-documents {
+    background: #2a2a2a;
+    padding: 24px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    border: 1px solid #333;
+}
+
+.recent-documents h2 {
+    color: #4fc3f7;
+    margin-bottom: 16px;
+    font-size: 1.4rem;
+}
+
+.recent-documents ul {
+    list-style: none;
+    margin-bottom: 20px;
+}
+
+.recent-documents li {
+    padding: 12px 16px;
+    background: #333;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.recent-documents li:hover {
+    background: #3a3a3a;
+}
+
+.recent-documents .doc-title {
+    font-weight: 500;
+    color: #e0e0e0;
+}
+
+.recent-documents .doc-path {
+    font-size: 0.8rem;
+    color: #888;
+    margin-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
+}
+
+.recent-documents .doc-date {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.recent-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.recent-documents .empty-message {
+    color: #888;
+    font-style: italic;
+    padding: 24px;
+    text-align: center;
 }
 
 /* HEADER */
