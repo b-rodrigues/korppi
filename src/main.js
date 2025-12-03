@@ -15,6 +15,7 @@ import {
 } from "./document-manager.js";
 import { initDocumentTabs } from "./document-tabs.js";
 import { initKeyboardShortcuts } from "./keyboard-shortcuts.js";
+import { initCollaborationUI, refreshPendingBadge } from "./collaboration-ui.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -106,6 +107,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Initialize document tabs
     initDocumentTabs();
     
+    // Initialize collaboration UI
+    initCollaborationUI();
+    
     // Initialize document manager
     try {
         await initDocumentManager();
@@ -118,6 +122,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Listen for document changes
     onDocumentChange((event, doc) => {
         updateDocumentUI();
+        refreshPendingBadge();
     });
 
     // Document operation buttons

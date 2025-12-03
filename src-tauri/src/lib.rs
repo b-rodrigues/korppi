@@ -7,6 +7,7 @@ pub mod conflict_commands;
 pub mod profile;
 pub mod kmd;
 pub mod document_manager;
+pub mod patch_bundle;
 
 use std::sync::Mutex;
 use patch_log::{list_patches, record_patch, get_patch};
@@ -20,6 +21,10 @@ use document_manager::{
     set_active_document, get_active_document, get_document_state,
     update_document_state, mark_document_modified, update_document_title,
     record_document_patch, list_document_patches, get_initial_file, DocumentManager,
+};
+use patch_bundle::{
+    export_patch_bundle, import_patch_bundle, preview_patch_bundle,
+    get_sync_state, get_pending_changes_count,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -67,6 +72,12 @@ pub fn run() {
             record_document_patch,
             list_document_patches,
             get_initial_file,
+            // Patch bundle collaboration commands
+            export_patch_bundle,
+            import_patch_bundle,
+            preview_patch_bundle,
+            get_sync_state,
+            get_pending_changes_count,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

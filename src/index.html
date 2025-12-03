@@ -21,6 +21,11 @@
                 <button id="open-doc-btn" class="header-btn" title="Open Document (Ctrl+O)">📂 Open</button>
                 <button id="save-doc-btn" class="header-btn" title="Save Document (Ctrl+S)">💾 Save</button>
                 <button id="export-md-btn" class="header-btn" title="Export as Markdown">📝 Export MD</button>
+                <div class="collaboration-section">
+                    <button id="share-changes-btn" class="header-btn" title="Share changes via email">📤 Share</button>
+                    <button id="import-changes-btn" class="header-btn" title="Import changes from collaborator">📥 Import</button>
+                    <span id="pending-changes-badge" class="badge hidden">0</span>
+                </div>
                 <button id="settings-btn" class="header-btn">⚙️ Settings</button>
             </div>
         </header>
@@ -94,6 +99,68 @@
             </div>
             <div class="modal-footer">
                 <button id="profile-save-btn" class="primary">Save Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Changes Modal -->
+    <div id="share-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 Share Changes</h2>
+                <button id="share-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="share-info">
+                    <p>Export your changes to share with collaborators via email.</p>
+                    <p id="share-changes-summary" class="changes-summary">Calculating changes...</p>
+                </div>
+                <div class="form-group">
+                    <label for="collaborator-select">Sharing with:</label>
+                    <select id="collaborator-select">
+                        <option value="">New collaborator...</option>
+                        <!-- Previous collaborators listed here -->
+                    </select>
+                </div>
+                <div id="share-collaborators" class="collaborators-list">
+                    <!-- Known collaborators will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="export-bundle-btn" class="primary">📤 Export Patch Bundle</button>
+                <button id="cancel-share-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Changes Modal -->
+    <div id="import-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📥 Import Changes</h2>
+                <button id="import-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="import-instructions" class="import-instructions">
+                    <p>Select a patch bundle file (.kmd-patch) received from a collaborator.</p>
+                    <button id="select-bundle-btn" class="primary">📁 Select File</button>
+                </div>
+                <div id="import-preview" class="import-preview" style="display: none;">
+                    <p><strong>From:</strong> <span id="import-author">-</span></p>
+                    <p><strong>Document:</strong> <span id="import-doc-title">-</span></p>
+                    <p><strong>Changes:</strong> <span id="import-count">-</span></p>
+                    <p><strong>Date range:</strong> <span id="import-dates">-</span></p>
+                </div>
+                <div id="import-conflicts" class="conflicts-warning" style="display: none;">
+                    ⚠️ <span id="conflict-count">0</span> potential conflicts detected
+                </div>
+                <div id="import-doc-mismatch" class="doc-mismatch-warning" style="display: none;">
+                    ⚠️ This patch bundle is from a different document. Changes will be merged into the current document.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-import-btn" class="primary" style="display: none;">📥 Import Changes</button>
+                <button id="cancel-import-btn">Cancel</button>
             </div>
         </div>
     </div>
