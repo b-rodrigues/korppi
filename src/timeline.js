@@ -49,7 +49,7 @@ export async function restoreToPatch(patchId) {
 
     const ts = new Date(patch.timestamp).toLocaleString();
     const confirmMsg = `This will revert to version #${patchId} from ${ts}.\n\nYour current changes will be saved first.\n\nContinue?`;
-    
+
     if (!confirm(confirmMsg)) {
         return false;
     }
@@ -150,7 +150,10 @@ export function renderPatchList(patches) {
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
                 </div>
-                ${canRestore ? `<button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩ Restore</button>` : ''}
+                <div class="timeline-item-actions">
+                    <button class="view-btn" data-patch-id="${patch.id}" title="View content">👁️</button>
+                    ${canRestore ? `<button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩</button>` : ''}
+                </div>
             </div>
             <div class="timeline-timestamp">${ts}</div>
         `;
@@ -161,17 +164,97 @@ export function renderPatchList(patches) {
     // Add click handlers for restore buttons
     list.querySelectorAll('.restore-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            e.stopPropagation(); // Prevent triggering the timeline item click
+            e.stopPropagation();
             const patchId = parseInt(btn.dataset.patchId);
             await restoreToPatch(patchId);
         });
     });
+
+    // Add click handlers for view buttons
+    list.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const patchId = parseInt(btn.dataset.patchId);
+            await viewPatchContent(patchId);
+        });
+    });
+}
+
+/**
+ * View the content of a patch in a modal
+ * @param {number} patchId - The ID of the patch to view
+ */
+async function viewPatchContent(patchId) {
+    const patch = await fetchPatch(patchId);
+    if (!patch) {
+        alert("Failed to load patch");
+        return;
+    }
+
+    const content = patch.data?.snapshot || "No content available";
+    showContentModal(patchId, content);
+}
+
+/**
+ * Show a modal with patch content
+ * @param {number} patchId - Patch ID
+ * @param {string} content - Content to display
+ */
+function showContentModal(patchId, content) {
+    let modal = document.getElementById("patch-content-modal");
+
+    if (!modal) {
+        // Create modal on first use
+        modal = document.createElement("div");
+        modal.id = "patch-content-modal";
+        modal.className = "modal";
+        modal.style.cssText = "display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,0.4);";
+
+        modal.innerHTML = `
+            <div class="modal-content" style="background-color:#fefefe;margin:5% auto;padding:0;border:1px solid #888;width:80%;max-width:800px;box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                <div class="modal-header" style="padding:15px;background-color:#f1f1f1;border-bottom:1px solid #ddd;">
+                    <span class="modal-close" style="color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer;">&times;</span>
+                    <h2 style="margin:0;">Patch Content</h2>
+                </div>
+                <div class="modal-body" style="padding:20px;max-height:60vh;overflow-y:auto;">
+                    <pre id="patch-content" style="background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;"></pre>
+                </div>
+                <div class="modal-footer" style="padding:15px;background-color:#f1f1f1;border-top:1px solid #ddd;text-align:right;">
+                    <button class="modal-close-btn" style="padding:8px 16px;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close handlers
+        const closeModal = () => { modal.style.display = "none"; };
+        modal.querySelector(".modal-close").onclick = closeModal;
+        modal.querySelector(".modal-close-btn").onclick = closeModal;
+
+        // Click outside to close
+        window.onclick = (event) => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        };
+    }
+
+    // Update content
+    const contentEl = modal.querySelector("#patch-content");
+    const headerEl = modal.querySelector(".modal-header h2");
+
+    if (contentEl) contentEl.textContent = content;
+    if (headerEl) headerEl.textContent = `Patch #${patchId} Content`;
+
+    // Show modal
+    modal.style.display = "block";
 }
 
 export function renderPatchDetails(patch) {
     const details = document.getElementById("timeline-details");
     const canRestore = hasSnapshotContent(patch);
-    
+
     details.innerHTML = `
         <h3>Patch #${patch.id}</h3>
         <p><strong>Author:</strong> ${patch.author}</p>
