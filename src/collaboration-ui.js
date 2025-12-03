@@ -146,18 +146,24 @@ async function openShareModal() {
                 option.textContent = collab.collaborator_name;
                 collaboratorSelect.appendChild(option);
                 
-                // Add to list
+                // Add to list (using safe DOM manipulation to prevent XSS)
                 const item = document.createElement("div");
                 item.className = "collaborator-item";
+                
+                const nameSpan = document.createElement("span");
+                nameSpan.className = "name";
+                nameSpan.textContent = collab.collaborator_name;
                 
                 const lastSent = collab.last_sent 
                     ? new Date(collab.last_sent).toLocaleDateString()
                     : "Never";
                 
-                item.innerHTML = `
-                    <span class="name">${collab.collaborator_name}</span>
-                    <span class="last-sync">Last shared: ${lastSent}</span>
-                `;
+                const syncSpan = document.createElement("span");
+                syncSpan.className = "last-sync";
+                syncSpan.textContent = `Last shared: ${lastSent}`;
+                
+                item.appendChild(nameSpan);
+                item.appendChild(syncSpan);
                 collaboratorsList.appendChild(item);
             });
         }

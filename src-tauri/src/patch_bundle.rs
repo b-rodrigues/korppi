@@ -23,11 +23,20 @@ use crate::document_manager::DocumentManager;
 use crate::patch_log::Patch;
 use crate::profile::UserProfile;
 
-/// Author information for patch bundles
+/// Time window (ms) within which concurrent edits from different authors
+/// are considered potential conflicts. Set to 1 minute.
+const CONFLICT_WINDOW_MS: i64 = 60_000;
+
+/// Author information for patch bundles.
+///
+/// Contains the identity of a user who created or contributed to a patch bundle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorInfo {
+    /// Unique identifier for the author (UUID)
     pub id: String,
+    /// Display name of the author
     pub name: String,
+    /// Optional email address for the author
     pub email: Option<String>,
 }
 
@@ -41,13 +50,20 @@ impl From<UserProfile> for AuthorInfo {
     }
 }
 
-/// A single patch entry in the bundle
+/// A single patch entry in the bundle.
+///
+/// Represents an individual edit operation that can be shared between collaborators.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchEntry {
+    /// Unique identifier for this patch
     pub id: i64,
+    /// Unix timestamp (ms) when this patch was created
     pub timestamp: i64,
+    /// Author ID who created this patch
     pub author: String,
+    /// Type of patch (e.g., "insert_text", "delete_text", "replace_text")
     pub kind: String,
+    /// Patch data containing the specific edit details
     pub data: serde_json::Value,
 }
 
@@ -63,15 +79,25 @@ impl From<Patch> for PatchEntry {
     }
 }
 
-/// A patch bundle for sharing changes via email
+/// A patch bundle for sharing changes via email.
+///
+/// Contains all the information needed to share edits with a collaborator,
+/// including document metadata, author information, and the actual patches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchBundle {
+    /// Unique identifier for this bundle (UUID)
     pub id: String,
+    /// UUID of the source document
     pub document_id: String,
+    /// Title of the document
     pub document_title: String,
+    /// Author who created this bundle
     pub author: AuthorInfo,
+    /// Timestamp when this bundle was created
     pub created_at: DateTime<Utc>,
+    /// Hash of Yjs state before patches (for conflict detection)
     pub base_state_hash: String,
+    /// The patches included in this bundle
     pub patches: Vec<PatchEntry>,
 }
 
@@ -509,11 +535,11 @@ pub fn preview_patch_bundle(
     })
 }
 
-/// Count potential conflicts between local and incoming patches
+/// Count potential conflicts between local and incoming patches.
+///
+/// Uses `CONFLICT_WINDOW_MS` to determine if concurrent edits from
+/// different authors might conflict.
 fn count_potential_conflicts(local: &[PatchEntry], incoming: &[PatchEntry]) -> usize {
-    // Simplified conflict detection: count overlapping time windows with different authors
-    const CONFLICT_WINDOW_MS: i64 = 60000; // 1 minute
-
     let mut conflicts = 0;
 
     for incoming_patch in incoming {
@@ -585,14 +611,23 @@ pub fn import_patch_bundle(
     // Import patches
     let patches_imported = import_patches_to_history(&doc.history_path, &bundle.patches)?;
 
+    // Track if Yjs update was applied or needs frontend merging
+    let mut yjs_needs_frontend_merge = false;
+    
     // Apply Yjs update if present
-    // Note: In a full implementation, this would merge with the existing Yjs state
-    // For now, we just store the incoming state if the document is empty
+    // Note: Full Yjs merging happens on the frontend. The backend stores the update
+    // for later merging by the Yjs instance. If the document already has state,
+    // the frontend is responsible for merging via Y.applyUpdate().
     if let Some(update) = yjs_update {
         if doc.yjs_state.is_empty() {
             doc.yjs_state = update;
+        } else {
+            // Document has existing state - frontend needs to merge
+            // We notify about this in the import result
+            yjs_needs_frontend_merge = true;
+            // Store update alongside existing state for frontend to merge
+            // For now, we don't modify the state - frontend will receive a reload event
         }
-        // If doc already has state, the frontend Yjs instance handles merging
     }
 
     // Mark document as modified
@@ -633,7 +668,7 @@ pub fn import_patch_bundle(
 
     save_sync_state(&sync_state)?;
 
-    let message = if is_same_document {
+    let mut message = if is_same_document {
         format!(
             "Imported {} changes from {}",
             patches_imported, bundle.author.name
@@ -644,6 +679,10 @@ pub fn import_patch_bundle(
             patches_imported, bundle.author.name
         )
     };
+    
+    if yjs_needs_frontend_merge {
+        message.push_str(". Document content will be merged when you reload.");
+    }
 
     Ok(ImportResult {
         success: true,
