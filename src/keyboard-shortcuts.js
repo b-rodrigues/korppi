@@ -63,8 +63,9 @@ async function handleKeyDown(e) {
                 }
                 
                 if (e.shiftKey) {
-                    // Save As - always show dialog by passing path: ""
-                    // The backend will interpret empty path as needing a dialog
+                    // Save As - pass null to trigger the save dialog
+                    // For a true "Save As", we need to pass a special indicator
+                    // Currently this behaves same as Save for unsaved documents
                     await saveDocument(activeId, null);
                 } else {
                     // Regular save

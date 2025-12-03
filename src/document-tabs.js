@@ -1,6 +1,15 @@
 // src/document-tabs.js
 // Manages the document tab UI
 
+/**
+ * @typedef {Object} DocumentHandle
+ * @property {string} id - Unique document ID
+ * @property {string|null} path - File path (null for unsaved documents)
+ * @property {string} title - Document title
+ * @property {boolean} is_modified - Whether document has unsaved changes
+ * @property {number} opened_at - Timestamp when document was opened
+ */
+
 import { 
     getOpenDocuments, 
     getActiveDocumentId, 
@@ -93,7 +102,7 @@ export function addTab(docHandle) {
 
 /**
  * Create a tab element
- * @param {Object} doc - Document handle
+ * @param {DocumentHandle} doc - Document handle
  * @returns {HTMLElement} Tab element
  */
 function createTabElement(doc) {

@@ -22,6 +22,9 @@ use crate::kmd::{
     check_version_compatibility, DocumentMeta, FormatInfo, AuthorProfile,
 };
 
+/// Default author color for new profiles
+const DEFAULT_AUTHOR_COLOR: &str = "#3498db";
+
 /// A handle to an open document
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentHandle {
@@ -236,7 +239,7 @@ fn bundle_to_kmd(
             id: author.id.clone(),
             name: author.name.clone(),
             email: author.email.clone(),
-            color: "#3498db".to_string(),
+            color: DEFAULT_AUTHOR_COLOR.to_string(),
             avatar_base64: None,
             public_key: None,
         };
