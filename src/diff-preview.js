@@ -1,8 +1,12 @@
 // src/diff-preview.js
 // Visual diff preview overlay for patches
 
+import { invoke } from '@tauri-apps/api/core';
 import { calculateCharDiff } from './diff-highlighter.js';
 import { getCachedProfile } from './profile-service.js';
+import { getActiveDocumentId } from './document-manager.js';
+import { mergeText } from './three-way-merge.js';
+import { getEditorContent } from './editor.js';
 
 let previewState = {
     active: false,
@@ -82,6 +86,8 @@ function showPreviewBanner() {
             <div class="preview-controls">
                 <button class="mode-btn active" data-mode="highlight">🎨 Highlight</button>
                 <button class="mode-btn" data-mode="diff">📝 Diff</button>
+                <button class="accept-patch-btn" style="background:#4caf50;color:white;margin-left:20px;">✓ Accept</button>
+                <button class="reject-patch-btn" style="background:#f44336;color:white;">✗ Reject</button>
                 <button class="exit-btn">✕ Exit Preview</button>
             </div>
         `;
@@ -101,6 +107,26 @@ function showPreviewBanner() {
         banner.querySelector('.exit-btn').addEventListener('click', () => {
             exitPreview();
         });
+
+        const acceptBtn = banner.querySelector('.accept-patch-btn');
+        const rejectBtn = banner.querySelector('.reject-patch-btn');
+
+        console.log("Accept button found:", acceptBtn);
+        console.log("Reject button found:", rejectBtn);
+
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', async () => {
+                console.log("Accept button clicked!");
+                await acceptCurrentPatch();
+            });
+        }
+
+        if (rejectBtn) {
+            rejectBtn.addEventListener('click', async () => {
+                console.log("Reject button clicked!");
+                await rejectCurrentPatch();
+            });
+        }
     }
 
     // Update patch ID
@@ -206,6 +232,100 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Accept the current patch being previewed
+ */
+async function acceptCurrentPatch() {
+    if (!previewState.active || !previewState.patchId) return;
+
+    const docId = getActiveDocumentId();
+    if (!docId) return;
+
+    try {
+        // Update review status in database
+        await invoke("update_patch_review_status", {
+            docId,
+            patchId: previewState.patchId,
+            status: "accepted"
+        });
+
+        // Perform 3-way merge
+        // base: original document (from first patch)
+        // local: current editor content
+        // canonical: the patch being accepted
+
+        const { fetchPatchList } = await import('./timeline.js');
+        const allPatches = await fetchPatchList();
+
+        // Find the base snapshot (first patch)
+        const savePatchesOnly = allPatches
+            .filter(p => p.kind === "Save" && p.data?.snapshot)
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+        const baseSnapshot = savePatchesOnly.length > 0
+            ? savePatchesOnly[0].data.snapshot
+            : '';
+
+        // Get current editor content (local)
+        const currentContent = getEditorContent();
+
+        // Get the patch content being accepted (canonical)
+        const patchContent = previewState.newText;
+
+        console.log("3-way merge:", {
+            base: baseSnapshot.substring(0, 50) + "...",
+            local: currentContent.substring(0, 50) + "...",
+            canonical: patchContent.substring(0, 50) + "..."
+        });
+
+        // Perform merge
+        const mergedContent = mergeText(baseSnapshot, currentContent, patchContent);
+
+        // Apply merged result to editor
+        const { restoreDocumentState } = await import('./yjs-setup.js');
+        restoreDocumentState(mergedContent);
+
+        alert("Patch accepted and merged!");
+        exitPreview();
+
+        // Refresh timeline
+        window.dispatchEvent(new CustomEvent('patch-status-updated'));
+
+    } catch (err) {
+        console.error("Failed to accept patch:", err);
+        alert(`Error: ${err}`);
+    }
+}
+
+/**
+ * Reject the current patch being previewed
+ */
+async function rejectCurrentPatch() {
+    if (!previewState.active || !previewState.patchId) return;
+
+    const docId = getActiveDocumentId();
+    if (!docId) return;
+
+    try {
+        // Update review status in database
+        await invoke("update_patch_review_status", {
+            docId,
+            patchId: previewState.patchId,
+            status: "rejected"
+        });
+
+        alert("Patch rejected!");
+        exitPreview();
+
+        // Refresh timeline
+        window.dispatchEvent(new CustomEvent('patch-status-updated'));
+
+    } catch (err) {
+        console.error("Failed to reject patch:", err);
+        alert(`Error: ${err}`);
+    }
 }
 
 /**

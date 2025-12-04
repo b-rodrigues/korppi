@@ -597,9 +597,10 @@ pub fn record_document_patch(
     
     let data_str = serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
     
+    // Current user's patches are auto-accepted (so we can distinguish from imported patches)
     conn.execute(
-        "INSERT INTO patches (timestamp, author, kind, data) VALUES (?1, ?2, ?3, ?4)",
-        params![patch.timestamp, patch.author, patch.kind, data_str],
+        "INSERT INTO patches (timestamp, author, kind, data, review_status) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![patch.timestamp, patch.author, patch.kind, data_str, "accepted"],
     ).map_err(|e| e.to_string())?;
     
     let patch_id = conn.last_insert_rowid();
@@ -638,7 +639,7 @@ pub fn list_document_patches(
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
     let mut stmt = conn
-        .prepare("SELECT id, timestamp, author, kind, data FROM patches ORDER BY id ASC")
+        .prepare("SELECT id, timestamp, author, kind, data, review_status FROM patches ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
     
     let rows = stmt
@@ -653,6 +654,7 @@ pub fn list_document_patches(
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
+                review_status: row.get(5).unwrap_or_else(|_| "pending".to_string()),
             })
         })
         .map_err(|e| e.to_string())?;

@@ -77,8 +77,7 @@ export async function saveDocument(id = null, path = null) {
                     kind: "Save",
                     data: {
                         snapshot: editorContent,
-                        authorColor,  // Store author color for multi-author highlighting
-                        review_status: "accepted"  // Auto-accept current user's patches
+                        authorColor  // Store author color for multi-author highlighting
                     }
                 };
                 await invoke("record_document_patch", { id: docId, patch });

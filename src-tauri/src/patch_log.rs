@@ -51,13 +51,19 @@ pub struct PatchInput {
     pub data: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Patch {
     pub id: i64,
     pub timestamp: i64,
     pub author: String,
     pub kind: String,
     pub data: serde_json::Value,
+    #[serde(default = "default_review_status")]
+    pub review_status: String,
+}
+
+fn default_review_status() -> String {
+    "pending".to_string()
 }
 
 #[tauri::command]
@@ -99,6 +105,7 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
+                review_status: "pending".to_string(),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -130,6 +137,7 @@ pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
+                review_status: "pending".to_string(),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -306,11 +314,11 @@ pub fn import_patches_from_document(
     let mut imported_patches = Vec::new();
     
     for (source_patch_id, timestamp, author, kind, data_str) in source_patches {
-        // Insert patch
+        // Insert patch with 'pending' review status (imported patches need review)
         target_conn
             .execute(
-                "INSERT INTO patches (timestamp, author, kind, data) VALUES (?1, ?2, ?3, ?4)",
-                params![timestamp, author, kind, data_str],
+                "INSERT INTO patches (timestamp, author, kind, data, review_status) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![timestamp, author, kind, data_str, "pending"],
             )
             .map_err(|e| e.to_string())?;
         
@@ -336,6 +344,7 @@ pub fn import_patches_from_document(
             author,
             kind,
             data,
+            review_status: "pending".to_string(),
         });
     }
     

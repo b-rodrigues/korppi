@@ -58,15 +58,26 @@
     ">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h2 style="margin:0;">Timeline</h2>
-            <select id="timeline-sort" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
-                <option value="time-desc">Newest First</option>
-                <option value="time-asc">Oldest First</option>
-                <option value="author">By Author</option>
-            </select>
+            <div style="display:flex;gap:8px;">
+                <select id="timeline-sort" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
+                    <option value="time-desc">Newest First</option>
+                    <option value="time-asc">Oldest First</option>
+                    <option value="author">By Author</option>
+                </select>
+                <select id="filter-author" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
+                    <option value="all">All Authors</option>
+                </select>
+                <select id="filter-status" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
         </div>
-        <button id="review-changes-btn"
-            style="display:none;margin-bottom:10px;width:100%;padding:10px;background:#e67e22;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
-            🔍 Review Changes
+        <button id="reset-to-original-btn"
+            style="margin-bottom:10px;width:100%;padding:8px;background:#e74c3c;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+            ↺ Reset to Original
         </button>
 
         <div id="timeline-list" style="

@@ -166,10 +166,34 @@ export function initTimeline() {
         });
     }
 
+    const filterAuthor = document.getElementById("filter-author");
+    const filterStatus = document.getElementById("filter-status");
+    const resetBtn = document.getElementById("reset-to-original-btn");
+
     // Wire up sort dropdown
     if (sortSelect) {
         sortSelect.addEventListener("change", () => {
             refreshTimeline();
+        });
+    }
+
+    // Wire up filter dropdowns
+    if (filterAuthor) {
+        filterAuthor.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    if (filterStatus) {
+        filterStatus.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up reset button
+    if (resetBtn) {
+        resetBtn.addEventListener("click", async () => {
+            await resetToOriginal();
         });
     }
 
@@ -180,6 +204,11 @@ export function initTimeline() {
             enterReviewMode();
         });
     }
+
+    // Listen for patch status updates
+    window.addEventListener('patch-status-updated', async () => {
+        await refreshTimeline();
+    });
 
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
@@ -198,26 +227,55 @@ export function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
-    // Filter to only show patches with snapshots (Save patches)
-    let savePatchesOnly = patches.filter(patch => hasSnapshotContent(patch));
+    // Get filter values
+    const authorFilter = document.getElementById("filter-author")?.value || "all";
+    const statusFilter = document.getElementById("filter-status")?.value || "all";
+    const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
 
-    // Apply sorting based on selected option
-    const sortSelect = document.getElementById("timeline-sort");
-    const sortBy = sortSelect?.value || "time-desc";
+    // Populate author dropdown with unique authors
+    const filterAuthorSelect = document.getElementById("filter-author");
+    if (filterAuthorSelect && patches.length > 0) {
+        const uniqueAuthors = [...new Set(patches.map(p => p.author))];
+        const currentValue = filterAuthorSelect.value;
 
-    if (sortBy === "time-desc") {
-        savePatchesOnly.sort((a, b) => b.timestamp - a.timestamp);
-    } else if (sortBy === "time-asc") {
-        savePatchesOnly.sort((a, b) => a.timestamp - b.timestamp);
-    } else if (sortBy === "author") {
-        savePatchesOnly.sort((a, b) => {
+        filterAuthorSelect.innerHTML = '<option value="all">All Authors</option>' +
+            uniqueAuthors.map(author =>
+                `<option value="${author}" ${currentValue === author ? 'selected' : ''}>${author}</option>`
+            ).join('');
+    }
+
+    // Filter patches
+    let filteredPatches = patches.filter(p => {
+        // Filter by author
+        if (authorFilter !== "all" && p.author !== authorFilter) {
+            return false;
+        }
+
+        // Filter by status
+        if (statusFilter !== "all" && p.review_status !== statusFilter) {
+            return false;
+        }
+
+        return true;
+    });
+
+    // Sort patches
+    if (sortOrder === "time-asc") {
+        filteredPatches.sort((a, b) => a.timestamp - b.timestamp);
+    } else if (sortOrder === "time-desc") {
+        filteredPatches.sort((a, b) => b.timestamp - a.timestamp);
+    } else if (sortOrder === "author") {
+        filteredPatches.sort((a, b) => {
             const authorCompare = a.author.localeCompare(b.author);
             if (authorCompare !== 0) return authorCompare;
             return b.timestamp - a.timestamp; // Secondary sort by time
         });
     }
 
-    savePatchesOnly.forEach((patch) => {
+    // Filter to only show patches with snapshots  
+    filteredPatches = filteredPatches.filter(patch => hasSnapshotContent(patch));
+
+    filteredPatches.forEach((patch) => {
         const div = document.createElement("div");
         div.className = "timeline-item";
         if (patch.id === restoredPatchId) {
@@ -302,21 +360,35 @@ async function previewPatch(patchId) {
         return;
     }
 
-    const newText = patch.data?.snapshot || "";
+    // Import dependencies
+    const { getEditorContent } = await import('./editor.js');
+    const { mergeText } = await import('./three-way-merge.js');
 
-    // Get previous SAVE patch for comparison
+    // Get current editor content as the "old" state
+    const currentContent = getEditorContent();
+
+    // Calculate what the merged result would be (3-way merge simulation)
+    // base: first patch snapshot
+    // local: current editor content
+    // canonical: patch being previewed
+
     const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches.filter(p => hasSnapshotContent(p));
-    const currentIndex = savePatchesOnly.findIndex(p => p.id === patchId);
+    const savePatchesOnly = allPatches
+        .filter(p => p.kind === "Save" && p.data?.snapshot)
+        .sort((a, b) => a.timestamp - b.timestamp);
 
-    let oldText = "";
-    if (currentIndex > 0) {
-        const previousPatch = savePatchesOnly[currentIndex - 1];
-        oldText = previousPatch.data?.snapshot || "";
-    }
+    const baseSnapshot = savePatchesOnly.length > 0
+        ? savePatchesOnly[0].data.snapshot
+        : '';
 
-    // Enter preview mode
-    enterPreview(patchId, oldText, newText);
+    const patchContent = patch.data?.snapshot || '';
+
+    // Simulate what the merge would produce
+    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+
+    // Show diff from current content to merged result
+    // This shows "what will change if you accept this patch"
+    enterPreview(patchId, currentContent, mergedResult);
 }
 
 /**
@@ -530,5 +602,51 @@ export function renderPatchDetails(patch) {
             const patchId = parseInt(restoreBtn.dataset.patchId);
             await restoreToPatch(patchId);
         });
+    }
+}
+
+/**
+ * Reset document to state before reconciliation
+ */
+async function resetToOriginal() {
+    console.log("resetToOriginal called");
+
+    const snapshot = localStorage.getItem('reconciliation-snapshot');
+
+    if (!snapshot) {
+        alert("No reconciliation snapshot found. This only works after importing patches.");
+        return;
+    }
+
+    console.log("Showing confirmation dialog");
+    let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted imported patches.");
+
+    // Tauri's confirm returns a Promise, handle both cases
+    if (userConfirmed instanceof Promise) {
+        userConfirmed = await userConfirmed;
+    }
+
+    console.log("User confirmed:", userConfirmed);
+
+    if (!userConfirmed) {
+        console.log("User cancelled reset");
+        return;
+    }
+
+    console.log("Proceeding with reset");
+
+    try {
+        const success = restoreDocumentState(snapshot);
+        if (success) {
+            // Clear the snapshot after successful restore
+            localStorage.removeItem('reconciliation-snapshot');
+            alert("Document restored to state before reconciliation");
+            await refreshTimeline();
+        } else {
+            alert("Failed to restore document");
+        }
+    } catch (err) {
+        console.error("Reset failed:", err);
+        alert(`Failed to reset: ${err}`);
     }
 }
