@@ -731,3 +731,50 @@ textarea {
 .preview-btn:active {
     transform: scale(0.95);
 }
+/* RECONCILIATION UI */
+#reconcile-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 2px solid #e67e22;
+    box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+}
+
+.reconcile-info { flex: 1; }
+.reconcile-label { font-weight: 600; color: #e67e22; font-size: 1rem; }
+.reconcile-controls { display: flex; gap: 8px; }
+
+.nav-btn, .bulk-btn, .apply-btn, .cancel-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.nav-btn { background: #555; color: #fff; }
+.bulk-btn { background: #3498db; color: #fff; }
+.apply-btn { background: #27ae60; color: #fff; }
+.cancel-btn { background: #e74c3c; color: #fff; }
+
+#reconcile-sidebar {
+    display: none;
+    position: fixed;
+    right: 0;
+    top: 100px;
+    width: 250px;
+    background: #2a2a2a;
+    border-left: 2px solid #444;
+    padding: 20px;
+    z-index: 100;
+}
+
+.author-list { display: flex; flex-direction: column; gap: 12px; }
+.author-item { padding: 10px; background: #333; border-radius: 6px; }
+.status-pending { color: #f39c12; }
+.status-accepted { color: #27ae60; }
+.status-rejected { color: #e74c3c; }

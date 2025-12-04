@@ -9,7 +9,7 @@ pub mod kmd;
 pub mod document_manager;
 
 use std::sync::Mutex;
-use patch_log::{list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch, restore_to_patch};
+use patch_log::{list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch, restore_to_patch, import_patches_from_document};
 use yjs_store::{load_doc, store_update};
 use conflict_commands::{detect_conflicts, get_conflicts, resolve_conflict, get_conflict_count};
 use profile::{get_profile, save_profile, get_profile_path};
@@ -73,6 +73,7 @@ pub fn run() {
             get_initial_file,
             save_document_snapshot,
             restore_document_to_patch,
+            import_patches_from_document,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

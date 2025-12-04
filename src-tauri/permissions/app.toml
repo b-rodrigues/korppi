@@ -39,5 +39,9 @@ commands.allow = [
     "update_document_title",
     "record_document_patch",
     "list_document_patches",
-    "get_initial_file"
+    "get_initial_file",
+    "save_document_snapshot",
+    "restore_document_to_patch",
+    "import_patches_from_document"
 ]
+

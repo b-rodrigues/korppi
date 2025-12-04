@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { forceSave, restoreDocumentState } from "./yjs-setup.js";
 import { getActiveDocumentId } from "./document-manager.js";
 import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
+import { calculateCharDiff } from "./diff-highlighter.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -112,7 +113,7 @@ export async function restoreToPatch(patchId) {
 /**
  * Refresh the timeline list
  */
-async function refreshTimeline() {
+export async function refreshTimeline() {
     const patches = await fetchPatchList();
     renderPatchList(patches);
 }
@@ -131,12 +132,90 @@ function setRestoreInProgress(inProgress) {
     }
 }
 
+/**
+ * Initialize timeline UI
+ */
+export function initTimeline() {
+    const toggleBtn = document.getElementById("timeline-toggle");
+    const container = document.getElementById("timeline-container");
+    const reviewBtn = document.getElementById("review-changes-btn");
+    const sortSelect = document.getElementById("timeline-sort");
+
+    if (toggleBtn && container) {
+        toggleBtn.addEventListener("click", async (e) => {
+            e.stopPropagation(); // Prevent click from bubbling
+            const isVisible = container.style.display !== "none";
+            if (isVisible) {
+                container.style.display = "none";
+            } else {
+                container.style.display = "block";
+                // Load patches when opening
+                await refreshTimeline();
+            }
+        });
+
+        // Close timeline when clicking outside (but not in preview mode)
+        document.addEventListener("click", (e) => {
+            const isVisible = container.style.display !== "none";
+            const inPreviewMode = isPreviewActive();
+            if (isVisible &&
+                !inPreviewMode &&  // Don't close in preview mode
+                !container.contains(e.target)) {
+                container.style.display = "none";
+            }
+        });
+    }
+
+    // Wire up sort dropdown
+    if (sortSelect) {
+        sortSelect.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up Review Changes button
+    if (reviewBtn) {
+        reviewBtn.addEventListener("click", () => {
+            const { enterReviewMode } = require("./reconcile.js");
+            enterReviewMode();
+        });
+    }
+
+    // Listen for reconciliation import event
+    window.addEventListener('reconciliation-imported', async () => {
+        await refreshTimeline();
+        // Show the Review Changes button
+        if (reviewBtn) {
+            reviewBtn.style.display = "block";
+        }
+    });
+
+    // Initial load
+    refreshTimeline();
+}
+
 export function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
     // Filter to only show patches with snapshots (Save patches)
-    const savePatchesOnly = patches.filter(patch => hasSnapshotContent(patch));
+    let savePatchesOnly = patches.filter(patch => hasSnapshotContent(patch));
+
+    // Apply sorting based on selected option
+    const sortSelect = document.getElementById("timeline-sort");
+    const sortBy = sortSelect?.value || "time-desc";
+
+    if (sortBy === "time-desc") {
+        savePatchesOnly.sort((a, b) => b.timestamp - a.timestamp);
+    } else if (sortBy === "time-asc") {
+        savePatchesOnly.sort((a, b) => a.timestamp - b.timestamp);
+    } else if (sortBy === "author") {
+        savePatchesOnly.sort((a, b) => {
+            const authorCompare = a.author.localeCompare(b.author);
+            if (authorCompare !== 0) return authorCompare;
+            return b.timestamp - a.timestamp; // Secondary sort by time
+        });
+    }
 
     savePatchesOnly.forEach((patch) => {
         const div = document.createElement("div");
@@ -147,11 +226,13 @@ export function renderPatchList(patches) {
         div.dataset.id = patch.id;
 
         const ts = new Date(patch.timestamp).toLocaleString();
+        const authorColor = patch.data?.authorColor || "#3498db";
 
         div.innerHTML = `
             <div class="timeline-item-header">
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
+                    <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${patch.author}</span>
                 </div>
                 <div class="timeline-item-actions">
                     <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
@@ -163,6 +244,18 @@ export function renderPatchList(patches) {
         `;
 
         list.appendChild(div);
+
+        // Add click listener to auto-preview when already in preview mode
+        div.addEventListener('click', async (e) => {
+            // Don't interfere with button clicks
+            if (e.target.closest('button')) return;
+
+            // If in preview mode, automatically preview this patch
+            if (isPreviewActive()) {
+                const patchId = parseInt(div.dataset.id);
+                await previewPatch(patchId);
+            }
+        });
     });
 
     // Add click handlers for preview buttons
@@ -257,35 +350,59 @@ async function viewPatchContent(patchId) {
 }
 
 /**
- * Calculate a simple diff between two text strings
+ * Format character-level diff with better line grouping
  * @param {string} oldText - Previous text
  * @param {string} newText - Current text
- * @returns {string} Diff output
+ * @returns {string} Diff output with character-level granularity
  */
 function calculateDiff(oldText, newText) {
-    const oldLines = oldText.split('\n');
-    const newLines = newText.split('\n');
-    const diff = [];
+    const diffOps = calculateCharDiff(oldText, newText);
 
-    const maxLength = Math.max(oldLines.length, newLines.length);
+    // Group operations by line for better readability
+    const lines = [];
+    let currentLine = { add: '', delete: '', equal: '' };
 
-    for (let i = 0; i < maxLength; i++) {
-        const oldLine = oldLines[i];
-        const newLine = newLines[i];
+    const flushLine = () => {
+        if (currentLine.delete || currentLine.add || currentLine.equal) {
+            // Output deletions first, then additions, then unchanged
+            if (currentLine.delete) {
+                lines.push(`- ${currentLine.delete}`);
+            }
+            if (currentLine.add) {
+                lines.push(`+ ${currentLine.add}`);
+            }
+            if (currentLine.equal && !currentLine.delete && !currentLine.add) {
+                lines.push(`  ${currentLine.equal}`);
+            }
+            currentLine = { add: '', delete: '', equal: '' };
+        }
+    };
 
-        if (oldLine === undefined) {
-            diff.push(`+ ${newLine}`);
-        } else if (newLine === undefined) {
-            diff.push(`- ${oldLine}`);
-        } else if (oldLine !== newLine) {
-            diff.push(`- ${oldLine}`);
-            diff.push(`+ ${newLine}`);
+    for (const op of diffOps) {
+        const text = op.text;
+
+        if (text.includes('\n')) {
+            // Split on newlines
+            const parts = text.split('\n');
+            for (let i = 0; i < parts.length; i++) {
+                if (i > 0) {
+                    // Flush current line before newline
+                    flushLine();
+                }
+
+                if (parts[i]) {
+                    currentLine[op.type] += parts[i];
+                }
+            }
         } else {
-            diff.push(`  ${oldLine}`);
+            currentLine[op.type] += text;
         }
     }
 
-    return diff.join('\n');
+    // Flush any remaining content
+    flushLine();
+
+    return lines.join('\n');
 }
 
 /**

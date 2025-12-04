@@ -600,6 +600,21 @@ pub fn record_document_patch(
         params![patch.timestamp, patch.author, patch.kind, data_str],
     ).map_err(|e| e.to_string())?;
     
+    let patch_id = conn.last_insert_rowid();
+    
+    // If this is a Save patch with a snapshot, save it to the snapshots table
+    if patch.kind == "Save" {
+        if let Some(snapshot_str) = patch.data.get("snapshot") {
+            if let Some(snapshot_text) = snapshot_str.as_str() {
+                // Store the snapshot text as bytes
+                conn.execute(
+                    "INSERT INTO snapshots (timestamp, patch_id, state) VALUES (?1, ?2, ?3)",
+                    params![patch.timestamp, patch_id, snapshot_text.as_bytes()],
+                ).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    
     Ok(())
 }
 
