@@ -736,15 +736,24 @@ async function resetToOriginal() {
     console.log("Proceeding with reset");
 
     try {
+        const docId = getActiveDocumentId();
+
+        // Reset document content
         const success = restoreDocumentState(snapshot);
-        if (success) {
-            // Clear the snapshot after successful restore
-            localStorage.removeItem('reconciliation-snapshot');
-            alert("Document restored to state before reconciliation");
-            await refreshTimeline();
-        } else {
+        if (!success) {
             alert("Failed to restore document");
+            return;
         }
+
+        // Reset all patch statuses back to pending
+        await invoke("reset_imported_patches_status", { docId });
+
+        // DON'T clear the snapshot - keep it for future resets
+        // localStorage.removeItem('reconciliation-snapshot');
+
+        alert("Document restored to state before reconciliation. All patches reset to pending.");
+        await refreshTimeline();
+
     } catch (err) {
         console.error("Reset failed:", err);
         alert(`Failed to reset: ${err}`);

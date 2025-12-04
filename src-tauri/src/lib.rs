@@ -22,6 +22,7 @@ use document_manager::{
     record_document_patch, list_document_patches, get_initial_file,
     save_document_snapshot, restore_document_to_patch,
     update_patch_review_status,
+    reset_imported_patches_status,
     DocumentManager,
 };
 
@@ -73,9 +74,10 @@ pub fn run() {
             record_document_patch,
             list_document_patches,
             get_initial_file,
-            save_document_snapshot,
             restore_document_to_patch,
+            save_document_snapshot,
             update_patch_review_status,
+            reset_imported_patches_status,
             import_patches_from_document,
         ])
         .run(tauri::generate_context!())
