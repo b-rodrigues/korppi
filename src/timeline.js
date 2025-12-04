@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { forceSave, restoreDocumentState } from "./yjs-setup.js";
 import { getActiveDocumentId } from "./document-manager.js";
+import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -153,6 +154,7 @@ export function renderPatchList(patches) {
                     <strong>#${patch.id}</strong> - ${patch.kind}
                 </div>
                 <div class="timeline-item-actions">
+                    <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
                     <button class="view-btn" data-patch-id="${patch.id}" title="View content">👁️</button>
                     <button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩</button>
                 </div>
@@ -161,6 +163,15 @@ export function renderPatchList(patches) {
         `;
 
         list.appendChild(div);
+    });
+
+    // Add click handlers for preview buttons
+    list.querySelectorAll('.preview-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const patchId = parseInt(btn.dataset.patchId);
+            await previewPatch(patchId);
+        });
     });
 
     // Add click handlers for restore buttons
@@ -180,6 +191,39 @@ export function renderPatchList(patches) {
             await viewPatchContent(patchId);
         });
     });
+}
+
+/**
+ * Preview a patch with diff highlighting
+ * @param {number} patchId - The ID of the patch to preview
+ */
+async function previewPatch(patchId) {
+    // Exit preview if already active
+    if (isPreviewActive()) {
+        exitPreview();
+    }
+
+    const patch = await fetchPatch(patchId);
+    if (!patch) {
+        alert("Failed to load patch");
+        return;
+    }
+
+    const newText = patch.data?.snapshot || "";
+
+    // Get previous SAVE patch for comparison
+    const allPatches = await fetchPatchList();
+    const savePatchesOnly = allPatches.filter(p => hasSnapshotContent(p));
+    const currentIndex = savePatchesOnly.findIndex(p => p.id === patchId);
+
+    let oldText = "";
+    if (currentIndex > 0) {
+        const previousPatch = savePatchesOnly[currentIndex - 1];
+        oldText = previousPatch.data?.snapshot || "";
+    }
+
+    // Enter preview mode
+    enterPreview(patchId, oldText, newText);
 }
 
 /**

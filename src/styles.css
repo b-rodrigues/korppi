@@ -20,6 +20,12 @@ body {
     padding: 24px;
 }
 
+/* EDITOR */
+#editor {
+    position: relative;
+    min-height: 400px;
+}
+
 /* DOCUMENT TABS */
 .document-tabs {
     display: flex;
@@ -180,6 +186,7 @@ header {
 header h1 {
     font-size: 2.4rem;
     background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -221,7 +228,7 @@ header p {
 
 .priority {
     border: 2px solid #4fc3f7;
-    box-shadow: 0 0 16px rgba(79,195,247,0.2);
+    box-shadow: 0 0 16px rgba(79, 195, 247, 0.2);
 }
 
 .info-section {
@@ -316,7 +323,7 @@ textarea {
 
 .result pre {
     margin-top: 8px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     padding: 12px;
     border-radius: 4px;
     overflow-x: auto;
@@ -353,7 +360,7 @@ textarea {
     button {
         width: 100%;
     }
-    
+
     .header-actions {
         flex-wrap: wrap;
     }
@@ -589,4 +596,138 @@ textarea {
     border-radius: 8px;
     font-weight: 600;
     z-index: 100;
+}
+
+/* DIFF PREVIEW */
+#diff-preview-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 2px solid #4fc3f7;
+    box-shadow: 0 2px 8px rgba(79, 195, 247, 0.3);
+}
+
+.preview-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.preview-label {
+    font-weight: 600;
+    color: #4fc3f7;
+    font-size: 1rem;
+}
+
+.preview-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.mode-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn:hover {
+    background: #555;
+}
+
+.mode-btn.active {
+    background: #4fc3f7;
+    color: #000;
+    border-color: #4fc3f7;
+}
+
+.exit-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.exit-btn:hover {
+    background: #c0392b;
+}
+
+#diff-preview-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #1e1e1e;
+    z-index: 10;
+    overflow: auto;
+    pointer-events: none;
+}
+
+#diff-preview-overlay .diff-content {
+    padding: 20px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #e0e0e0;
+}
+
+.diff-addition {
+    border-radius: 2px;
+    padding: 1px 2px;
+}
+
+.diff-deletion {
+    text-decoration: line-through;
+    color: #888;
+    background-color: rgba(231, 76, 60, 0.15);
+    border-radius: 2px;
+    padding: 1px 2px;
+}
+
+/* Timeline action buttons */
+.timeline-item-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.view-btn,
+.preview-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    background: #555;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.view-btn:hover,
+.preview-btn:hover {
+    background: #666;
+    transform: scale(1.05);
+}
+
+.view-btn:active,
+.preview-btn:active {
+    transform: scale(0.95);
 }
