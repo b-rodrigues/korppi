@@ -134,7 +134,10 @@ export function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
-    patches.forEach((patch) => {
+    // Filter to only show patches with snapshots (Save patches)
+    const savePatchesOnly = patches.filter(patch => hasSnapshotContent(patch));
+
+    savePatchesOnly.forEach((patch) => {
         const div = document.createElement("div");
         div.className = "timeline-item";
         if (patch.id === restoredPatchId) {
@@ -143,7 +146,6 @@ export function renderPatchList(patches) {
         div.dataset.id = patch.id;
 
         const ts = new Date(patch.timestamp).toLocaleString();
-        const canRestore = hasSnapshotContent(patch);
 
         div.innerHTML = `
             <div class="timeline-item-header">
@@ -152,7 +154,7 @@ export function renderPatchList(patches) {
                 </div>
                 <div class="timeline-item-actions">
                     <button class="view-btn" data-patch-id="${patch.id}" title="View content">👁️</button>
-                    ${canRestore ? `<button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩</button>` : ''}
+                    <button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩</button>
                 </div>
             </div>
             <div class="timeline-timestamp">${ts}</div>
@@ -193,13 +195,14 @@ async function viewPatchContent(patchId) {
 
     const content = patch.data?.snapshot || "No content available";
 
-    // Get previous patch for diff
-    const patches = await fetchPatchList();
-    const currentIndex = patches.findIndex(p => p.id === patchId);
+    // Get previous SAVE patch for diff (not edit patches)
+    const allPatches = await fetchPatchList();
+    const savePatchesOnly = allPatches.filter(p => hasSnapshotContent(p));
+    const currentIndex = savePatchesOnly.findIndex(p => p.id === patchId);
     let diff = null;
 
     if (currentIndex > 0) {
-        const previousPatch = patches[currentIndex - 1];
+        const previousPatch = savePatchesOnly[currentIndex - 1];
         const previousContent = previousPatch.data?.snapshot || "";
         diff = calculateDiff(previousContent, content);
     } else {
