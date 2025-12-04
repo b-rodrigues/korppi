@@ -2,6 +2,7 @@
 // Frontend service for managing multiple documents
 
 import { invoke } from "@tauri-apps/api/core";
+import { getCachedProfile } from "./profile-service.js";
 
 let activeDocumentId = null;
 let openDocuments = new Map();
@@ -62,9 +63,11 @@ export async function saveDocument(id = null, path = null) {
     if (editorContent) {
         try {
             const timestamp = Date.now();
+            const profile = getCachedProfile();
+            const author = profile?.name || "Local User";
             const patch = {
                 timestamp,
-                author: "Local User", // TODO: Get from profile
+                author,
                 kind: "Save",
                 data: {
                     snapshot: editorContent
