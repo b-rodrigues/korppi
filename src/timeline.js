@@ -170,6 +170,9 @@ export function initTimeline() {
     const filterAuthor = document.getElementById("filter-author");
     const filterStatus = document.getElementById("filter-status");
     const resetBtn = document.getElementById("reset-to-original-btn");
+    const lineStart = document.getElementById("filter-line-start");
+    const lineEnd = document.getElementById("filter-line-end");
+    const clearLineFilter = document.getElementById("clear-line-filter");
 
     // Wire up sort dropdown
     if (sortSelect) {
@@ -187,6 +190,28 @@ export function initTimeline() {
 
     if (filterStatus) {
         filterStatus.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up line range filter inputs
+    if (lineStart) {
+        lineStart.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    if (lineEnd) {
+        lineEnd.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up clear line filter button
+    if (clearLineFilter) {
+        clearLineFilter.addEventListener("click", () => {
+            if (lineStart) lineStart.value = "";
+            if (lineEnd) lineEnd.value = "";
             refreshTimeline();
         });
     }
@@ -232,6 +257,8 @@ export function renderPatchList(patches) {
     const authorFilter = document.getElementById("filter-author")?.value || "all";
     const statusFilter = document.getElementById("filter-status")?.value || "all";
     const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
+    const lineStart = parseInt(document.getElementById("filter-line-start")?.value) || null;
+    const lineEnd = parseInt(document.getElementById("filter-line-end")?.value) || null;
 
     // Populate author dropdown with unique authors
     const filterAuthorSelect = document.getElementById("filter-author");
@@ -294,6 +321,10 @@ export function renderPatchList(patches) {
     // Filter to only show patches with snapshots  
     filteredPatches = filteredPatches.filter(patch => hasSnapshotContent(patch));
 
+    // Store filtered patches for later use
+    const patchesBeforeLineFilter = [...filteredPatches];
+
+    // Render each patch and calculate line ranges
     filteredPatches.forEach((patch) => {
         const div = document.createElement("div");
         div.className = "timeline-item";
@@ -330,6 +361,24 @@ export function renderPatchList(patches) {
 
                 // Store line range data on the patch for sorting
                 patch._lineRange = lineRange;
+            }
+        }
+
+        // Apply line range filter if set
+        if (lineStart !== null || lineEnd !== null) {
+            if (!patch._lineRange) {
+                return; // Skip patches without line range data when filtering
+            }
+
+            const patchStart = patch._lineRange.startLine;
+            const patchEnd = patch._lineRange.endLine;
+
+            // Check if patch overlaps with the requested range
+            if (lineStart !== null && patchEnd < lineStart) {
+                return; // Patch is entirely before the requested range
+            }
+            if (lineEnd !== null && patchStart > lineEnd) {
+                return; // Patch is entirely after the requested range
             }
         }
 
