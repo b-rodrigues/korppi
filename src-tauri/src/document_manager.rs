@@ -695,6 +695,20 @@ pub fn update_patch_review_status(
     Ok(())
 }
 
+/// Reset all patches to pending status (for reconciliation reset)
+#[tauri::command]
+pub fn reset_imported_patches_status(doc_id: String) -> Result<(), String> {
+    let conn = get_db_connection(&doc_id)?;
+    
+    // Reset all patches back to 'pending' status
+    conn.execute(
+        "UPDATE patches SET review_status = 'pending'",
+        [],
+    ).map_err(|e| format!("Failed to reset patch statuses: {}", e))?;
+    
+    Ok(())
+}
+
 /// Get file path passed as command line argument
 #[tauri::command]
 pub fn get_initial_file() -> Option<String> {
