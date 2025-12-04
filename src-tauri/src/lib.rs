@@ -20,7 +20,9 @@ use document_manager::{
     set_active_document, get_active_document, get_document_state,
     update_document_state, mark_document_modified, update_document_title,
     record_document_patch, list_document_patches, get_initial_file,
-    save_document_snapshot, restore_document_to_patch, DocumentManager,
+    save_document_snapshot, restore_document_to_patch,
+    update_patch_review_status,
+    DocumentManager,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -73,6 +75,7 @@ pub fn run() {
             get_initial_file,
             save_document_snapshot,
             restore_document_to_patch,
+            update_patch_review_status,
             import_patches_from_document,
         ])
         .run(tauri::generate_context!())

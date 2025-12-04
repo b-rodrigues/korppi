@@ -578,7 +578,8 @@ pub fn record_document_patch(
             timestamp   INTEGER NOT NULL,
             author      TEXT    NOT NULL,
             kind        TEXT    NOT NULL,
-            data        TEXT    NOT NULL
+            data        TEXT    NOT NULL,
+            review_status TEXT  DEFAULT 'pending'
         );
 
         CREATE TABLE IF NOT EXISTS snapshots (
@@ -590,6 +591,7 @@ pub fn record_document_patch(
         );
 
         CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
+        CREATE INDEX IF NOT EXISTS idx_patches_review_status ON patches(review_status);
         "#,
     ).map_err(|e| e.to_string())?;
     
@@ -661,6 +663,34 @@ pub fn list_document_patches(
     }
     
     Ok(patches)
+}
+
+/// Update the review status of a patch
+#[tauri::command]
+pub fn update_patch_review_status(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    patch_id: i64,
+    status: String,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Validate status
+    if status != "pending" && status != "accepted" && status != "rejected" {
+        return Err(format!("Invalid review status: {}", status));
+    }
+    
+    conn.execute(
+        "UPDATE patches SET review_status = ?1 WHERE id = ?2",
+        params![status, patch_id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
 }
 
 /// Get file path passed as command line argument
