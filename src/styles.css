@@ -597,3 +597,106 @@ textarea {
     color: #ffb74d;
     margin-bottom: 16px;
 }
+
+/* TIMELINE STYLES */
+.timeline-item {
+    padding: 12px;
+    margin-bottom: 8px;
+    background: #333;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s, border-left 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.timeline-item:hover {
+    background: #3a3a3a;
+}
+
+.timeline-item.restored {
+    border-left: 3px solid #4fc3f7;
+    background: #2a3a4a;
+}
+
+.timeline-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.timeline-item-info {
+    flex: 1;
+}
+
+.timeline-timestamp {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+/* Restore Button */
+.restore-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    background: #4fc3f7;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.restore-btn:hover {
+    background: #29b6f6;
+    transform: scale(1.05);
+}
+
+.restore-btn:active {
+    transform: scale(0.95);
+}
+
+.restore-btn-detail {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 12px 0;
+    transition: background 0.2s, transform 0.1s;
+    display: block;
+    width: 100%;
+}
+
+.restore-btn-detail:hover {
+    background: linear-gradient(135deg, #29b6f6, #0288d1);
+}
+
+.no-restore-hint {
+    color: #888;
+    font-style: italic;
+    margin: 12px 0;
+    font-size: 0.85rem;
+}
+
+/* Restoring state */
+#timeline-container.restoring {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+#timeline-container.restoring::after {
+    content: "Restoring...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #4fc3f7;
+    padding: 16px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    z-index: 100;
+}

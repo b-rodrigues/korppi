@@ -4,14 +4,16 @@
   "version": "0.1.0",
   "identifier": "com.korppi.prototype",
   "build": {
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "",
-    "frontendDist": "../src"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "Korppi Prototype",
         "width": 800,
         "height": 600,
@@ -29,7 +31,9 @@
     "icon": [],
     "fileAssociations": [
       {
-        "ext": ["kmd"],
+        "ext": [
+          "kmd"
+        ],
         "mimeType": "application/vnd.korppi.document+zip",
         "description": "Korppi Markdown Document"
       }

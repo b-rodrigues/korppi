@@ -2,9 +2,13 @@
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "default",
   "description": "Default capabilities for Korppi",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
-    "dialog:default"
+    "dialog:default",
+    "opener:default",
+    "allow-app-commands"
   ]
 }

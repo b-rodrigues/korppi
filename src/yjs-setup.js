@@ -1,7 +1,7 @@
 // src/yjs-setup.js
 import * as Y from "yjs";
 import { invoke } from "@tauri-apps/api/core";
-import { 
+import {
     getActiveDocumentId,
     updateDocumentState,
     getDocumentState,
@@ -9,10 +9,10 @@ import {
     onDocumentChange
 } from "./document-manager.js";
 
-export const ydoc = new Y.Doc();
-export const yXmlFragment = ydoc.getXmlFragment("prosemirror");
+export let ydoc = new Y.Doc();
+export let yXmlFragment = ydoc.getXmlFragment("prosemirror");
 
-let isApplyingFromDisk = false;
+let applyingCounter = 0;
 let saveTimeout = null;
 let currentDocId = null;
 
@@ -26,19 +26,21 @@ export async function loadDocumentState(docId = null) {
         // Fall back to legacy single-document mode
         return loadInitialDoc();
     }
-    
+
     currentDocId = id;
-    isApplyingFromDisk = true;
-    
+    applyingCounter++;
+
     try {
         const state = await getDocumentState(id);
         if (state && state.length > 0) {
             Y.applyUpdate(ydoc, state);
+        } else {
+            // console.log("YJS: Loaded state is empty");
         }
     } catch (err) {
         console.warn("Failed to load document state, starting fresh:", err);
     } finally {
-        isApplyingFromDisk = false;
+        applyingCounter--;
     }
 }
 
@@ -56,10 +58,13 @@ export async function loadInitialDoc() {
  * Save the current Yjs state
  */
 async function saveCurrentState() {
-    if (isApplyingFromDisk) return;
-    
+    // alert("saveCurrentState called. applyingCounter=" + applyingCounter);
+    if (applyingCounter > 0) {
+        return;
+    }
+
     const fullState = Y.encodeStateAsUpdate(ydoc);
-    
+
     // If we have an active document in the manager, save to it
     const docId = currentDocId || getActiveDocumentId();
     if (docId) {
@@ -81,7 +86,7 @@ async function saveCurrentState() {
 // Debounced save to avoid hammering the filesystem
 function debouncedSave() {
     if (saveTimeout) clearTimeout(saveTimeout);
-    
+
     saveTimeout = setTimeout(async () => {
         await saveCurrentState();
     }, 300); // 300ms debounce
@@ -89,23 +94,23 @@ function debouncedSave() {
 
 export function enablePersistence() {
     ydoc.on("update", () => {
-        if (isApplyingFromDisk) return;
+        if (applyingCounter > 0) return;
         debouncedSave();
-        
+
         // Mark the current document as modified
         const docId = currentDocId || getActiveDocumentId();
         if (docId) {
-            markDocumentModified(docId, true).catch(() => {});
+            markDocumentModified(docId, true).catch(() => { });
         }
     });
 }
 
 export function beginApplyingDiskUpdates() {
-    isApplyingFromDisk = true;
+    applyingCounter++;
 }
 
 export function endApplyingDiskUpdates() {
-    isApplyingFromDisk = false;
+    applyingCounter--;
 }
 
 // Force immediate save (for beforeunload, etc.)
@@ -115,16 +120,22 @@ export async function forceSave() {
 }
 
 /**
- * Reset the Yjs document for a new/different document
+ * Completely replace the Yjs document with a fresh one.
+ * This avoids history merge issues when switching documents.
  */
-export function resetDocument() {
-    isApplyingFromDisk = true;
-    // Clear the existing content
-    const fragment = ydoc.getXmlFragment("prosemirror");
-    if (fragment.length > 0) {
-        fragment.delete(0, fragment.length);
+export function resetYDoc() {
+    if (ydoc) {
+        ydoc.destroy();
     }
-    isApplyingFromDisk = false;
+
+    ydoc = new Y.Doc();
+    yXmlFragment = ydoc.getXmlFragment("prosemirror");
+
+    // Re-enable persistence on the new doc
+    enablePersistence();
+
+    // Notify the editor to rebind plugins
+    window.dispatchEvent(new CustomEvent('yjs-doc-replaced'));
 }
 
 /**
@@ -134,8 +145,67 @@ export function resetDocument() {
 export async function switchDocument(docId) {
     // Save current state first
     await forceSave();
-    
-    // Reset and load new document
-    resetDocument();
+
+    // Replace the Yjs document entirely
+    resetYDoc();
+
+    // Load new document state into the fresh doc
     await loadDocumentState(docId);
+}
+
+/**
+ * Restore the document state from a text snapshot.
+ * This replaces the current Yjs document content with the provided text.
+ * @param {string} textContent - The text content to restore
+ */
+export function restoreDocumentState(textContent) {
+    if (!textContent || typeof textContent !== 'string') {
+        console.warn("restoreDocumentState: No valid text content provided");
+        return false;
+    }
+
+    applyingCounter++;
+
+    try {
+        // Get the XML fragment and clear it
+        const xmlFragment = ydoc.getXmlFragment("prosemirror");
+        
+        // Use a transaction to make the change atomic
+        ydoc.transact(() => {
+            // Delete all existing content
+            while (xmlFragment.length > 0) {
+                xmlFragment.delete(0, 1);
+            }
+
+            // Create a paragraph node with the restored text
+            // Split by newlines to create separate paragraphs
+            const paragraphs = textContent.split('\n');
+            
+            for (const para of paragraphs) {
+                const paragraph = new Y.XmlElement('paragraph');
+                const textNode = new Y.XmlText();
+                textNode.insert(0, para);
+                paragraph.insert(0, [textNode]);
+                xmlFragment.push([paragraph]);
+            }
+        });
+
+        // Mark the document as modified
+        const docId = currentDocId || getActiveDocumentId();
+        if (docId) {
+            markDocumentModified(docId, true).catch(err => {
+                console.warn('Failed to mark document as modified:', err);
+            });
+        }
+
+        // Notify the editor that content was restored
+        window.dispatchEvent(new CustomEvent('yjs-content-restored'));
+
+        return true;
+    } catch (err) {
+        console.error("Failed to restore document state:", err);
+        return false;
+    } finally {
+        applyingCounter--;
+    }
 }

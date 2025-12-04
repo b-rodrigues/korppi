@@ -10,7 +10,7 @@ pub mod document_manager;
 pub mod patch_bundle;
 
 use std::sync::Mutex;
-use patch_log::{list_patches, record_patch, get_patch};
+use patch_log::{list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch, restore_to_patch};
 use yjs_store::{load_doc, store_update};
 use conflict_commands::{detect_conflicts, get_conflicts, resolve_conflict, get_conflict_count};
 use profile::{get_profile, save_profile, get_profile_path};
@@ -20,7 +20,8 @@ use document_manager::{
     get_open_documents, get_recent_documents, clear_recent_documents,
     set_active_document, get_active_document, get_document_state,
     update_document_state, mark_document_modified, update_document_title,
-    record_document_patch, list_document_patches, get_initial_file, DocumentManager,
+    record_document_patch, list_document_patches, get_initial_file,
+    save_document_snapshot, restore_document_to_patch, DocumentManager,
 };
 use patch_bundle::{
     export_patch_bundle, import_patch_bundle, preview_patch_bundle,
@@ -42,6 +43,9 @@ pub fn run() {
             record_patch,
             list_patches,
             get_patch,
+            save_snapshot,
+            get_snapshot_for_patch,
+            restore_to_patch,
             detect_conflicts,
             get_conflicts,
             resolve_conflict,
@@ -72,6 +76,8 @@ pub fn run() {
             record_document_patch,
             list_document_patches,
             get_initial_file,
+            save_document_snapshot,
+            restore_document_to_patch,
             // Patch bundle collaboration commands
             export_patch_bundle,
             import_patch_bundle,

@@ -1,7 +1,7 @@
 // src-tauri/patch_log.rs
 use std::path::PathBuf;
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
@@ -24,6 +24,16 @@ fn get_conn(app: &AppHandle) -> Result<Connection, String> {
             kind        TEXT    NOT NULL,
             data        TEXT    NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            patch_id    INTEGER NOT NULL,
+            state       BLOB    NOT NULL,
+            FOREIGN KEY (patch_id) REFERENCES patches(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
         "#,
     )
     .map_err(|e| e.to_string())?;
@@ -122,4 +132,112 @@ pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
         .map_err(|e| e.to_string())?;
 
     Ok(patch)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Snapshot {
+    pub id: i64,
+    pub timestamp: i64,
+    pub patch_id: i64,
+    pub state: Vec<u8>,
+}
+
+/// Maximum allowed snapshot size (100 MB)
+const MAX_SNAPSHOT_SIZE: usize = 100 * 1024 * 1024;
+
+/// Save a Yjs state snapshot at a specific patch ID
+#[tauri::command]
+pub fn save_snapshot(app: AppHandle, patch_id: i64, state: Vec<u8>) -> Result<(), String> {
+    // Validate input
+    if state.is_empty() {
+        return Err("Snapshot state cannot be empty".to_string());
+    }
+    if state.len() > MAX_SNAPSHOT_SIZE {
+        return Err(format!("Snapshot size exceeds maximum allowed ({} bytes)", MAX_SNAPSHOT_SIZE));
+    }
+
+    let conn = get_conn(&app)?;
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as i64;
+
+    conn.execute(
+        "INSERT INTO snapshots (timestamp, patch_id, state) VALUES (?1, ?2, ?3)",
+        params![timestamp, patch_id, state],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Get the nearest snapshot before or at a given patch ID
+#[tauri::command]
+pub fn get_snapshot_for_patch(app: AppHandle, patch_id: i64) -> Result<Option<Snapshot>, String> {
+    let conn = get_conn(&app)?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, timestamp, patch_id, state FROM snapshots
+             WHERE patch_id <= ?1
+             ORDER BY patch_id DESC
+             LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let snapshot = stmt
+        .query_row([patch_id], |row| {
+            Ok(Snapshot {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                patch_id: row.get(2)?,
+                state: row.get(3)?,
+            })
+        })
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    Ok(snapshot)
+}
+
+/// Result of a restore operation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RestoreResult {
+    pub snapshot_content: Option<String>,
+    pub patch_id: i64,
+}
+
+/// Restore to a specific patch - returns the snapshot content (text) for that patch
+/// This uses the text snapshot stored in the patch data if available
+#[tauri::command]
+pub fn restore_to_patch(app: AppHandle, patch_id: i64) -> Result<RestoreResult, String> {
+    let conn = get_conn(&app)?;
+
+    // First, try to get the patch to extract the snapshot field from data
+    let mut stmt = conn
+        .prepare("SELECT data FROM patches WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let data_str: Option<String> = stmt
+        .query_row([patch_id], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    if let Some(data_str) = data_str {
+        // Parse the JSON data and extract the snapshot field if present
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&data_str) {
+            if let Some(snapshot) = data.get("snapshot").and_then(|s| s.as_str()) {
+                return Ok(RestoreResult {
+                    snapshot_content: Some(snapshot.to_string()),
+                    patch_id,
+                });
+            }
+        }
+    }
+
+    // No snapshot content available
+    Ok(RestoreResult {
+        snapshot_content: None,
+        patch_id,
+    })
 }

@@ -43,8 +43,39 @@ export async function saveDocument(id = null, path = null) {
     if (!docId) {
         throw new Error("No document to save");
     }
+
+    // Capture editor content before saving
+    let editorContent = "";
+    try {
+        // Get content from editor
+        const { getEditorContent } = await import("./editor.js");
+        editorContent = getEditorContent();
+    } catch (err) {
+        console.warn("Could not get editor content:", err);
+    }
+
+    // Save the document
     const handle = await invoke("save_document", { id: docId, path });
     openDocuments.set(handle.id, handle);
+
+    // Record a patch with the saved content
+    if (editorContent) {
+        try {
+            const timestamp = Date.now();
+            const patch = {
+                timestamp,
+                author: "Local User", // TODO: Get from profile
+                kind: "Save",
+                data: {
+                    snapshot: editorContent
+                }
+            };
+            await invoke("record_document_patch", { id: docId, patch });
+        } catch (err) {
+            console.error("Failed to record save patch:", err);
+        }
+    }
+
     notifyListeners("save", handle);
     return handle;
 }
@@ -61,7 +92,7 @@ export async function closeDocument(id, force = false) {
         const handle = openDocuments.get(id);
         openDocuments.delete(id);
         notifyListeners("close", handle);
-        
+
         // Switch to another document if this was active
         if (activeDocumentId === id) {
             const remaining = Array.from(openDocuments.keys());
