@@ -3,6 +3,7 @@ import { forceSave, restoreDocumentState } from "./yjs-setup.js";
 import { getActiveDocumentId } from "./document-manager.js";
 import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
+import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -284,7 +285,35 @@ export function renderPatchList(patches) {
         div.dataset.id = patch.id;
 
         const ts = new Date(patch.timestamp).toLocaleString();
-        const authorColor = patch.data?.authorColor || "#3498db";
+        const authorColor = patch.data?.authorColor || "#808080";
+
+        // Calculate line range if this patch has snapshot data
+        let lineRangeInfo = '';
+        if (patch.data?.snapshot) {
+            // Get previous patch for comparison
+            const currentIndex = filteredPatches.indexOf(patch);
+            let previousSnapshot = '';
+
+            if (currentIndex > 0) {
+                // Find previous patch with snapshot
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (filteredPatches[i].data?.snapshot) {
+                        previousSnapshot = filteredPatches[i].data.snapshot;
+                        break;
+                    }
+                }
+            }
+
+            const lineRange = detectLineRange(previousSnapshot, patch.data.snapshot);
+            if (lineRange) {
+                const changeIcon = lineRange.type === 'added' ? '➕' :
+                    lineRange.type === 'deleted' ? '➖' : '✏️';
+                lineRangeInfo = `<div class="line-range-info" style="font-size:0.75rem;color:#666;margin-top:2px;">${changeIcon} ${formatLineRange(lineRange)} (${lineRange.affectedLines} ${lineRange.affectedLines === 1 ? 'line' : 'lines'})</div>`;
+
+                // Store line range data on the patch for sorting
+                patch._lineRange = lineRange;
+            }
+        }
 
         div.innerHTML = `
             <div class="timeline-item-header">
@@ -299,6 +328,7 @@ export function renderPatchList(patches) {
                 </div>
             </div>
             <div class="timeline-timestamp">${ts}</div>
+            ${lineRangeInfo}
         `;
 
         list.appendChild(div);
