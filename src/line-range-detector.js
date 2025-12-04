@@ -10,32 +10,56 @@ import { calculateCharDiff } from './diff-highlighter.js';
  * @returns {{ startLine: number, endLine: number, type: string } | null}
  */
 export function detectLineRange(oldText, newText) {
-    if (!oldText || !newText) {
+    if (!newText) {
         return null;
     }
 
-    // Fast path: if texts are identical, no changes
+    // If both are empty or identical, no changes
     if (oldText === newText) {
         return null;
     }
 
+    // Handle case where oldText is empty (new content)
+    if (!oldText || oldText.length === 0) {
+        const lines = newText.split('\n');
+        return {
+            startLine: 1,
+            endLine: lines.length,
+            type: 'added',
+            affectedLines: lines.length
+        };
+    }
+
     const diffOps = calculateCharDiff(oldText, newText);
 
-    // Find first and last changed positions
+    // Check if there are any actual changes
+    const hasChanges = diffOps.some(op => op.type !== 'equal');
+    if (!hasChanges) {
+        return null;
+    }
+
+    // Find first and last changed positions in the NEW text
     let firstChangePos = -1;
     let lastChangePos = -1;
-    let currentPos = 0;
+    let newTextPos = 0;
 
     for (const op of diffOps) {
-        if (op.type !== 'equal') {
+        if (op.type === 'add') {
+            // Addition in new text
             if (firstChangePos === -1) {
-                firstChangePos = currentPos;
+                firstChangePos = newTextPos;
             }
-            lastChangePos = currentPos + op.text.length;
-        }
-
-        if (op.type !== 'delete') {
-            currentPos += op.text.length;
+            lastChangePos = newTextPos + op.text.length;
+            newTextPos += op.text.length;
+        } else if (op.type === 'delete') {
+            // Deletion - mark position but don't advance in new text
+            if (firstChangePos === -1) {
+                firstChangePos = newTextPos;
+            }
+            lastChangePos = Math.max(lastChangePos, newTextPos);
+        } else {
+            // Equal - advance position
+            newTextPos += op.text.length;
         }
     }
 
@@ -52,18 +76,24 @@ export function detectLineRange(oldText, newText) {
 
     for (let i = 0; i < lines.length; i++) {
         const lineLength = lines[i].length + 1; // +1 for newline
+        const lineEnd = charCount + lineLength;
 
-        if (!foundStart && charCount + lineLength > firstChangePos) {
+        if (!foundStart && lineEnd > firstChangePos) {
             startLine = i + 1; // 1-indexed
             foundStart = true;
         }
 
-        if (charCount + lineLength > lastChangePos) {
+        if (lineEnd > lastChangePos) {
             endLine = i + 1; // 1-indexed
             break;
         }
 
         charCount += lineLength;
+    }
+
+    // Ensure endLine is at least startLine
+    if (endLine < startLine) {
+        endLine = startLine;
     }
 
     // Determine change type

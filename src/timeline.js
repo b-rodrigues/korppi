@@ -171,7 +171,7 @@ export function initTimeline() {
     const filterStatus = document.getElementById("filter-status");
     const resetBtn = document.getElementById("reset-to-original-btn");
     const lineStart = document.getElementById("filter-line-start");
-    const lineEnd = document.getElementById("filter-line-end");
+    const lineRange = document.getElementById("filter-line-range");
     const clearLineFilter = document.getElementById("clear-line-filter");
 
     // Wire up sort dropdown
@@ -201,8 +201,8 @@ export function initTimeline() {
         });
     }
 
-    if (lineEnd) {
-        lineEnd.addEventListener("change", () => {
+    if (lineRange) {
+        lineRange.addEventListener("change", () => {
             refreshTimeline();
         });
     }
@@ -211,7 +211,7 @@ export function initTimeline() {
     if (clearLineFilter) {
         clearLineFilter.addEventListener("click", () => {
             if (lineStart) lineStart.value = "";
-            if (lineEnd) lineEnd.value = "";
+            if (lineRange) lineRange.value = "";
             refreshTimeline();
         });
     }
@@ -258,7 +258,10 @@ export function renderPatchList(patches) {
     const statusFilter = document.getElementById("filter-status")?.value || "all";
     const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
     const lineStart = parseInt(document.getElementById("filter-line-start")?.value) || null;
-    const lineEnd = parseInt(document.getElementById("filter-line-end")?.value) || null;
+    const lineRange = parseInt(document.getElementById("filter-line-range")?.value) || null;
+
+    // Calculate line end from start + range
+    const lineEnd = (lineStart !== null && lineRange !== null) ? lineStart + lineRange : null;
 
     // Populate author dropdown with unique authors
     const filterAuthorSelect = document.getElementById("filter-author");

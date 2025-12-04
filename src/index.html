@@ -70,17 +70,17 @@
                 </select>
                 <select id="filter-status" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
                     <option value="all">All Status</option>
-                    <option value="pending">Pending</option>
+                    <option value="pending" selected>Pending</option>
                     <option value="accepted">Accepted</option>
                     <option value="rejected">Rejected</option>
                 </select>
                 <div style="display:flex;gap:4px;align-items:center;">
-                    <label style="font-size:0.8rem;white-space:nowrap;">Lines:</label>
-                    <input id="filter-line-start" type="number" min="1" placeholder="From"
-                        style="width:60px;padding:4px;border-radius:4px;border:1px solid #ccc;">
-                    <span style="font-size:0.8rem;">-</span>
-                    <input id="filter-line-end" type="number" min="1" placeholder="To"
-                        style="width:60px;padding:4px;border-radius:4px;border:1px solid #ccc;">
+                    <label style="font-size:0.8rem;white-space:nowrap;">Start:</label>
+                    <input id="filter-line-start" type="number" min="1" placeholder="1"
+                        style="width:50px;padding:4px;border-radius:4px;border:1px solid #ccc;">
+                    <label style="font-size:0.8rem;white-space:nowrap;">Range:</label>
+                    <input id="filter-line-range" type="number" min="1" placeholder="10"
+                        style="width:50px;padding:4px;border-radius:4px;border:1px solid #ccc;">
                     <button id="clear-line-filter"
                         style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;background:#f0f0f0;cursor:pointer;font-size:0.8rem;">✕</button>
                 </div>
