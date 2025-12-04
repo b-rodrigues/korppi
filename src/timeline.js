@@ -271,6 +271,24 @@ export function renderPatchList(patches) {
             if (authorCompare !== 0) return authorCompare;
             return b.timestamp - a.timestamp; // Secondary sort by time
         });
+    } else if (sortOrder === "line-order") {
+        filteredPatches.sort((a, b) => {
+            // Patches with line range data come first
+            const aHasRange = a._lineRange !== undefined;
+            const bHasRange = b._lineRange !== undefined;
+
+            if (!aHasRange && !bHasRange) return a.timestamp - b.timestamp;
+            if (!aHasRange) return 1; // a comes after
+            if (!bHasRange) return -1; // b comes after
+
+            // Both have ranges, sort by start line
+            if (a._lineRange.startLine !== b._lineRange.startLine) {
+                return a._lineRange.startLine - b._lineRange.startLine;
+            }
+
+            // Same start line, sort by end line
+            return a._lineRange.endLine - b._lineRange.endLine;
+        });
     }
 
     // Filter to only show patches with snapshots  
