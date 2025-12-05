@@ -1,0 +1,47 @@
+name: unit-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  korppi_test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Silence nix-channel warning
+        run: mkdir -p ~/.nix-defexpr/channels
+
+      - uses: cachix/install-nix-action@v31
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: rstats-on-nix
+          authToken: ${{ secrets.CACHIX_AUTH }}
+
+      - name: Build dev shell
+        run: |
+          export CARGO_BUILD_JOBS=1
+          export RUSTFLAGS="-C debuginfo=0 -C opt-level=0"
+
+          SYSTEM=$([ "${{ runner.os }}" = "macOS" ] && echo "aarch64-darwin" || echo "x86_64-linux")
+          nix build .#devShells.${SYSTEM}.default
+
+      - name: Run unit tests
+        run: |
+          export CARGO_BUILD_JOBS=1
+          export RUSTFLAGS="-C debuginfo=0 -C opt-level=0"
+
+          SYSTEM=$([ "${{ runner.os }}" = "macOS" ] && echo "aarch64-darwin" || echo "x86_64-linux")
+          nix develop .#devShells.${SYSTEM}.default --command bash -c "cd src-tauri && cargo test --all-features"
