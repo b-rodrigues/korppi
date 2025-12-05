@@ -19,6 +19,7 @@ fn test_overlapping_edit_detection() {
                 "deletedText": "old text",
                 "insertedText": "alice's edit"
             }]),
+            review_status: "pending".to_string(),
         },
         Patch {
             id: 2,
@@ -31,6 +32,7 @@ fn test_overlapping_edit_detection() {
                 "deletedText": "xt here",
                 "insertedText": "bob's edit"
             }]),
+            review_status: "pending".to_string(),
         },
     ];
 
@@ -56,6 +58,7 @@ fn test_no_conflict_different_regions() {
                 "at": 10,
                 "insertedText": "hello"
             }]),
+            review_status: "pending".to_string(),
         },
         Patch {
             id: 2,
@@ -67,6 +70,7 @@ fn test_no_conflict_different_regions() {
                 "at": 100, // Different position
                 "insertedText": "world"
             }]),
+            review_status: "pending".to_string(),
         },
     ];
 
@@ -90,6 +94,7 @@ fn test_concurrent_insert_same_position() {
                 "at": 50,
                 "insertedText": "alice first"
             }]),
+            review_status: "pending".to_string(),
         },
         Patch {
             id: 2,
@@ -101,6 +106,7 @@ fn test_concurrent_insert_same_position() {
                 "at": 50, // Same position!
                 "insertedText": "bob first"
             }]),
+            review_status: "pending".to_string(),
         },
     ];
 
