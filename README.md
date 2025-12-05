@@ -1,3 +1,5 @@
+
+
 # Korppi
 
 Korppi is a text editor that tries to focus on one problem, and one problem only: how to 
@@ -27,11 +29,11 @@ The history travels with the file, so you (or your collaborators) can always see
 ### Asynchronous collaboration
 Because each document incorporates its own history, when your colleagues edit their copies of the file, you can
 import their patches into your main document, and reconcile all versions of the document back into one, clean document.
-All patch can be either accepted or rejected, but rejected patches aren’t deleted: they’re just not going to be used
+All patches can be either accepted or rejected, but rejected patches aren’t deleted: they’re just not going to be used
 to create the final, clean document.
 
 ### Crash-Proof & Conflict-Free
-Korppi is built to be robust. It saves your work automatically and uses advanced technology (similar to what Google Docs uses) 
+Korppi is built to be robust. It saves your work automatically and uses a simple 3-way merge algorithm (similar to what Google Docs uses) 
 to merge changes intelligently. You don't have to worry about "conflicted copies" or losing work.
 
 ### Private & Offline
