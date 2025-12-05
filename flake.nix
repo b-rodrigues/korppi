@@ -29,16 +29,16 @@
 
         # Platform-specific system libraries
         darwinDeps = with pkgs; lib.optionals stdenv.isDarwin [
-          darwin.apple-sdk.frameworks.Security
-          darwin.apple-sdk.frameworks.CoreServices
-          darwin.apple-sdk.frameworks.CoreFoundation
-          darwin.apple-sdk.frameworks.Foundation
-          darwin.apple-sdk.frameworks.AppKit
-          darwin.apple-sdk.frameworks.WebKit
-          darwin.apple-sdk.frameworks.Cocoa
-          darwin.apple-sdk.frameworks.IOKit
-          darwin.apple-sdk.frameworks.QuartzCore
-          darwin.apple-sdk.frameworks.Carbon
+          darwin.apple_sdk.frameworks.Security
+          darwin.apple_sdk.frameworks.CoreServices
+          darwin.apple_sdk.frameworks.CoreFoundation
+          darwin.apple_sdk.frameworks.Foundation
+          darwin.apple_sdk.frameworks.AppKit
+          darwin.apple_sdk.frameworks.WebKit
+          darwin.apple_sdk.frameworks.Cocoa
+          darwin.apple_sdk.frameworks.IOKit
+          darwin.apple_sdk.frameworks.QuartzCore
+          darwin.apple_sdk.frameworks.Carbon
           libiconv
         ];
 
