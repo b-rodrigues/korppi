@@ -697,8 +697,16 @@ pub fn update_patch_review_status(
 
 /// Reset all patches to pending status (for reconciliation reset)
 #[tauri::command]
-pub fn reset_imported_patches_status(doc_id: String) -> Result<(), String> {
-    let conn = get_db_connection(&doc_id)?;
+pub fn reset_imported_patches_status(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
     // Reset all patches back to 'pending' status
     conn.execute(

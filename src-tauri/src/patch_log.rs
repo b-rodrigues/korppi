@@ -216,7 +216,7 @@ pub fn get_snapshot_for_patch(app: AppHandle, patch_id: i64) -> Result<Option<Sn
 pub fn import_patches_from_document(
     source_path: String,
     target_doc_id: String,
-    app: AppHandle,
+    _app: AppHandle,
 ) -> Result<Vec<Patch>, String> {
     // Open the source KMD file
     let source_file = std::fs::File::open(&source_path)
