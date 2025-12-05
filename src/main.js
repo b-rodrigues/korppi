@@ -1,5 +1,5 @@
 import { initEditor } from "./editor.js";
-import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails } from "./timeline.js";
+import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 
 // Global error handler to catch load errors
@@ -8,6 +8,7 @@ import { initConflictUI } from "./conflict-ui.js";
 import { initProfileSettings } from "./profile-settings.js";
 import { exportAsMarkdown } from "./kmd-service.js";
 import { forceSave } from "./yjs-setup.js";
+import { startReconciliation } from "./reconcile.js";
 import {
     initDocumentManager,
     newDocument,
@@ -106,6 +107,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const newDocBtn = document.getElementById("new-doc-btn");
     const openDocBtn = document.getElementById("open-doc-btn");
     const saveDocBtn = document.getElementById("save-doc-btn");
+    const reconcileBtn = document.getElementById("reconcile-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
 
     if (newDocBtn) {
@@ -139,6 +141,17 @@ window.addEventListener("DOMContentLoaded", async () => {
                 if (!err.toString().includes("cancelled")) {
                     console.error("Failed to save document:", err);
                 }
+            }
+        });
+    }
+
+    if (reconcileBtn) {
+        reconcileBtn.addEventListener("click", async () => {
+            try {
+                await startReconciliation();
+            } catch (err) {
+                console.error("Reconciliation failed:", err);
+                alert("Reconciliation failed: " + err);
             }
         });
     }
@@ -202,30 +215,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     // 4. Initialize Timeline
-    const toggle = document.getElementById("timeline-toggle");
-    const container = document.getElementById("timeline-container");
-    const list = document.getElementById("timeline-list");
-
-    if (toggle && container && list) {
-        toggle.addEventListener("click", async () => {
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                const patches = await fetchPatchList();
-                renderPatchList(patches);
-            } else {
-                container.style.display = "none";
-            }
-        });
-
-        list.addEventListener("click", async (event) => {
-            const item = event.target.closest(".timeline-item");
-            if (!item) return;
-
-            const id = parseInt(item.dataset.id);
-            const patch = await fetchPatch(id);
-            if (patch) renderPatchDetails(patch);
-        });
-    }
+    initTimeline();
 
     // 5. Initialize Document Manager (Async - might block/fail)
     try {

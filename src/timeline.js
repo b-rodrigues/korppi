@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { forceSave, restoreDocumentState } from "./yjs-setup.js";
 import { getActiveDocumentId } from "./document-manager.js";
 import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
+import { calculateCharDiff } from "./diff-highlighter.js";
+import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -112,7 +114,7 @@ export async function restoreToPatch(patchId) {
 /**
  * Refresh the timeline list
  */
-async function refreshTimeline() {
+export async function refreshTimeline() {
     const patches = await fetchPatchList();
     renderPatchList(patches);
 }
@@ -131,14 +133,202 @@ function setRestoreInProgress(inProgress) {
     }
 }
 
+/**
+ * Initialize timeline UI
+ */
+export function initTimeline() {
+    const toggleBtn = document.getElementById("timeline-toggle");
+    const container = document.getElementById("timeline-container");
+    const reviewBtn = document.getElementById("review-changes-btn");
+    const sortSelect = document.getElementById("timeline-sort");
+
+    if (toggleBtn && container) {
+        toggleBtn.addEventListener("click", async (e) => {
+            e.stopPropagation(); // Prevent click from bubbling
+            const isVisible = container.style.display !== "none";
+            if (isVisible) {
+                container.style.display = "none";
+            } else {
+                container.style.display = "block";
+                // Load patches when opening
+                await refreshTimeline();
+            }
+        });
+
+        // Close timeline when clicking outside (but not in preview mode)
+        document.addEventListener("click", (e) => {
+            const isVisible = container.style.display !== "none";
+            const inPreviewMode = isPreviewActive();
+            if (isVisible &&
+                !inPreviewMode &&  // Don't close in preview mode
+                !container.contains(e.target)) {
+                container.style.display = "none";
+            }
+        });
+    }
+
+    const filterAuthor = document.getElementById("filter-author");
+    const filterStatus = document.getElementById("filter-status");
+    const resetBtn = document.getElementById("reset-to-original-btn");
+    const lineStart = document.getElementById("filter-line-start");
+    const lineRange = document.getElementById("filter-line-range");
+    const clearLineFilter = document.getElementById("clear-line-filter");
+
+    // Wire up sort dropdown
+    if (sortSelect) {
+        sortSelect.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up filter dropdowns
+    if (filterAuthor) {
+        filterAuthor.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    if (filterStatus) {
+        filterStatus.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up line range filter inputs
+    if (lineStart) {
+        lineStart.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    if (lineRange) {
+        lineRange.addEventListener("change", () => {
+            refreshTimeline();
+        });
+    }
+
+    // Wire up clear line filter button
+    if (clearLineFilter) {
+        clearLineFilter.addEventListener("click", () => {
+            if (lineStart) lineStart.value = "";
+            if (lineRange) lineRange.value = "";
+            refreshTimeline();
+        });
+    }
+
+    // Wire up reset button
+    if (resetBtn) {
+        resetBtn.addEventListener("click", async () => {
+            await resetToOriginal();
+        });
+    }
+
+    // Wire up Review Changes button
+    if (reviewBtn) {
+        reviewBtn.addEventListener("click", () => {
+            const { enterReviewMode } = require("./reconcile.js");
+            enterReviewMode();
+        });
+    }
+
+    // Listen for patch status updates
+    window.addEventListener('patch-status-updated', async () => {
+        await refreshTimeline();
+    });
+
+    // Listen for reconciliation import event
+    window.addEventListener('reconciliation-imported', async () => {
+        await refreshTimeline();
+        // Show the Review Changes button
+        if (reviewBtn) {
+            reviewBtn.style.display = "block";
+        }
+    });
+
+    // Initial load
+    refreshTimeline();
+}
+
 export function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
-    // Filter to only show patches with snapshots (Save patches)
-    const savePatchesOnly = patches.filter(patch => hasSnapshotContent(patch));
+    // Get filter values
+    const authorFilter = document.getElementById("filter-author")?.value || "all";
+    const statusFilter = document.getElementById("filter-status")?.value || "all";
+    const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
+    const lineStart = parseInt(document.getElementById("filter-line-start")?.value) || null;
+    const lineRange = parseInt(document.getElementById("filter-line-range")?.value) || null;
 
-    savePatchesOnly.forEach((patch) => {
+    // Calculate line end from start + range
+    const lineEnd = (lineStart !== null && lineRange !== null) ? lineStart + lineRange : null;
+
+    // Populate author dropdown with unique authors
+    const filterAuthorSelect = document.getElementById("filter-author");
+    if (filterAuthorSelect && patches.length > 0) {
+        const uniqueAuthors = [...new Set(patches.map(p => p.author))];
+        const currentValue = filterAuthorSelect.value;
+
+        filterAuthorSelect.innerHTML = '<option value="all">All Authors</option>' +
+            uniqueAuthors.map(author =>
+                `<option value="${author}" ${currentValue === author ? 'selected' : ''}>${author}</option>`
+            ).join('');
+    }
+
+    // Filter patches
+    let filteredPatches = patches.filter(p => {
+        // Filter by author
+        if (authorFilter !== "all" && p.author !== authorFilter) {
+            return false;
+        }
+
+        // Filter by status
+        if (statusFilter !== "all" && p.review_status !== statusFilter) {
+            return false;
+        }
+
+        return true;
+    });
+
+    // Sort patches
+    if (sortOrder === "time-asc") {
+        filteredPatches.sort((a, b) => a.timestamp - b.timestamp);
+    } else if (sortOrder === "time-desc") {
+        filteredPatches.sort((a, b) => b.timestamp - a.timestamp);
+    } else if (sortOrder === "author") {
+        filteredPatches.sort((a, b) => {
+            const authorCompare = a.author.localeCompare(b.author);
+            if (authorCompare !== 0) return authorCompare;
+            return b.timestamp - a.timestamp; // Secondary sort by time
+        });
+    } else if (sortOrder === "line-order") {
+        filteredPatches.sort((a, b) => {
+            // Patches with line range data come first
+            const aHasRange = a._lineRange !== undefined;
+            const bHasRange = b._lineRange !== undefined;
+
+            if (!aHasRange && !bHasRange) return a.timestamp - b.timestamp;
+            if (!aHasRange) return 1; // a comes after
+            if (!bHasRange) return -1; // b comes after
+
+            // Both have ranges, sort by start line
+            if (a._lineRange.startLine !== b._lineRange.startLine) {
+                return a._lineRange.startLine - b._lineRange.startLine;
+            }
+
+            // Same start line, sort by end line
+            return a._lineRange.endLine - b._lineRange.endLine;
+        });
+    }
+
+    // Filter to only show patches with snapshots  
+    filteredPatches = filteredPatches.filter(patch => hasSnapshotContent(patch));
+
+    // Store filtered patches for later use
+    const patchesBeforeLineFilter = [...filteredPatches];
+
+    // Render each patch and calculate line ranges
+    filteredPatches.forEach((patch) => {
         const div = document.createElement("div");
         div.className = "timeline-item";
         if (patch.id === restoredPatchId) {
@@ -147,11 +337,59 @@ export function renderPatchList(patches) {
         div.dataset.id = patch.id;
 
         const ts = new Date(patch.timestamp).toLocaleString();
+        const authorColor = patch.data?.authorColor || "#808080";
+
+        // Calculate line range if this patch has snapshot data
+        let lineRangeInfo = '';
+        if (patch.data?.snapshot) {
+            // Get previous patch for comparison
+            const currentIndex = filteredPatches.indexOf(patch);
+            let previousSnapshot = '';
+
+            if (currentIndex > 0) {
+                // Find previous patch with snapshot
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (filteredPatches[i].data?.snapshot) {
+                        previousSnapshot = filteredPatches[i].data.snapshot;
+                        break;
+                    }
+                }
+            }
+
+            const lineRange = detectLineRange(previousSnapshot, patch.data.snapshot);
+            if (lineRange) {
+                const changeIcon = lineRange.type === 'added' ? '➕' :
+                    lineRange.type === 'deleted' ? '➖' : '✏️';
+                lineRangeInfo = `<div class="line-range-info" style="font-size:0.75rem;color:#666;margin-top:2px;">${changeIcon} ${formatLineRange(lineRange)} (${lineRange.affectedLines} ${lineRange.affectedLines === 1 ? 'line' : 'lines'})</div>`;
+
+                // Store line range data on the patch for sorting
+                patch._lineRange = lineRange;
+            }
+        }
+
+        // Apply line range filter if set
+        if (lineStart !== null || lineEnd !== null) {
+            if (!patch._lineRange) {
+                return; // Skip patches without line range data when filtering
+            }
+
+            const patchStart = patch._lineRange.startLine;
+            const patchEnd = patch._lineRange.endLine;
+
+            // Check if patch overlaps with the requested range
+            if (lineStart !== null && patchEnd < lineStart) {
+                return; // Patch is entirely before the requested range
+            }
+            if (lineEnd !== null && patchStart > lineEnd) {
+                return; // Patch is entirely after the requested range
+            }
+        }
 
         div.innerHTML = `
             <div class="timeline-item-header">
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
+                    <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${patch.author}</span>
                 </div>
                 <div class="timeline-item-actions">
                     <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
@@ -160,9 +398,22 @@ export function renderPatchList(patches) {
                 </div>
             </div>
             <div class="timeline-timestamp">${ts}</div>
+            ${lineRangeInfo}
         `;
 
         list.appendChild(div);
+
+        // Add click listener to auto-preview when already in preview mode
+        div.addEventListener('click', async (e) => {
+            // Don't interfere with button clicks
+            if (e.target.closest('button')) return;
+
+            // If in preview mode, automatically preview this patch
+            if (isPreviewActive()) {
+                const patchId = parseInt(div.dataset.id);
+                await previewPatch(patchId);
+            }
+        });
     });
 
     // Add click handlers for preview buttons
@@ -209,21 +460,35 @@ async function previewPatch(patchId) {
         return;
     }
 
-    const newText = patch.data?.snapshot || "";
+    // Import dependencies
+    const { getEditorContent } = await import('./editor.js');
+    const { mergeText } = await import('./three-way-merge.js');
 
-    // Get previous SAVE patch for comparison
+    // Get current editor content as the "old" state
+    const currentContent = getEditorContent();
+
+    // Calculate what the merged result would be (3-way merge simulation)
+    // base: first patch snapshot
+    // local: current editor content
+    // canonical: patch being previewed
+
     const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches.filter(p => hasSnapshotContent(p));
-    const currentIndex = savePatchesOnly.findIndex(p => p.id === patchId);
+    const savePatchesOnly = allPatches
+        .filter(p => p.kind === "Save" && p.data?.snapshot)
+        .sort((a, b) => a.timestamp - b.timestamp);
 
-    let oldText = "";
-    if (currentIndex > 0) {
-        const previousPatch = savePatchesOnly[currentIndex - 1];
-        oldText = previousPatch.data?.snapshot || "";
-    }
+    const baseSnapshot = savePatchesOnly.length > 0
+        ? savePatchesOnly[0].data.snapshot
+        : '';
 
-    // Enter preview mode
-    enterPreview(patchId, oldText, newText);
+    const patchContent = patch.data?.snapshot || '';
+
+    // Simulate what the merge would produce
+    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+
+    // Show diff from current content to merged result
+    // This shows "what will change if you accept this patch"
+    enterPreview(patchId, currentContent, mergedResult);
 }
 
 /**
@@ -257,35 +522,59 @@ async function viewPatchContent(patchId) {
 }
 
 /**
- * Calculate a simple diff between two text strings
+ * Format character-level diff with better line grouping
  * @param {string} oldText - Previous text
  * @param {string} newText - Current text
- * @returns {string} Diff output
+ * @returns {string} Diff output with character-level granularity
  */
 function calculateDiff(oldText, newText) {
-    const oldLines = oldText.split('\n');
-    const newLines = newText.split('\n');
-    const diff = [];
+    const diffOps = calculateCharDiff(oldText, newText);
 
-    const maxLength = Math.max(oldLines.length, newLines.length);
+    // Group operations by line for better readability
+    const lines = [];
+    let currentLine = { add: '', delete: '', equal: '' };
 
-    for (let i = 0; i < maxLength; i++) {
-        const oldLine = oldLines[i];
-        const newLine = newLines[i];
+    const flushLine = () => {
+        if (currentLine.delete || currentLine.add || currentLine.equal) {
+            // Output deletions first, then additions, then unchanged
+            if (currentLine.delete) {
+                lines.push(`- ${currentLine.delete}`);
+            }
+            if (currentLine.add) {
+                lines.push(`+ ${currentLine.add}`);
+            }
+            if (currentLine.equal && !currentLine.delete && !currentLine.add) {
+                lines.push(`  ${currentLine.equal}`);
+            }
+            currentLine = { add: '', delete: '', equal: '' };
+        }
+    };
 
-        if (oldLine === undefined) {
-            diff.push(`+ ${newLine}`);
-        } else if (newLine === undefined) {
-            diff.push(`- ${oldLine}`);
-        } else if (oldLine !== newLine) {
-            diff.push(`- ${oldLine}`);
-            diff.push(`+ ${newLine}`);
+    for (const op of diffOps) {
+        const text = op.text;
+
+        if (text.includes('\n')) {
+            // Split on newlines
+            const parts = text.split('\n');
+            for (let i = 0; i < parts.length; i++) {
+                if (i > 0) {
+                    // Flush current line before newline
+                    flushLine();
+                }
+
+                if (parts[i]) {
+                    currentLine[op.type] += parts[i];
+                }
+            }
         } else {
-            diff.push(`  ${oldLine}`);
+            currentLine[op.type] += text;
         }
     }
 
-    return diff.join('\n');
+    // Flush any remaining content
+    flushLine();
+
+    return lines.join('\n');
 }
 
 /**
@@ -413,5 +702,60 @@ export function renderPatchDetails(patch) {
             const patchId = parseInt(restoreBtn.dataset.patchId);
             await restoreToPatch(patchId);
         });
+    }
+}
+
+/**
+ * Reset document to state before reconciliation
+ */
+async function resetToOriginal() {
+    console.log("resetToOriginal called");
+
+    const snapshot = localStorage.getItem('reconciliation-snapshot');
+
+    if (!snapshot) {
+        alert("No reconciliation snapshot found. This only works after importing patches.");
+        return;
+    }
+
+    console.log("Showing confirmation dialog");
+    let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted imported patches.");
+
+    // Tauri's confirm returns a Promise, handle both cases
+    if (userConfirmed instanceof Promise) {
+        userConfirmed = await userConfirmed;
+    }
+
+    console.log("User confirmed:", userConfirmed);
+
+    if (!userConfirmed) {
+        console.log("User cancelled reset");
+        return;
+    }
+
+    console.log("Proceeding with reset");
+
+    try {
+        const docId = getActiveDocumentId();
+
+        // Reset document content
+        const success = restoreDocumentState(snapshot);
+        if (!success) {
+            alert("Failed to restore document");
+            return;
+        }
+
+        // Reset all patch statuses back to pending
+        await invoke("reset_imported_patches_status", { docId });
+
+        // DON'T clear the snapshot - keep it for future resets
+        // localStorage.removeItem('reconciliation-snapshot');
+
+        alert("Document restored to state before reconciliation. All patches reset to pending.");
+        await refreshTimeline();
+
+    } catch (err) {
+        console.error("Reset failed:", err);
+        alert(`Failed to reset: ${err}`);
     }
 }

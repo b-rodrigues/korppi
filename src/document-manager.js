@@ -55,29 +55,41 @@ export async function saveDocument(id = null, path = null) {
         console.warn("Could not get editor content:", err);
     }
 
-    // Save the document
-    const handle = await invoke("save_document", { id: docId, path });
-    openDocuments.set(handle.id, handle);
-
-    // Record a patch with the saved content
+    // Record a patch with the saved content BEFORE saving the file
+    // so the patch is included in the bundled history.sqlite
     if (editorContent) {
         try {
-            const timestamp = Date.now();
-            const profile = getCachedProfile();
-            const author = profile?.name || "Local User";
-            const patch = {
-                timestamp,
-                author,
-                kind: "Save",
-                data: {
-                    snapshot: editorContent
-                }
-            };
-            await invoke("record_document_patch", { id: docId, patch });
+            // Check if content has changed from last save
+            const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
+            const lastSavePatch = patches
+                .filter(p => p.kind === "Save" && p.data?.snapshot)
+                .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+            // Only create a new patch if content has actually changed
+            if (!lastSavePatch || lastSavePatch.data.snapshot !== editorContent) {
+                const timestamp = Date.now();
+                const profile = getCachedProfile();
+                const author = profile?.name || "Local User";
+                const authorColor = profile?.color || "#3498db";
+                const patch = {
+                    timestamp,
+                    author,
+                    kind: "Save",
+                    data: {
+                        snapshot: editorContent,
+                        authorColor  // Store author color for multi-author highlighting
+                    }
+                };
+                await invoke("record_document_patch", { id: docId, patch });
+            }
         } catch (err) {
             console.error("Failed to record save patch:", err);
         }
     }
+
+    // Save the document (bundles the history.sqlite with the patch we just recorded)
+    const handle = await invoke("save_document", { id: docId, path });
+    openDocuments.set(handle.id, handle);
 
     notifyListeners("save", handle);
     return handle;

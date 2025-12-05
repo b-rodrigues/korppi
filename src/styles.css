@@ -274,9 +274,249 @@ button.primary {
 }
 
 button.danger {
-    background: #e53935;
-    color: #fff;
+    background-color: #f8d7da;
+    color: #721c24;
 }
+
+/* Review Mode Styles */
+.review-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    gap: 20px;
+}
+
+.review-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.review-label {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.author-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.author-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.author-filter-item:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.author-filter-checkbox {
+    cursor: pointer;
+}
+
+.author-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.author-count {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.review-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.review-btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    background: white;
+    color: #667eea;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.review-btn:hover {
+    background: #f0f0f0;
+    transform: translateY(-1px);
+}
+
+/* Review Overlay */
+.review-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    z-index: 10;
+    overflow: auto;
+    padding: 20px;
+}
+
+.review-content {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.review-addition {
+    cursor: pointer;
+    border-radius: 2px;
+    transition: opacity 0.2s;
+}
+
+.review-addition:hover {
+    opacity: 0.8 !important;
+}
+
+.review-deletion {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #666;
+}
+
+/* Review Popup */
+.review-popup {
+    position: fixed;
+    background: white;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    min-width: 200px;
+}
+
+.popup-author {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.popup-timestamp {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.popup-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.popup-accept-btn,
+.popup-reject-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.popup-accept-btn {
+    background: #4caf50;
+    color: white;
+}
+
+.popup-accept-btn:hover {
+    background: #45a049;
+}
+
+.popup-reject-btn {
+    background: #f44336;
+    color: white;
+}
+
+.popup-reject-btn:hover {
+    background: #da190b;
+}
+
+/* Author Selection */
+.author-selection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    padding: 0 20px;
+}
+
+.author-select-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+}
+
+.author-select-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.author-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.author-patches {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.accept-btn {
+    background: #4caf50 !important;
+    color: white !important;
+}
+
+.accept-btn:hover {
+    background: #45a049 !important;
+}
+
+.reject-btn {
+    background: #f44336 !important;
+    color: white !important;
+}
+
+.reject-btn:hover {
+    background: #da190b !important;
+}
+
+
 
 button:disabled {
     opacity: 0.5;
@@ -730,4 +970,99 @@ textarea {
 .view-btn:active,
 .preview-btn:active {
     transform: scale(0.95);
+}
+
+/* RECONCILIATION UI */
+#reconcile-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 2px solid #e67e22;
+    box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+}
+
+.reconcile-info {
+    flex: 1;
+}
+
+.reconcile-label {
+    font-weight: 600;
+    color: #e67e22;
+    font-size: 1rem;
+}
+
+.reconcile-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-btn,
+.bulk-btn,
+.apply-btn,
+.cancel-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.nav-btn {
+    background: #555;
+    color: #fff;
+}
+
+.bulk-btn {
+    background: #3498db;
+    color: #fff;
+}
+
+.apply-btn {
+    background: #27ae60;
+    color: #fff;
+}
+
+.cancel-btn {
+    background: #e74c3c;
+    color: #fff;
+}
+
+#reconcile-sidebar {
+    display: none;
+    position: fixed;
+    right: 0;
+    top: 100px;
+    width: 250px;
+    background: #2a2a2a;
+    border-left: 2px solid #444;
+    padding: 20px;
+    z-index: 100;
+}
+
+.author-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.author-item {
+    padding: 10px;
+    background: #333;
+    border-radius: 6px;
+}
+
+.status-pending {
+    color: #f39c12;
+}
+
+.status-accepted {
+    color: #27ae60;
+}
+
+.status-rejected {
+    color: #e74c3c;
 }

@@ -2,71 +2,56 @@
 // Character-level diff highlighting for patch preview
 
 /**
- * Calculate character-level diff between two texts
+ * Calculate word-level diff between two texts
  * Returns an array of diff operations
  * @param {string} oldText - Previous text
  * @param {string} newText - Current text
  * @returns {Array} Array of {type: 'add'|'delete'|'equal', text: string}
  */
 export function calculateCharDiff(oldText, newText) {
-    // Simple character-level diff using Myers algorithm concept
-    const old = oldText.split('');
-    const neu = newText.split('');
+    // Tokenize into words and whitespace
+    const tokenize = (text) => {
+        const tokens = [];
+        // Match words (non-whitespace) or whitespace sequences
+        const regex = /(\S+|\s+)/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            tokens.push(match[0]);
+        }
+        return tokens;
+    };
 
-    const dp = Array(old.length + 1).fill(null).map(() => Array(neu.length + 1).fill(0));
+    const oldTokens = tokenize(oldText);
+    const newTokens = tokenize(newText);
 
-    // Fill DP table
-    for (let i = 0; i <= old.length; i++) {
-        for (let j = 0; j <= neu.length; j++) {
-            if (i === 0) {
-                dp[i][j] = j;
-            } else if (j === 0) {
-                dp[i][j] = i;
-            } else if (old[i - 1] === neu[j - 1]) {
-                dp[i][j] = dp[i - 1][j - 1];
+    // LCS-based diff on tokens
+    const m = oldTokens.length;
+    const n = newTokens.length;
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (oldTokens[i - 1] === newTokens[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
             } else {
-                dp[i][j] = 1 + Math.min(
-                    dp[i - 1][j],     // delete
-                    dp[i][j - 1],     // insert
-                    dp[i - 1][j - 1]  // replace
-                );
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
             }
         }
     }
 
     // Backtrack to build diff
     const diff = [];
-    let i = old.length;
-    let j = neu.length;
-
+    let i = m, j = n;
     while (i > 0 || j > 0) {
-        if (i === 0) {
-            diff.unshift({ type: 'add', text: neu[j - 1] });
-            j--;
-        } else if (j === 0) {
-            diff.unshift({ type: 'delete', text: old[i - 1] });
-            i--;
-        } else if (old[i - 1] === neu[j - 1]) {
-            diff.unshift({ type: 'equal', text: old[i - 1] });
-            i--;
+        if (i > 0 && j > 0 && oldTokens[i - 1] === newTokens[j - 1]) {
+            diff.unshift({ type: 'equal', text: oldTokens[i - 1] });
+            i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+            diff.unshift({ type: 'add', text: newTokens[j - 1] });
             j--;
         } else {
-            const deleteCost = dp[i - 1][j];
-            const insertCost = dp[i][j - 1];
-            const replaceCost = dp[i - 1][j - 1];
-
-            if (replaceCost <= deleteCost && replaceCost <= insertCost) {
-                diff.unshift({ type: 'delete', text: old[i - 1] });
-                diff.unshift({ type: 'add', text: neu[j - 1] });
-                i--;
-                j--;
-            } else if (deleteCost <= insertCost) {
-                diff.unshift({ type: 'delete', text: old[i - 1] });
-                i--;
-            } else {
-                diff.unshift({ type: 'add', text: neu[j - 1] });
-                j--;
-            }
+            diff.unshift({ type: 'delete', text: oldTokens[i - 1] });
+            i--;
         }
     }
 

@@ -578,7 +578,8 @@ pub fn record_document_patch(
             timestamp   INTEGER NOT NULL,
             author      TEXT    NOT NULL,
             kind        TEXT    NOT NULL,
-            data        TEXT    NOT NULL
+            data        TEXT    NOT NULL,
+            review_status TEXT  DEFAULT 'pending'
         );
 
         CREATE TABLE IF NOT EXISTS snapshots (
@@ -590,15 +591,32 @@ pub fn record_document_patch(
         );
 
         CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
+        CREATE INDEX IF NOT EXISTS idx_patches_review_status ON patches(review_status);
         "#,
     ).map_err(|e| e.to_string())?;
     
     let data_str = serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
     
+    // Current user's patches are auto-accepted (so we can distinguish from imported patches)
     conn.execute(
-        "INSERT INTO patches (timestamp, author, kind, data) VALUES (?1, ?2, ?3, ?4)",
-        params![patch.timestamp, patch.author, patch.kind, data_str],
+        "INSERT INTO patches (timestamp, author, kind, data, review_status) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![patch.timestamp, patch.author, patch.kind, data_str, "accepted"],
     ).map_err(|e| e.to_string())?;
+    
+    let patch_id = conn.last_insert_rowid();
+    
+    // If this is a Save patch with a snapshot, save it to the snapshots table
+    if patch.kind == "Save" {
+        if let Some(snapshot_str) = patch.data.get("snapshot") {
+            if let Some(snapshot_text) = snapshot_str.as_str() {
+                // Store the snapshot text as bytes
+                conn.execute(
+                    "INSERT INTO snapshots (timestamp, patch_id, state) VALUES (?1, ?2, ?3)",
+                    params![patch.timestamp, patch_id, snapshot_text.as_bytes()],
+                ).map_err(|e| e.to_string())?;
+            }
+        }
+    }
     
     Ok(())
 }
@@ -621,7 +639,7 @@ pub fn list_document_patches(
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
     let mut stmt = conn
-        .prepare("SELECT id, timestamp, author, kind, data FROM patches ORDER BY id ASC")
+        .prepare("SELECT id, timestamp, author, kind, data, review_status FROM patches ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
     
     let rows = stmt
@@ -636,6 +654,7 @@ pub fn list_document_patches(
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
+                review_status: row.get(5).unwrap_or_else(|_| "pending".to_string()),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -646,6 +665,56 @@ pub fn list_document_patches(
     }
     
     Ok(patches)
+}
+
+/// Update the review status of a patch
+#[tauri::command]
+pub fn update_patch_review_status(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    patch_id: i64,
+    status: String,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Validate status
+    if status != "pending" && status != "accepted" && status != "rejected" {
+        return Err(format!("Invalid review status: {}", status));
+    }
+    
+    conn.execute(
+        "UPDATE patches SET review_status = ?1 WHERE id = ?2",
+        params![status, patch_id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+/// Reset all patches to pending status (for reconciliation reset)
+#[tauri::command]
+pub fn reset_imported_patches_status(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Reset all patches back to 'pending' status
+    conn.execute(
+        "UPDATE patches SET review_status = 'pending'",
+        [],
+    ).map_err(|e| format!("Failed to reset patch statuses: {}", e))?;
+    
+    Ok(())
 }
 
 /// Get file path passed as command line argument
