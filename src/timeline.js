@@ -137,35 +137,8 @@ function setRestoreInProgress(inProgress) {
  * Initialize timeline UI
  */
 export function initTimeline() {
-    const toggleBtn = document.getElementById("timeline-toggle");
-    const container = document.getElementById("timeline-container");
-    const reviewBtn = document.getElementById("review-changes-btn");
+    // Timeline is now always visible in the right sidebar
     const sortSelect = document.getElementById("timeline-sort");
-
-    if (toggleBtn && container) {
-        toggleBtn.addEventListener("click", async (e) => {
-            e.stopPropagation(); // Prevent click from bubbling
-            const isVisible = container.style.display !== "none";
-            if (isVisible) {
-                container.style.display = "none";
-            } else {
-                container.style.display = "block";
-                // Load patches when opening
-                await refreshTimeline();
-            }
-        });
-
-        // Close timeline when clicking outside (but not in preview mode)
-        document.addEventListener("click", (e) => {
-            const isVisible = container.style.display !== "none";
-            const inPreviewMode = isPreviewActive();
-            if (isVisible &&
-                !inPreviewMode &&  // Don't close in preview mode
-                !container.contains(e.target)) {
-                container.style.display = "none";
-            }
-        });
-    }
 
     const filterAuthor = document.getElementById("filter-author");
     const filterStatus = document.getElementById("filter-status");
@@ -223,14 +196,6 @@ export function initTimeline() {
         });
     }
 
-    // Wire up Review Changes button
-    if (reviewBtn) {
-        reviewBtn.addEventListener("click", () => {
-            const { enterReviewMode } = require("./reconcile.js");
-            enterReviewMode();
-        });
-    }
-
     // Listen for patch status updates
     window.addEventListener('patch-status-updated', async () => {
         await refreshTimeline();
@@ -239,10 +204,6 @@ export function initTimeline() {
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
         await refreshTimeline();
-        // Show the Review Changes button
-        if (reviewBtn) {
-            reviewBtn.style.display = "block";
-        }
     });
 
     // Initial load

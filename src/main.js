@@ -1,11 +1,6 @@
 import { initEditor } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
-
-// Global error handler to catch load errors
-// Global error handler removed
-// alert removed
-import { initProfileSettings } from "./profile-settings.js";
 import { exportAsMarkdown } from "./kmd-service.js";
 import { forceSave } from "./yjs-setup.js";
 import { startReconciliation } from "./reconcile.js";
@@ -22,13 +17,18 @@ import {
 import { initDocumentTabs } from "./document-tabs.js";
 import { initKeyboardShortcuts } from "./keyboard-shortcuts.js";
 
+// New UI components
+import { initResizableSidebars } from "./components/resizable-sidebar.js";
+import { initThemeToggle } from "./components/theme-toggle.js";
+import { initProfileButton } from "./components/profile-button.js";
+import { initFormattingToolbar } from "./components/formatting-toolbar.js";
+
 // Store the current markdown content
 let currentMarkdown = "";
 
 // Listen for markdown updates from the editor
 window.addEventListener("markdown-updated", (event) => {
     currentMarkdown = event.detail.markdown || "";
-    console.log("Main: markdown-updated, length=" + currentMarkdown.length);
 });
 
 /**
@@ -37,7 +37,7 @@ window.addEventListener("markdown-updated", (event) => {
 async function showRecentDocuments() {
     const recentPanel = document.getElementById("recent-documents");
     const recentList = document.getElementById("recent-list");
-    const editor = document.getElementById("editor");
+    const editorScroll = document.querySelector(".editor-scroll");
 
     if (!recentPanel || !recentList) return;
 
@@ -71,7 +71,7 @@ async function showRecentDocuments() {
         }
 
         recentPanel.style.display = "block";
-        if (editor) editor.style.display = "none";
+        if (editorScroll) editorScroll.style.display = "none";
     } catch (err) {
         console.error("Failed to load recent documents:", err);
     }
@@ -82,10 +82,10 @@ async function showRecentDocuments() {
  */
 function hideRecentDocuments() {
     const recentPanel = document.getElementById("recent-documents");
-    const editor = document.getElementById("editor");
+    const editorScroll = document.querySelector(".editor-scroll");
 
     if (recentPanel) recentPanel.style.display = "none";
-    if (editor) editor.style.display = "block";
+    if (editorScroll) editorScroll.style.display = "block";
 }
 
 /**
@@ -101,17 +101,33 @@ function updateDocumentUI() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+    console.log("Korppi starting...");
 
-    // 1. Initialize Main App Buttons (New, Open, Save, Export)
-    // We do this FIRST so they are clickable immediately.
+    // 1. Initialize UI Layout Components (sidebars, theme)
+    initResizableSidebars();
+    initThemeToggle();
+    await initProfileButton();
+
+    // 2. Initialize Document Action Buttons
     const newDocBtn = document.getElementById("new-doc-btn");
     const openDocBtn = document.getElementById("open-doc-btn");
     const saveDocBtn = document.getElementById("save-doc-btn");
     const reconcileBtn = document.getElementById("reconcile-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
+    const newTabBtn = document.getElementById("new-tab-btn");
 
     if (newDocBtn) {
         newDocBtn.addEventListener("click", async () => {
+            try {
+                await newDocument();
+            } catch (err) {
+                console.error("Failed to create new document:", err);
+            }
+        });
+    }
+
+    if (newTabBtn) {
+        newTabBtn.addEventListener("click", async () => {
             try {
                 await newDocument();
             } catch (err) {
@@ -170,13 +186,12 @@ window.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // 2. Initialize UI Components
-    initProfileSettings();
+    // 3. Initialize Conflict UI and Keyboard Shortcuts
     initConflictUI();
     initKeyboardShortcuts();
     initDocumentTabs();
 
-    // 3. Initialize Recent Documents Panel Buttons
+    // 4. Initialize Recent Documents Panel Buttons
     const newDocumentBtn = document.getElementById("new-document-btn");
     const openDocumentBtn = document.getElementById("open-document-btn");
     const clearRecentBtn = document.getElementById("clear-recent-btn");
@@ -214,10 +229,10 @@ window.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // 4. Initialize Timeline
+    // 5. Initialize Timeline (always visible in right sidebar)
     initTimeline();
 
-    // 5. Initialize Document Manager (Async - might block/fail)
+    // 6. Initialize Document Manager
     try {
         console.log("Initializing document manager...");
         await initDocumentManager();
@@ -225,21 +240,24 @@ window.addEventListener("DOMContentLoaded", async () => {
         updateDocumentUI();
     } catch (err) {
         console.error("Failed to initialize document manager:", err);
-        alert("Failed to init doc manager: " + err);
         showRecentDocuments();
     }
 
-    // Listen for document changes
+    // 7. Listen for document changes
     onDocumentChange((event, doc) => {
         updateDocumentUI();
     });
 
-    // 6. Initialize Editor (Last step to avoid blocking UI)
+    // 8. Initialize Editor
     try {
         console.log("Initializing editor...");
-        await initEditor();
+        const editor = await initEditor();
+        // Initialize formatting toolbar with editor instance
+        initFormattingToolbar(editor);
         console.log("Editor initialized");
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }
+
+    console.log("Korppi ready!");
 });
