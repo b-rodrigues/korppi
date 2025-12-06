@@ -60,6 +60,25 @@ export async function exportAsMarkdown(markdownContent) {
 }
 
 /**
+ * Export the document as a DOCX file.
+ * Gets the current editor content and converts it to DOCX format.
+ * @param {string} markdownContent - The markdown content to export
+ * @returns {Promise<string|null>} Export path or null if cancelled
+ */
+export async function exportAsDocx(markdownContent) {
+    const path = await save({
+        filters: [{ name: 'Word Document', extensions: ['docx'] }],
+        defaultPath: 'document.docx'
+    });
+    
+    if (path) {
+        await invoke("export_docx", { path, content: markdownContent });
+        return path;
+    }
+    return null;
+}
+
+/**
  * Get current document metadata.
  * @returns {Promise<Object>} Document metadata
  */

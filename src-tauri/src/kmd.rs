@@ -20,6 +20,9 @@ use uuid::Uuid;
 use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
 
+use docx_rs::*;
+use pulldown_cmark::{Event, Tag, TagEnd, Parser, HeadingLevel, CodeBlockKind};
+
 pub const KMD_VERSION: &str = "0.1.0";
 pub const MIN_READER_VERSION: &str = "0.1.0";
 pub const APP_NAME: &str = "korppi";
@@ -591,6 +594,263 @@ pub fn export_markdown(path: String, content: String) -> Result<(), String> {
     write_text_file(path, content)
 }
 
+/// Convert markdown to DOCX format
+fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
+    let mut docx = Docx::new();
+    let parser = Parser::new(markdown);
+    
+    let mut current_paragraph = Paragraph::new();
+    let mut current_text = String::new();
+    let mut in_paragraph = false;
+    let mut list_items: Vec<Paragraph> = Vec::new();
+    let mut in_list = false;
+    let mut is_ordered_list = false;
+    
+    // Stack to track formatting
+    let mut bold_depth: i32 = 0;
+    let mut italic_depth: i32 = 0;
+    let mut in_code_block = false;
+    let mut code_text = String::new();
+    let mut paragraph_style: Option<String> = None;
+    
+    // Helper function to flush current text with formatting
+    let flush_text = |para: Paragraph, text: &str, is_bold: bool, is_italic: bool| -> Paragraph {
+        if text.is_empty() {
+            return para;
+        }
+        let mut run = Run::new().add_text(text);
+        if is_bold {
+            run = run.bold();
+        }
+        if is_italic {
+            run = run.italic();
+        }
+        para.add_run(run)
+    };
+    
+    for event in parser {
+        match event {
+            Event::Start(tag) => {
+                match tag {
+                    Tag::Heading { level, .. } => {
+                        // Flush any existing paragraph
+                        if in_paragraph && !current_text.is_empty() {
+                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                            current_text.clear();
+                        }
+                        if in_paragraph {
+                            docx = docx.add_paragraph(current_paragraph);
+                            current_paragraph = Paragraph::new();
+                            in_paragraph = false;
+                        }
+                        
+                        // Create heading with appropriate level
+                        let heading_level = match level {
+                            HeadingLevel::H1 => 1,
+                            HeadingLevel::H2 => 2,
+                            HeadingLevel::H3 => 3,
+                            HeadingLevel::H4 => 4,
+                            HeadingLevel::H5 => 5,
+                            HeadingLevel::H6 => 6,
+                        };
+                        paragraph_style = Some(format!("Heading{}", heading_level));
+                        current_paragraph = Paragraph::new();
+                        in_paragraph = true;
+                    }
+                    Tag::Paragraph => {
+                        in_paragraph = true;
+                        paragraph_style = None;
+                    }
+                    Tag::Strong => {
+                        // Flush current text before changing format
+                        if !current_text.is_empty() {
+                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                            current_text.clear();
+                        }
+                        bold_depth += 1;
+                    }
+                    Tag::Emphasis => {
+                        // Flush current text before changing format
+                        if !current_text.is_empty() {
+                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                            current_text.clear();
+                        }
+                        italic_depth += 1;
+                    }
+                    Tag::List(start_num) => {
+                        in_list = true;
+                        is_ordered_list = start_num.is_some();
+                    }
+                    Tag::Item => {
+                        // Start a new list item
+                        current_paragraph = Paragraph::new();
+                        in_paragraph = true;
+                    }
+                    Tag::CodeBlock(CodeBlockKind::Fenced(_)) | Tag::CodeBlock(CodeBlockKind::Indented) => {
+                        in_code_block = true;
+                        code_text.clear();
+                    }
+                    Tag::BlockQuote(_) => {
+                        paragraph_style = Some("Quote".to_string());
+                        current_paragraph = Paragraph::new();
+                        in_paragraph = true;
+                    }
+                    _ => {}
+                }
+            }
+            Event::End(tag) => {
+                match tag {
+                    TagEnd::Heading(_) | TagEnd::Paragraph => {
+                        if in_paragraph {
+                            if !current_text.is_empty() {
+                                current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                                current_text.clear();
+                            }
+                            
+                            // Apply style if any
+                            if let Some(ref style) = paragraph_style {
+                                current_paragraph = current_paragraph.style(style);
+                            }
+                            
+                            if in_list {
+                                list_items.push(current_paragraph);
+                            } else {
+                                docx = docx.add_paragraph(current_paragraph);
+                            }
+                            
+                            current_paragraph = Paragraph::new();
+                            in_paragraph = false;
+                            paragraph_style = None;
+                        }
+                    }
+                    TagEnd::Strong => {
+                        // Flush current text before changing format
+                        if !current_text.is_empty() {
+                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                            current_text.clear();
+                        }
+                        bold_depth = bold_depth.saturating_sub(1);
+                    }
+                    TagEnd::Emphasis => {
+                        // Flush current text before changing format
+                        if !current_text.is_empty() {
+                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                            current_text.clear();
+                        }
+                        italic_depth = italic_depth.saturating_sub(1);
+                    }
+                    TagEnd::List(_) => {
+                        // Add all collected list items
+                        for item in list_items.drain(..) {
+                            let indented_item = if is_ordered_list {
+                                item.numbering(
+                                    NumberingId::new(2),
+                                    IndentLevel::new(0),
+                                )
+                            } else {
+                                item.numbering(
+                                    NumberingId::new(1),
+                                    IndentLevel::new(0),
+                                )
+                            };
+                            docx = docx.add_paragraph(indented_item);
+                        }
+                        in_list = false;
+                        is_ordered_list = false;
+                    }
+                    TagEnd::Item => {
+                        // Item end is handled by paragraph end
+                    }
+                    TagEnd::CodeBlock => {
+                        if in_code_block {
+                            // Add code block as paragraph with monospace font
+                            let code_para = Paragraph::new()
+                                .add_run(
+                                    Run::new()
+                                        .add_text(&code_text)
+                                        .fonts(RunFonts::new().ascii("Courier New"))
+                                        .size(20)
+                                );
+                            docx = docx.add_paragraph(code_para);
+                            in_code_block = false;
+                            code_text.clear();
+                        }
+                    }
+                    TagEnd::BlockQuote(_) => {
+                        if in_paragraph {
+                            if !current_text.is_empty() {
+                                current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                                current_text.clear();
+                            }
+                            if let Some(ref style) = paragraph_style {
+                                current_paragraph = current_paragraph.style(style);
+                            }
+                            docx = docx.add_paragraph(current_paragraph);
+                            current_paragraph = Paragraph::new();
+                            in_paragraph = false;
+                            paragraph_style = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Event::Text(text) => {
+                if in_code_block {
+                    code_text.push_str(&text);
+                } else {
+                    current_text.push_str(&text);
+                }
+            }
+            Event::Code(code) => {
+                // Inline code - flush current text first
+                if !current_text.is_empty() {
+                    current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+                    current_text.clear();
+                }
+                let code_run = Run::new()
+                    .add_text(&code.to_string())
+                    .fonts(RunFonts::new().ascii("Courier New"))
+                    .size(20);
+                current_paragraph = current_paragraph.add_run(code_run);
+            }
+            Event::SoftBreak | Event::HardBreak => {
+                if in_code_block {
+                    code_text.push('\n');
+                } else {
+                    current_text.push(' ');
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    // Flush any remaining content
+    if !current_text.is_empty() {
+        current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0);
+    }
+    if in_paragraph {
+        if let Some(ref style) = paragraph_style {
+            current_paragraph = current_paragraph.style(style);
+        }
+        docx = docx.add_paragraph(current_paragraph);
+    }
+    
+    Ok(docx)
+}
+
+/// Export markdown content as a DOCX file
+#[tauri::command]
+pub fn export_docx(path: String, content: String) -> Result<(), String> {
+    let docx = markdown_to_docx(&content)?;
+    
+    let file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
+    docx.build()
+        .pack(file)
+        .map_err(|e| format!("Failed to write DOCX: {}", e))?;
+    
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -730,5 +990,53 @@ mod tests {
 
         assert_eq!(parsed.id, profile.id);
         assert_eq!(parsed.color, profile.color);
+    }
+
+    #[test]
+    fn test_markdown_to_docx_basic() {
+        let markdown = "# Heading 1\n\nThis is a paragraph with **bold** and *italic* text.";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_lists() {
+        let markdown = "# Lists\n\n- Item 1\n- Item 2\n\n1. First\n2. Second";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_code() {
+        let markdown = "# Code\n\nInline `code` and:\n\n```\ncode block\n```";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_blockquote() {
+        let markdown = "> This is a quote\n> with multiple lines";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_export_docx_creates_file() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.docx");
+        let path_str = file_path.to_str().unwrap().to_string();
+        
+        let markdown = "# Test Document\n\nThis is a test.";
+        let result = export_docx(path_str.clone(), markdown.to_string());
+        
+        assert!(result.is_ok());
+        assert!(file_path.exists());
+        
+        // Check file is not empty
+        let metadata = fs::metadata(&file_path).unwrap();
+        assert!(metadata.len() > 0);
     }
 }
