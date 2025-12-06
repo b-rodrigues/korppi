@@ -23,6 +23,7 @@ import { initThemeToggle } from "./components/theme-toggle.js";
 import { initProfileButton } from "./components/profile-button.js";
 import { initFormattingToolbar } from "./components/formatting-toolbar.js";
 import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
+import { initWelcomeModal } from "./components/welcome-modal.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -107,6 +108,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     initResizableSidebars();
     initThemeToggle();
     await initProfileButton();
+    
+    // Initialize welcome modal after profile button is ready
+    await initWelcomeModal();
 
     // 2. Initialize Document Action Buttons
     const newDocBtn = document.getElementById("new-doc-btn");
