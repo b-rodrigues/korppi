@@ -7,6 +7,7 @@ pub mod conflict_commands;
 pub mod profile;
 pub mod kmd;
 pub mod document_manager;
+pub mod comments;
 
 use std::sync::Mutex;
 use patch_log::{list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch, restore_to_patch, import_patches_from_document};
@@ -24,6 +25,9 @@ use document_manager::{
     update_patch_review_status,
     reset_imported_patches_status,
     DocumentManager,
+};
+use comments::{
+    add_comment, list_comments, add_reply, resolve_comment, delete_comment, mark_comment_deleted, restore_comment,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -79,6 +83,14 @@ pub fn run() {
             update_patch_review_status,
             reset_imported_patches_status,
             import_patches_from_document,
+            // Comment commands
+            add_comment,
+            list_comments,
+            add_reply,
+            resolve_comment,
+            delete_comment,
+            mark_comment_deleted,
+            restore_comment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

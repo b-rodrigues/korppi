@@ -47,5 +47,12 @@ commands.allow = [
     "reset_imported_patches_status",
     "save_snapshot",
     "get_snapshot_for_patch",
-    "restore_to_patch"
+    "restore_to_patch",
+    "add_comment",
+    "list_comments",
+    "add_reply",
+    "resolve_comment",
+    "delete_comment",
+    "mark_comment_deleted",
+    "restore_comment"
 ]
