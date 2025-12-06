@@ -332,6 +332,98 @@ textarea {
     gap: 8px;
 }
 
+/* ===== WELCOME MODAL ===== */
+.welcome-modal-content {
+    max-width: 480px;
+    padding: 24px;
+}
+
+.welcome-header h2 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+.welcome-body {
+    margin-bottom: 24px;
+}
+
+.welcome-body p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.welcome-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.welcome-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.welcome-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.welcome-checkbox input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.btn-secondary:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-text {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 8px 16px;
+}
+
+.btn-text:hover {
+    color: var(--text-primary);
+}
+
 /* ===== FORM ===== */
 .form-group {
     margin-bottom: 16px;

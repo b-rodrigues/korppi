@@ -203,6 +203,33 @@
         </div>
     </div>
 
+    <!-- Welcome Modal -->
+    <div id="welcome-modal" class="modal" style="display: none;">
+        <div class="modal-content welcome-modal-content">
+            <div class="welcome-header">
+                <h2>Welcome to Korppi! 👋</h2>
+            </div>
+            <div class="welcome-body">
+                <p>Get started by setting up your profile to personalize your writing experience.</p>
+                <div class="welcome-actions">
+                    <button id="welcome-configure-profile-btn" class="btn-primary">
+                        Configure Profile
+                    </button>
+                    <a href="https://example.com/docs" id="welcome-docs-link" class="btn-secondary" target="_blank">
+                        View Documentation
+                    </a>
+                </div>
+            </div>
+            <div class="welcome-footer">
+                <label class="welcome-checkbox">
+                    <input type="checkbox" id="welcome-dont-show-again">
+                    <span>Don't show this again</span>
+                </label>
+                <button id="welcome-close-btn" class="btn-text">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="./main.js"></script>
 </body>
 
