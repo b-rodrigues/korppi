@@ -9,8 +9,8 @@
 # - Windows x86_64 (.exe/.msi)
 # - Windows aarch64 (.exe/.msi, cross-compiled)
 #
-# Uses Nix flake for Linux and macOS builds to ensure consistent dependencies
-# Uses standard Rust toolchain for Windows builds
+# Uses standard GitHub Actions setup for dependencies (Node, Rust, system libs)
+# instead of Nix.
 
 name: Release Build
 
@@ -33,43 +33,68 @@ jobs:
         include:
           - arch: x86_64
             runner: ubuntu-latest
-            nix-system: x86_64-linux
             rust-target: x86_64-unknown-linux-gnu
           - arch: aarch64
             runner: ubuntu-latest
-            nix-system: x86_64-linux
             rust-target: aarch64-unknown-linux-gnu
     
     steps:
       - uses: actions/checkout@v5
 
-      - name: Silence nix-channel warning
-        run: mkdir -p ~/.nix-defexpr/channels
-
-      - uses: cachix/install-nix-action@v31
-
-      - uses: cachix/cachix-action@v15
-        with:
-          name: rstats-on-nix
-          authToken: ${{ secrets.CACHIX_AUTH }}
-
-      - name: Install cross-compilation dependencies (aarch64)
-        if: matrix.arch == 'aarch64'
+      - name: Install system dependencies (x86_64)
+        if: matrix.arch == 'x86_64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
 
-      - name: Install dependencies and build
+      - name: Install system dependencies (aarch64)
+        if: matrix.arch == 'aarch64'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo sed -i 's/^deb/deb [arch=amd64]/' /etc/apt/sources.list
+          # Add Ubuntu Ports for arm64
+          CODENAME=$(lsb_release -cs)
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME} main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libssl-dev:arm64 \
+            libgtk-3-dev:arm64 \
+            libayatana-appindicator3-dev:arm64 \
+            librsvg2-dev:arm64 \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri app
         env:
           CC_aarch64_unknown_linux_gnu: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
           CXX_aarch64_unknown_linux_gnu: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-g++' || '' }}
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
-        run: |
-          nix develop .#devShells.${{ matrix.nix-system }}.default --command bash -c "
-            npm install
-            rustup target add ${{ matrix.rust-target }}
-            npm run tauri build -- --bundles appimage --target ${{ matrix.rust-target }}
-          "
+          PKG_CONFIG_PATH: ${{ matrix.arch == 'aarch64' && '/usr/lib/aarch64-linux-gnu/pkgconfig' || '' }}
+          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.arch == 'aarch64' && '1' || '' }}
+        run: npm run tauri build -- --bundles appimage --target ${{ matrix.rust-target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -88,32 +113,29 @@ jobs:
         include:
           - arch: x86_64
             runner: macos-13
-            nix-system: x86_64-darwin
             rust-target: x86_64-apple-darwin
           - arch: aarch64
             runner: macos-latest
-            nix-system: aarch64-darwin
             rust-target: aarch64-apple-darwin
     
     steps:
       - uses: actions/checkout@v5
 
-      - name: Silence nix-channel warning
-        run: mkdir -p ~/.nix-defexpr/channels
-
-      - uses: cachix/install-nix-action@v31
-
-      - uses: cachix/cachix-action@v15
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: rstats-on-nix
-          authToken: ${{ secrets.CACHIX_AUTH }}
+          node-version: '20'
 
-      - name: Install dependencies and build
-        run: |
-          nix develop .#devShells.${{ matrix.nix-system }}.default --command bash -c "
-            npm install
-            npm run tauri build -- --target ${{ matrix.rust-target }}
-          "
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri app
+        run: npm run tauri build -- --target ${{ matrix.rust-target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
