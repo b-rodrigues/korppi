@@ -22,6 +22,7 @@ import { initResizableSidebars } from "./components/resizable-sidebar.js";
 import { initThemeToggle } from "./components/theme-toggle.js";
 import { initProfileButton } from "./components/profile-button.js";
 import { initFormattingToolbar } from "./components/formatting-toolbar.js";
+import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -225,8 +226,9 @@ window.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // 5. Initialize Timeline (always visible in right sidebar)
+    // 5. Initialize Timeline and Comments (right sidebar)
     initTimeline();
+    initCommentsPanel();
 
     // 6. Initialize Document Manager
     try {
@@ -247,6 +249,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         const editor = await initEditor();
         // Initialize formatting toolbar with editor instance
         initFormattingToolbar(editor);
+        // Initialize comments context menu
+        initEditorContextMenu();
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }
