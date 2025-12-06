@@ -281,11 +281,12 @@ function switchToTab(tab) {
  */
 export async function refreshComments() {
     try {
+        // First check for orphaned comments (run on unresolved only, not on current filter)
+        await checkForOrphanedComments();
+
+        // Then fetch with the current filter
         const comments = await listComments(currentStatusFilter);
         commentsCache = comments;
-
-        // Check for orphaned comments (anchors that can't be resolved)
-        await checkForOrphanedComments(comments);
 
         renderCommentsList(comments);
     } catch (err) {
@@ -297,26 +298,24 @@ export async function refreshComments() {
  * Check if any comments have become orphaned (text deleted).
  * Mark them as 'deleted' status.
  */
-async function checkForOrphanedComments(comments) {
+async function checkForOrphanedComments() {
+    // Fetch all unresolved comments to check for orphans
+    const unresolvedComments = await listComments('unresolved');
     const documentText = getEditorContent();
 
-    for (const comment of comments) {
-        // Skip already deleted or replies
-        if (comment.status === 'deleted' || comment.parent_id !== null) continue;
+    if (!documentText) return;
 
-        // Try to resolve anchor
-        let position = resolveAnchor(comment.start_anchor, comment.end_anchor);
+    for (const comment of unresolvedComments) {
+        // Skip replies
+        if (comment.parent_id !== null) continue;
 
-        // Fallback to fuzzy match
-        if (!position) {
-            position = fallbackFuzzyMatch(comment.selected_text, documentText);
-        }
+        // Try fuzzy match (simpler and more reliable than Yjs anchors for now)
+        const found = documentText.includes(comment.selected_text);
 
-        // If still no position, mark as deleted
-        if (!position) {
+        // If text not found, mark as deleted
+        if (!found) {
             try {
                 await markCommentDeleted(comment.id);
-                comment.status = 'deleted'; // Update local cache
             } catch (err) {
                 console.warn("Failed to mark orphaned comment as deleted:", err);
             }
@@ -510,24 +509,41 @@ function highlightCommentInEditor(comment) {
     // Skip if deleted
     if (comment.status === 'deleted') return;
 
-    // Try to resolve anchor
-    let position = resolveAnchor(comment.start_anchor, comment.end_anchor);
+    const searchText = comment.selected_text;
+    if (!searchText) return;
 
-    // Fallback to fuzzy match
-    if (!position) {
-        const documentText = getEditorContent();
-        position = fallbackFuzzyMatch(comment.selected_text, documentText);
-    }
-
-    if (!position) return;
-
-    // Add temporary highlight using CSS class injection
     editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
+        const doc = view.state.doc;
 
-        // Create a temporary highlight via DOM manipulation
-        const from = view.coordsAtPos(position.from);
-        const to = view.coordsAtPos(position.to);
+        // Search for the text in the document
+        let found = false;
+        let foundFrom = -1;
+        let foundTo = -1;
+
+        doc.descendants((node, pos) => {
+            if (found) return false; // Stop if already found
+            if (node.isText) {
+                const text = node.text;
+                const idx = text.indexOf(searchText);
+                if (idx !== -1) {
+                    foundFrom = pos + idx;
+                    foundTo = foundFrom + searchText.length;
+                    found = true;
+                    return false;
+                }
+            }
+        });
+
+        if (!found) return;
+
+        // Get coordinates from ProseMirror positions
+        const fromCoords = view.coordsAtPos(foundFrom);
+        const toCoords = view.coordsAtPos(foundTo);
+
+        // Handle multi-line selections - use bounding box
+        const minLeft = Math.min(fromCoords.left, toCoords.left);
+        const maxRight = Math.max(fromCoords.right, toCoords.right);
 
         // Create highlight overlay
         clearCommentHighlight();
@@ -536,10 +552,10 @@ function highlightCommentInEditor(comment) {
         highlight.className = 'comment-highlight-overlay';
         highlight.style.cssText = `
             position: fixed;
-            left: ${from.left}px;
-            top: ${from.top}px;
-            width: ${to.right - from.left}px;
-            height: ${to.bottom - from.top}px;
+            left: ${minLeft}px;
+            top: ${fromCoords.top}px;
+            width: ${maxRight - minLeft}px;
+            height: ${toCoords.bottom - fromCoords.top}px;
             background: ${comment.author_color || '#4fc3f7'}33;
             border: 2px solid ${comment.author_color || '#4fc3f7'};
             pointer-events: none;
