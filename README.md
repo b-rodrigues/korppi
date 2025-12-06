@@ -32,6 +32,9 @@ import their patches into your main document, and reconcile all versions of the 
 All patches can be either accepted or rejected, but rejected patches aren’t deleted: they’re just not going to be used
 to create the final, clean document.
 
+This final document which contains all the input of all the co-authors can then be exported as a `.docx` to add styles, a table
+of contents etc...
+
 ### Crash-Proof & Conflict-Free
 Korppi is built to be robust. It saves your work automatically and uses a simple 3-way merge algorithm (similar to what Google Docs uses) 
 to merge changes intelligently. You don't have to worry about "conflicted copies" or losing work.
