@@ -1,0 +1,199 @@
+# GitHub Actions workflow to build Korppi binaries for all platforms
+# Triggers on version tags (e.g., v1.0.0, v2.1.3)
+# 
+# Builds for 6 platform/architecture combinations:
+# - Linux x86_64 (AppImage)
+# - Linux aarch64 (AppImage, cross-compiled)
+# - macOS x86_64 (Intel, .dmg)
+# - macOS aarch64 (Apple Silicon, .dmg)
+# - Windows x86_64 (.exe/.msi)
+# - Windows aarch64 (.exe/.msi, cross-compiled)
+#
+# Uses Nix flake for Linux and macOS builds to ensure consistent dependencies
+# Uses standard Rust toolchain for Windows builds
+
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            nix-system: x86_64-linux
+            rust-target: x86_64-unknown-linux-gnu
+          - arch: aarch64
+            runner: ubuntu-latest
+            nix-system: x86_64-linux
+            rust-target: aarch64-unknown-linux-gnu
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Silence nix-channel warning
+        run: mkdir -p ~/.nix-defexpr/channels
+
+      - uses: cachix/install-nix-action@v31
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: rstats-on-nix
+          authToken: ${{ secrets.CACHIX_AUTH }}
+
+      - name: Install cross-compilation dependencies (aarch64)
+        if: matrix.arch == 'aarch64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Install dependencies and build
+        env:
+          CC_aarch64_unknown_linux_gnu: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
+          CXX_aarch64_unknown_linux_gnu: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-g++' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.arch == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
+        run: |
+          nix develop .#devShells.${{ matrix.nix-system }}.default --command bash -c "
+            npm install
+            rustup target add ${{ matrix.rust-target }}
+            npm run tauri build -- --bundles appimage --target ${{ matrix.rust-target }}
+          "
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.1.3
+        with:
+          name: linux-${{ matrix.arch }}-appimage
+          path: src-tauri/target/${{ matrix.rust-target }}/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-13
+            nix-system: x86_64-darwin
+            rust-target: x86_64-apple-darwin
+          - arch: aarch64
+            runner: macos-latest
+            nix-system: aarch64-darwin
+            rust-target: aarch64-apple-darwin
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Silence nix-channel warning
+        run: mkdir -p ~/.nix-defexpr/channels
+
+      - uses: cachix/install-nix-action@v31
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: rstats-on-nix
+          authToken: ${{ secrets.CACHIX_AUTH }}
+
+      - name: Install dependencies and build
+        run: |
+          nix develop .#devShells.${{ matrix.nix-system }}.default --command bash -c "
+            npm install
+            npm run tauri build -- --target ${{ matrix.rust-target }}
+          "
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.1.3
+        with:
+          name: macos-${{ matrix.arch }}-dmg
+          path: src-tauri/target/${{ matrix.rust-target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            rust-target: x86_64-pc-windows-msvc
+          - arch: aarch64
+            rust-target: aarch64-pc-windows-msvc
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri app
+        run: npm run tauri build -- --target ${{ matrix.rust-target }}
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4.1.3
+        with:
+          name: windows-${{ matrix.arch }}-msi
+          path: src-tauri/target/${{ matrix.rust-target }}/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4.1.3
+        with:
+          name: windows-${{ matrix.arch }}-exe
+          path: src-tauri/target/${{ matrix.rust-target }}/release/bundle/nsis/*.exe
+          if-no-files-found: warn
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4.1.3
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.AppImage
+            artifacts/**/*.dmg
+            artifacts/**/*.msi
+            artifacts/**/*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

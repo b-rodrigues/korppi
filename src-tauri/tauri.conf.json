@@ -29,6 +29,11 @@
     "active": true,
     "targets": "all",
     "icon": [],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "fileAssociations": [
       {
         "ext": [
