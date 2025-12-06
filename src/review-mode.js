@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getActiveDocumentId } from "./document-manager.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
 import { getCachedProfile } from "./profile-service.js";
+import { hexToRgba, escapeHtml } from "./utils.js";
 
 let reviewState = {
     active: false,
@@ -540,21 +541,4 @@ function clearOverlay() {
     }
 }
 
-/**
- * Convert hex to rgba
- */
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Escape HTML
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Utility functions hexToRgba and escapeHtml are imported from utils.js

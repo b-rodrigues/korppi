@@ -6,6 +6,7 @@ import { calculateCharDiff } from './diff-highlighter.js';
 import { getCachedProfile } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
+import { hexToRgba, escapeHtml } from './utils.js';
 import { getEditorContent } from './editor.js';
 
 let previewState = {
@@ -210,29 +211,7 @@ function clearPreview() {
     }
 }
 
-/**
- * Convert hex color to rgba
- * @param {string} hex - Hex color
- * @param {number} alpha - Alpha value
- * @returns {string} rgba string
- */
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Escape HTML characters
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Utility functions hexToRgba and escapeHtml are imported from utils.js
 
 /**
  * Accept the current patch being previewed
