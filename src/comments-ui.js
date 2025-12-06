@@ -16,6 +16,7 @@ import {
 } from "./comments-service.js";
 import { getEditorContent, editor, editorViewCtx } from "./editor.js";
 import { escapeHtml } from "./utils.js";
+import { getProfile } from "./profile-service.js";
 
 // ============================================================================
 // State
@@ -368,10 +369,16 @@ function renderCommentsList(comments) {
             await refreshComments();
         });
 
-        // Delete button (permanent hard delete from database)
+        // Delete button: soft delete for unresolved/resolved, hard delete for already deleted
         item.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
             e.stopPropagation();
-            await deleteComment(commentId);
+            if (comment && comment.status === 'deleted') {
+                // Already deleted → hard delete (permanent removal)
+                await deleteComment(commentId);
+            } else {
+                // Unresolved or resolved → soft delete (move to deleted status)
+                await markCommentDeleted(commentId);
+            }
             await refreshComments();
         });
 
@@ -510,7 +517,7 @@ function scrollToComment(commentId) {
 /**
  * Highlight a comment's text in the editor (on hover).
  */
-function highlightCommentInEditor(comment) {
+async function highlightCommentInEditor(comment) {
     if (!comment || !editor) return;
 
     // Skip if deleted
@@ -519,9 +526,9 @@ function highlightCommentInEditor(comment) {
     const searchText = comment.selected_text;
     if (!searchText) return;
 
-    // Get author color (use author_color from comment, fallback to profile default)
-    const highlightColor = comment.author_color || '#3498db';
-    console.log('Highlight color for comment:', comment.id, 'author_color:', comment.author_color, 'using:', highlightColor);
+    // Use current profile color for highlighting (not the stored author_color)
+    const profile = await getProfile();
+    const highlightColor = profile.authorColor || '#3498db';
 
     editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
