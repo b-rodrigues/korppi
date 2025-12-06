@@ -297,3 +297,29 @@ pub fn mark_comment_deleted(
 
     Ok(())
 }
+
+/// Restore a deleted comment (set status back to 'unresolved')
+#[tauri::command]
+pub fn restore_comment(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    comment_id: i64,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+
+    let doc = manager
+        .documents
+        .get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+
+    // Restore this comment and its replies
+    conn.execute(
+        "UPDATE comments SET status = 'unresolved' WHERE id = ?1 OR parent_id = ?1",
+        params![comment_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

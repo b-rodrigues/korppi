@@ -27,7 +27,7 @@ use document_manager::{
     DocumentManager,
 };
 use comments::{
-    add_comment, list_comments, add_reply, resolve_comment, delete_comment, mark_comment_deleted,
+    add_comment, list_comments, add_reply, resolve_comment, delete_comment, mark_comment_deleted, restore_comment,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -90,6 +90,7 @@ pub fn run() {
             resolve_comment,
             delete_comment,
             mark_comment_deleted,
+            restore_comment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

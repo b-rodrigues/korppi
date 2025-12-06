@@ -11,6 +11,7 @@ import {
     resolveComment,
     deleteComment,
     markCommentDeleted,
+    restoreComment,
     buildCommentThreads
 } from "./comments-service.js";
 import { getEditorContent, editor, editorViewCtx } from "./editor.js";
@@ -374,6 +375,13 @@ function renderCommentsList(comments) {
             await refreshComments();
         });
 
+        // Restore button (for deleted comments)
+        item.querySelector(".restore-btn")?.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            await restoreComment(commentId);
+            await refreshComments();
+        });
+
         // Reply button
         item.querySelector(".reply-btn")?.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -423,6 +431,7 @@ function renderCommentThread(thread, documentText) {
             <div class="comment-actions">
                 ${!isDeleted && !isResolved ? '<button class="reply-btn" title="Reply">↩ Reply</button>' : ''}
                 ${!isDeleted && !isResolved ? '<button class="resolve-btn" title="Resolve">✓ Resolve</button>' : ''}
+                ${isDeleted ? '<button class="restore-btn" title="Restore">↻ Restore</button>' : ''}
                 <button class="delete-btn" title="Delete permanently">🗑</button>
             </div>
         </div>

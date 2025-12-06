@@ -195,6 +195,20 @@ export async function markCommentDeleted(commentId) {
     });
 }
 
+/**
+ * Restore a deleted comment (set status back to 'unresolved').
+ * @param {number} commentId - Comment ID to restore
+ */
+export async function restoreComment(commentId) {
+    const docId = getActiveDocumentId();
+    if (!docId) throw new Error("No active document");
+
+    await invoke("restore_comment", {
+        docId,
+        commentId
+    });
+}
+
 // ============================================================================
 // Helper: Build thread structure from flat list
 // ============================================================================
