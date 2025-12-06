@@ -1156,6 +1156,45 @@ textarea {
     color: var(--text-primary);
 }
 
+/* Comment Status Styling */
+.comment-item.deleted {
+    opacity: 0.6;
+    border-left: 3px solid var(--danger);
+}
+
+.comment-item.resolved {
+    opacity: 0.7;
+    border-left: 3px solid var(--success);
+}
+
+.comment-status {
+    display: inline-block;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+}
+
+.comment-status.deleted {
+    background: rgba(231, 76, 60, 0.2);
+    color: var(--danger);
+}
+
+.comment-status.resolved {
+    background: rgba(46, 204, 113, 0.2);
+    color: var(--success);
+}
+
+/* Comments Filter */
+.comments-filter {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.comments-filter select {
+    width: 100%;
+}
+
 /* Reply Input */
 .reply-input-container {
     margin-top: 8px;

@@ -181,6 +181,20 @@ export async function deleteComment(commentId) {
     });
 }
 
+/**
+ * Mark a comment as deleted (soft delete - still visible with 'deleted' status).
+ * @param {number} commentId - Comment ID to mark as deleted
+ */
+export async function markCommentDeleted(commentId) {
+    const docId = getActiveDocumentId();
+    if (!docId) throw new Error("No active document");
+
+    await invoke("mark_comment_deleted", {
+        docId,
+        commentId
+    });
+}
+
 // ============================================================================
 // Helper: Build thread structure from flat list
 // ============================================================================

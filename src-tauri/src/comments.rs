@@ -51,7 +51,7 @@ fn init_comments_table(conn: &Connection) -> Result<(), String> {
             end_anchor      TEXT    NOT NULL,
             selected_text   TEXT    NOT NULL,
             content         TEXT    NOT NULL,
-            status          TEXT    DEFAULT 'active',
+            status          TEXT    DEFAULT 'unresolved',
             parent_id       INTEGER,
             FOREIGN KEY (parent_id) REFERENCES comments(id)
         );
@@ -265,6 +265,32 @@ pub fn delete_comment(
     // Delete the comment and its replies
     conn.execute(
         "DELETE FROM comments WHERE id = ?1 OR parent_id = ?1",
+        params![comment_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Mark a comment as deleted (soft delete - keeps it in DB but with 'deleted' status)
+#[tauri::command]
+pub fn mark_comment_deleted(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    comment_id: i64,
+) -> Result<(), String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+
+    let doc = manager
+        .documents
+        .get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+
+    // Mark this comment and its replies as deleted
+    conn.execute(
+        "UPDATE comments SET status = 'deleted' WHERE id = ?1 OR parent_id = ?1",
         params![comment_id],
     )
     .map_err(|e| e.to_string())?;

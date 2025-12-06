@@ -52,5 +52,6 @@ commands.allow = [
     "list_comments",
     "add_reply",
     "resolve_comment",
-    "delete_comment"
+    "delete_comment",
+    "mark_comment_deleted"
 ]

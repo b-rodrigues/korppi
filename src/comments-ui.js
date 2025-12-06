@@ -10,6 +10,7 @@ import {
     addReply,
     resolveComment,
     deleteComment,
+    markCommentDeleted,
     buildCommentThreads
 } from "./comments-service.js";
 import { getEditorContent, editor, editorViewCtx } from "./editor.js";
@@ -21,6 +22,8 @@ import { escapeHtml } from "./utils.js";
 
 let commentsCache = [];
 let activeTab = "timeline"; // 'timeline' or 'comments'
+let currentStatusFilter = null; // null = all, 'unresolved', 'resolved', 'deleted'
+let currentHighlightDecoration = null;
 
 // ============================================================================
 // Context Menu
@@ -209,6 +212,14 @@ export function initCommentsPanel() {
         commentsPanel.className = "comments-panel";
         commentsPanel.style.display = "none";
         commentsPanel.innerHTML = `
+            <div class="comments-filter">
+                <select id="comments-status-filter" class="compact-select">
+                    <option value="">All Comments</option>
+                    <option value="unresolved" selected>Unresolved</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="deleted">Deleted</option>
+                </select>
+            </div>
             <div class="comments-list" id="comments-list">
                 <p class="empty-message">No comments yet</p>
             </div>
@@ -221,6 +232,15 @@ export function initCommentsPanel() {
         } else {
             rightSidebar.appendChild(commentsPanel);
         }
+
+        // Status filter handler
+        commentsPanel.querySelector("#comments-status-filter").addEventListener("change", (e) => {
+            currentStatusFilter = e.target.value || null;
+            refreshComments();
+        });
+
+        // Set initial filter
+        currentStatusFilter = "unresolved";
     }
 
     // Listen for document changes to refresh comments
@@ -261,11 +281,46 @@ function switchToTab(tab) {
  */
 export async function refreshComments() {
     try {
-        const comments = await listComments("active");
+        const comments = await listComments(currentStatusFilter);
         commentsCache = comments;
+
+        // Check for orphaned comments (anchors that can't be resolved)
+        await checkForOrphanedComments(comments);
+
         renderCommentsList(comments);
     } catch (err) {
         console.error("Failed to load comments:", err);
+    }
+}
+
+/**
+ * Check if any comments have become orphaned (text deleted).
+ * Mark them as 'deleted' status.
+ */
+async function checkForOrphanedComments(comments) {
+    const documentText = getEditorContent();
+
+    for (const comment of comments) {
+        // Skip already deleted or replies
+        if (comment.status === 'deleted' || comment.parent_id !== null) continue;
+
+        // Try to resolve anchor
+        let position = resolveAnchor(comment.start_anchor, comment.end_anchor);
+
+        // Fallback to fuzzy match
+        if (!position) {
+            position = fallbackFuzzyMatch(comment.selected_text, documentText);
+        }
+
+        // If still no position, mark as deleted
+        if (!position) {
+            try {
+                await markCommentDeleted(comment.id);
+                comment.status = 'deleted'; // Update local cache
+            } catch (err) {
+                console.warn("Failed to mark orphaned comment as deleted:", err);
+            }
+        }
     }
 }
 
@@ -290,6 +345,15 @@ function renderCommentsList(comments) {
     // Add event handlers
     container.querySelectorAll(".comment-item").forEach(item => {
         const commentId = parseInt(item.dataset.commentId);
+        const comment = commentsCache.find(c => c.id === commentId);
+
+        // Hover to highlight text in editor
+        item.addEventListener("mouseenter", () => {
+            highlightCommentInEditor(comment);
+        });
+        item.addEventListener("mouseleave", () => {
+            clearCommentHighlight();
+        });
 
         // Click to scroll to position
         item.addEventListener("click", (e) => {
@@ -297,17 +361,17 @@ function renderCommentsList(comments) {
             scrollToComment(commentId);
         });
 
-        // Resolve button
+        // Resolve button (only for unresolved)
         item.querySelector(".resolve-btn")?.addEventListener("click", async (e) => {
             e.stopPropagation();
             await resolveComment(commentId);
             await refreshComments();
         });
 
-        // Delete button
+        // Delete button (hard delete)
         item.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
             e.stopPropagation();
-            if (confirm("Delete this comment and all replies?")) {
+            if (confirm("Permanently delete this comment and all replies?")) {
                 await deleteComment(commentId);
                 await refreshComments();
             }
@@ -331,13 +395,22 @@ function renderCommentThread(thread, documentText) {
         : thread.selected_text;
     const date = new Date(thread.timestamp).toLocaleDateString();
     const repliesCount = thread.replies?.length || 0;
+    const isDeleted = thread.status === 'deleted';
+    const isResolved = thread.status === 'resolved';
+
+    const statusBadge = isDeleted
+        ? '<span class="comment-status deleted">⚠ Text deleted</span>'
+        : isResolved
+            ? '<span class="comment-status resolved">✓ Resolved</span>'
+            : '';
 
     return `
-        <div class="comment-item" data-comment-id="${thread.id}">
+        <div class="comment-item ${isDeleted ? 'deleted' : ''} ${isResolved ? 'resolved' : ''}" data-comment-id="${thread.id}">
             <div class="comment-header">
                 <span class="comment-author" style="color:${color};">${escapeHtml(thread.author)}</span>
                 <span class="comment-date">${date}</span>
             </div>
+            ${statusBadge}
             <div class="comment-excerpt">"${escapeHtml(excerpt)}"</div>
             <div class="comment-content">${escapeHtml(thread.content)}</div>
             ${repliesCount > 0 ? `
@@ -351,9 +424,9 @@ function renderCommentThread(thread, documentText) {
                 </div>
             ` : ""}
             <div class="comment-actions">
-                <button class="reply-btn" title="Reply">↩ Reply</button>
-                <button class="resolve-btn" title="Resolve">✓ Resolve</button>
-                <button class="delete-btn" title="Delete">🗑</button>
+                ${!isDeleted && !isResolved ? '<button class="reply-btn" title="Reply">↩ Reply</button>' : ''}
+                ${!isDeleted && !isResolved ? '<button class="resolve-btn" title="Resolve">✓ Resolve</button>' : ''}
+                <button class="delete-btn" title="Delete permanently">🗑</button>
             </div>
         </div>
     `;
@@ -426,6 +499,68 @@ function scrollToComment(commentId) {
             view.focus();
         });
     }
+}
+
+/**
+ * Highlight a comment's text in the editor (on hover).
+ */
+function highlightCommentInEditor(comment) {
+    if (!comment || !editor) return;
+
+    // Skip if deleted
+    if (comment.status === 'deleted') return;
+
+    // Try to resolve anchor
+    let position = resolveAnchor(comment.start_anchor, comment.end_anchor);
+
+    // Fallback to fuzzy match
+    if (!position) {
+        const documentText = getEditorContent();
+        position = fallbackFuzzyMatch(comment.selected_text, documentText);
+    }
+
+    if (!position) return;
+
+    // Add temporary highlight using CSS class injection
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+
+        // Create a temporary highlight via DOM manipulation
+        const from = view.coordsAtPos(position.from);
+        const to = view.coordsAtPos(position.to);
+
+        // Create highlight overlay
+        clearCommentHighlight();
+
+        const highlight = document.createElement('div');
+        highlight.className = 'comment-highlight-overlay';
+        highlight.style.cssText = `
+            position: fixed;
+            left: ${from.left}px;
+            top: ${from.top}px;
+            width: ${to.right - from.left}px;
+            height: ${to.bottom - from.top}px;
+            background: ${comment.author_color || '#4fc3f7'}33;
+            border: 2px solid ${comment.author_color || '#4fc3f7'};
+            pointer-events: none;
+            z-index: 50;
+            border-radius: 3px;
+        `;
+        document.body.appendChild(highlight);
+        currentHighlightDecoration = highlight;
+    });
+}
+
+/**
+ * Clear the comment highlight overlay.
+ */
+function clearCommentHighlight() {
+    if (currentHighlightDecoration) {
+        currentHighlightDecoration.remove();
+        currentHighlightDecoration = null;
+    }
+    // Also remove any stray overlays
+    document.querySelectorAll('.comment-highlight-overlay').forEach(el => el.remove());
 }
 
 // ============================================================================
