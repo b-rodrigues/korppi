@@ -526,9 +526,9 @@ async function highlightCommentInEditor(comment) {
     const searchText = comment.selected_text;
     if (!searchText) return;
 
-    // Use current profile color for highlighting (not the stored author_color)
+    // Use current profile color for highlighting
     const profile = await getProfile();
-    const highlightColor = profile.authorColor || '#3498db';
+    const highlightColor = profile.color || '#3498db';
 
     editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
