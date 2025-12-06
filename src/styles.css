@@ -382,7 +382,7 @@ textarea {
 }
 
 .btn-primary {
-    background: var(--accent-color, #4fc3f7);
+    background: var(--accent);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -397,8 +397,8 @@ textarea {
 
 .btn-secondary {
     background: transparent;
-    color: var(--accent-color, #4fc3f7);
-    border: 1px solid var(--accent-color, #4fc3f7);
+    color: var(--accent);
+    border: 1px solid var(--accent);
     padding: 10px 20px;
     border-radius: 4px;
     cursor: pointer;
@@ -408,7 +408,7 @@ textarea {
 }
 
 .btn-secondary:hover {
-    background: var(--accent-color, #4fc3f7);
+    background: var(--accent);
     color: white;
 }
 

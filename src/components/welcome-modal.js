@@ -4,6 +4,8 @@
 const WELCOME_DISMISSED_KEY = 'korppi-welcome-dismissed';
 
 let welcomeModal = null;
+let escapeKeyHandler = null;
+let isSetup = false;
 
 /**
  * Initialize and show the welcome modal if not previously dismissed
@@ -26,6 +28,10 @@ export async function initWelcomeModal() {
  * Set up welcome modal event listeners
  */
 function setupWelcomeModal() {
+    // Prevent duplicate setup
+    if (isSetup) return;
+    isSetup = true;
+
     const closeBtn = document.getElementById('welcome-close-btn');
     const configureProfileBtn = document.getElementById('welcome-configure-profile-btn');
     const dontShowAgainCheckbox = document.getElementById('welcome-dont-show-again');
@@ -55,11 +61,12 @@ function setupWelcomeModal() {
     });
 
     // Escape to close
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && welcomeModal.style.display !== 'none') {
+    escapeKeyHandler = (e) => {
+        if (e.key === 'Escape' && welcomeModal && welcomeModal.style.display !== 'none') {
             closeWelcomeModal();
         }
-    });
+    };
+    document.addEventListener('keydown', escapeKeyHandler);
 }
 
 /**
@@ -83,6 +90,13 @@ function closeWelcomeModal() {
     }
 
     welcomeModal.style.display = 'none';
+
+    // Remove the escape key listener when modal is closed
+    if (escapeKeyHandler) {
+        document.removeEventListener('keydown', escapeKeyHandler);
+        escapeKeyHandler = null;
+        isSetup = false;
+    }
 }
 
 /**
