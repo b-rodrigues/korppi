@@ -815,6 +815,134 @@ textarea {
     color: var(--accent);
 }
 
+/* ===== PATCH CONTENT MODAL ===== */
+#patch-content-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+#patch-content-modal .modal-content {
+    background: var(--bg-page);
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    width: 80%;
+    max-width: 800px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-lg);
+}
+
+#patch-content-modal .modal-header {
+    padding: 15px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#patch-content-modal .modal-header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#patch-content-modal .modal-close {
+    color: var(--text-muted);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    line-height: 1;
+}
+
+#patch-content-modal .modal-close:hover {
+    color: var(--text-primary);
+}
+
+#patch-content-modal .modal-tabs {
+    display: flex;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-light);
+}
+
+#patch-content-modal .tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-secondary);
+    transition: all 0.1s;
+}
+
+#patch-content-modal .tab-btn:hover {
+    background: var(--btn-bg-hover);
+}
+
+#patch-content-modal .tab-btn.active {
+    background: var(--bg-page);
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+}
+
+#patch-content-modal .modal-body {
+    padding: 16px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#patch-content-modal .tab-content {
+    display: none;
+    background: var(--bg-panel);
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+#patch-content-modal .tab-content.visible {
+    display: block;
+}
+
+#patch-content-modal .modal-footer {
+    padding: 12px 16px;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-light);
+    text-align: right;
+}
+
+#patch-content-modal .modal-close-btn {
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+#patch-content-modal .modal-close-btn:hover {
+    background: var(--accent-dark);
+}
+
 /* ===== CONFLICT UI ===== */
 .conflict-indicator {
     position: fixed;
