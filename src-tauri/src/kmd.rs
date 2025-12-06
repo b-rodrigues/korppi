@@ -991,4 +991,52 @@ mod tests {
         assert_eq!(parsed.id, profile.id);
         assert_eq!(parsed.color, profile.color);
     }
+
+    #[test]
+    fn test_markdown_to_docx_basic() {
+        let markdown = "# Heading 1\n\nThis is a paragraph with **bold** and *italic* text.";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_lists() {
+        let markdown = "# Lists\n\n- Item 1\n- Item 2\n\n1. First\n2. Second";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_code() {
+        let markdown = "# Code\n\nInline `code` and:\n\n```\ncode block\n```";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_blockquote() {
+        let markdown = "> This is a quote\n> with multiple lines";
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_export_docx_creates_file() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.docx");
+        let path_str = file_path.to_str().unwrap().to_string();
+        
+        let markdown = "# Test Document\n\nThis is a test.";
+        let result = export_docx(path_str.clone(), markdown.to_string());
+        
+        assert!(result.is_ok());
+        assert!(file_path.exists());
+        
+        // Check file is not empty
+        let metadata = fs::metadata(&file_path).unwrap();
+        assert!(metadata.len() > 0);
+    }
 }
