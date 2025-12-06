@@ -1,106 +1,152 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korppi Prototype</title>
+    <title>Korppi</title>
+    <link rel="stylesheet" href="styles/themes.css">
+    <link rel="stylesheet" href="styles/layout.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-
-    <!-- Document Tabs -->
-    <div id="document-tabs" class="document-tabs">
-        <!-- Tabs will be dynamically inserted here -->
-    </div>
-
-    <div class="container">
-        <header>
-            <h1>🦀 Korppi Collaborative Editor</h1>
-            <div class="header-actions">
-                <button id="new-doc-btn" class="header-btn" title="New Document (Ctrl+N)">📄 New</button>
-                <button id="open-doc-btn" class="header-btn" title="Open Document (Ctrl+O)">📂 Open</button>
-                <button id="save-doc-btn" class="header-btn" title="Save Document (Ctrl+S)">💾 Save</button>
-                <button id="reconcile-btn" class="header-btn" title="Reconcile document versions">📋 Reconcile</button>
-                <button id="export-md-btn" class="header-btn" title="Export as Markdown">📝 Export MD</button>
-                <button id="settings-btn" class="header-btn">⚙️ Settings</button>
+    <div class="app-container">
+        <!-- Document Tabs Bar -->
+        <div class="document-tabs-bar">
+            <div id="document-tabs" class="document-tabs">
+                <!-- Tabs dynamically inserted -->
             </div>
-        </header>
-
-        <!-- Recent Documents Panel (shown when no documents are open) -->
-        <div id="recent-documents" class="recent-documents" style="display: none;">
-            <h2>Recent Documents</h2>
-            <ul id="recent-list"></ul>
-            <div class="recent-actions">
-                <button id="new-document-btn" class="primary">📄 New Document</button>
-                <button id="open-document-btn">📂 Open Document</button>
-                <button id="clear-recent-btn" class="danger">Clear Recent</button>
-            </div>
+            <button class="new-tab-btn" id="new-tab-btn" title="New Document">+</button>
         </div>
 
-        <div id="editor"></div>
-    </div>
-    <script type="module" src="./main.js"></script>
-    <button id="timeline-toggle">Timeline</button>
-
-    <div id="timeline-container" style="
-        display:none;
-        position:fixed;
-        top:0;
-        right:0;
-        width:400px;
-        height:100%;
-        background:#fafafa;
-        border-left:1px solid #ccc;
-        overflow-y:auto;
-        padding:10px;
-    ">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h2 style="margin:0;">Timeline</h2>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <select id="timeline-sort" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
-                    <option value="time-desc">Newest First</option>
-                    <option value="time-asc">Oldest First</option>
-                    <option value="author">By Author</option>
-                    <option value="line-order">By Line Order</option>
-                </select>
-                <select id="filter-author" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
-                    <option value="all">All Authors</option>
-                </select>
-                <select id="filter-status" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
-                    <option value="all">All Status</option>
-                    <option value="pending" selected>Pending</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="rejected">Rejected</option>
-                </select>
-                <div style="display:flex;gap:4px;align-items:center;">
-                    <label style="font-size:0.8rem;white-space:nowrap;">Start:</label>
-                    <input id="filter-line-start" type="number" min="1" placeholder="1"
-                        style="width:50px;padding:4px;border-radius:4px;border:1px solid #ccc;">
-                    <label style="font-size:0.8rem;white-space:nowrap;">Range:</label>
-                    <input id="filter-line-range" type="number" min="1" placeholder="10"
-                        style="width:50px;padding:4px;border-radius:4px;border:1px solid #ccc;">
-                    <button id="clear-line-filter"
-                        style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;background:#f0f0f0;cursor:pointer;font-size:0.8rem;">✕</button>
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Left Sidebar -->
+            <aside class="left-sidebar">
+                <!-- Profile Section -->
+                <div class="profile-section">
+                    <button id="profile-button" class="profile-button" title="Profile Settings">
+                        ?
+                    </button>
+                    <div class="profile-info">
+                        <div id="profile-name-display" class="profile-name">Set up profile</div>
+                    </div>
+                    <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+                        <span class="icon">🌙</span>
+                        <span class="label">Dark</span>
+                    </button>
                 </div>
-            </div>
+
+                <!-- Formatting Toolbar -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Format</div>
+                    <div class="format-toolbar" id="format-toolbar">
+                        <!-- Buttons inserted by JS -->
+                    </div>
+                </div>
+
+                <!-- Document Actions -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Document</div>
+                    <div class="action-buttons">
+                        <button id="new-doc-btn" class="action-btn" title="New Document (Ctrl+N)">
+                            <span class="icon">📄</span>
+                            <span class="label">New</span>
+                            <span class="shortcut">Ctrl+N</span>
+                        </button>
+                        <button id="open-doc-btn" class="action-btn" title="Open Document (Ctrl+O)">
+                            <span class="icon">📂</span>
+                            <span class="label">Open</span>
+                            <span class="shortcut">Ctrl+O</span>
+                        </button>
+                        <button id="save-doc-btn" class="action-btn" title="Save Document (Ctrl+S)">
+                            <span class="icon">💾</span>
+                            <span class="label">Save</span>
+                            <span class="shortcut">Ctrl+S</span>
+                        </button>
+                        <button id="reconcile-btn" class="action-btn" title="Reconcile Changes">
+                            <span class="icon">📋</span>
+                            <span class="label">Reconcile</span>
+                        </button>
+                        <button id="export-md-btn" class="action-btn" title="Export as Markdown">
+                            <span class="icon">📝</span>
+                            <span class="label">Export MD</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Editor Area -->
+            <main class="editor-area">
+                <!-- Editor scroll container -->
+                <div class="editor-scroll">
+                    <div class="editor-page">
+                        <div id="editor"></div>
+                    </div>
+                </div>
+
+                <!-- Recent Documents Panel (shown when no docs open) - overlays editor -->
+                <div id="recent-documents" class="recent-documents-overlay" style="display: none;">
+                    <div class="recent-documents">
+                        <h2>📚 Recent Documents</h2>
+                        <ul id="recent-list"></ul>
+                        <div class="recent-actions">
+                            <button id="new-document-btn" class="primary">📄 New Document</button>
+                            <button id="open-document-btn">📂 Open Document</button>
+                            <button id="clear-recent-btn" class="danger">Clear Recent</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar (Timeline) -->
+            <aside class="right-sidebar">
+                <div class="timeline-header">
+                    <h3>Timeline</h3>
+                    <div class="timeline-controls">
+                        <select id="timeline-sort" class="compact-select" title="Sort order">
+                            <option value="time-desc">Newest</option>
+                            <option value="time-asc">Oldest</option>
+                            <option value="author">By Author</option>
+                            <option value="line-order">By Line</option>
+                        </select>
+                        <select id="filter-author" class="compact-select" title="Filter by author">
+                            <option value="all">All Authors</option>
+                        </select>
+                        <select id="filter-status" class="compact-select" title="Filter by status">
+                            <option value="all">All</option>
+                            <option value="pending" selected>Pending</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="timeline-controls" style="margin-top: 4px;">
+                        <label style="font-size: 10px; color: var(--text-muted);">Lines:</label>
+                        <input id="filter-line-start" type="number" min="1" placeholder="Start" style="width: 50px;"
+                            class="compact-select">
+                        <input id="filter-line-range" type="number" min="1" placeholder="Range" style="width: 50px;"
+                            class="compact-select">
+                        <button id="clear-line-filter" class="format-btn" title="Clear line filter">✕</button>
+                    </div>
+                </div>
+
+                <div id="timeline-list" class="timeline-list">
+                    <!-- Patches dynamically inserted -->
+                </div>
+
+                <div class="timeline-actions">
+                    <button id="reset-to-original-btn" class="action-btn"
+                        style="background: var(--danger); color: white; border-color: var(--danger);">
+                        <span class="icon">↺</span>
+                        <span class="label">Reset to Original</span>
+                    </button>
+                </div>
+            </aside>
         </div>
-        <button id="reset-to-original-btn"
-            style="margin-bottom:10px;width:100%;padding:8px;background:#e74c3c;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
-            ↺ Reset to Original
-        </button>
-
-        <div id="timeline-list" style="
-            border-bottom:1px solid #ddd;
-            margin-bottom:10px;
-            padding-bottom:10px;
-        "></div>
-
-        <div id="timeline-details"></div>
     </div>
 
-    <!-- Profile Settings Modal -->
+    <!-- Profile Modal -->
     <div id="profile-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
@@ -108,6 +154,25 @@
                 <button id="profile-modal-close" class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Avatar Upload -->
+                <div class="form-group">
+                    <label>Profile Picture</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div id="profile-avatar-preview" class="profile-button"
+                            style="width: 64px; height: 64px; font-size: 24px; cursor: default;">
+                            ?
+                        </div>
+                        <div>
+                            <input type="file" id="profile-avatar-input" accept="image/*" style="display: none;">
+                            <button type="button" class="action-btn"
+                                onclick="document.getElementById('profile-avatar-input').click()">
+                                <span class="icon">📷</span>
+                                <span class="label">Upload Photo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="profile-name">Name <span class="required">*</span></label>
                     <input type="text" id="profile-name" placeholder="Your name" required>
@@ -119,8 +184,8 @@
                 <div class="form-group">
                     <label for="profile-color">Author Highlight Color</label>
                     <div class="color-picker-wrapper">
-                        <input type="color" id="profile-color" value="#3498db">
-                        <span id="profile-color-value">#3498db</span>
+                        <input type="color" id="profile-color" value="#4fc3f7">
+                        <span id="profile-color-value">#4fc3f7</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -133,6 +198,8 @@
             </div>
         </div>
     </div>
+
+    <script type="module" src="./main.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,120 @@
+/* ===========================================
+   KORPPI CSS THEME SYSTEM
+   Dense Modern-Retro Technical Aesthetic
+   =========================================== */
+
+/* ===== LIGHT MODE (DEFAULT) ===== */
+:root,
+:root[data-theme="light"] {
+    /* Backgrounds */
+    --bg-app: #e0e0e0;
+    --bg-sidebar: #d4d4d4;
+    --bg-page: #ffffff;
+    --bg-panel: #f0f0f0;
+
+    /* Buttons */
+    --btn-bg: #c8c8c8;
+    --btn-bg-hover: #b8b8b8;
+    --btn-bg-active: #a8a8a8;
+    --btn-border: #999999;
+
+    /* Text */
+    --text-primary: #1a1a1a;
+    --text-secondary: #555555;
+    --text-muted: #888888;
+
+    /* Borders & Dividers */
+    --border-color: #b0b0b0;
+    --border-light: #c8c8c8;
+    --divider: #a0a0a0;
+
+    /* Accent */
+    --accent: #4fc3f7;
+    --accent-dark: #29b6f6;
+    --accent-bg: rgba(79, 195, 247, 0.15);
+
+    /* Status colors */
+    --success: #4caf50;
+    --warning: #ff9800;
+    --danger: #e74c3c;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
+    --shadow-page: 0 2px 12px rgba(0, 0, 0, 0.08);
+
+    /* Resize handles */
+    --resize-handle: #b0b0b0;
+    --resize-handle-hover: #4fc3f7;
+
+    /* Timeline */
+    --timeline-bg: #f5f5f5;
+    --timeline-item-bg: #ffffff;
+    --timeline-item-hover: #f0f8ff;
+}
+
+/* ===== DARK MODE ===== */
+:root[data-theme="dark"] {
+    /* Backgrounds */
+    --bg-app: #1a1a1a;
+    --bg-sidebar: #222222;
+    --bg-page: #2a2a2a;
+    --bg-panel: #1e1e1e;
+
+    /* Buttons */
+    --btn-bg: #3a3a3a;
+    --btn-bg-hover: #444444;
+    --btn-bg-active: #505050;
+    --btn-border: #555555;
+
+    /* Text */
+    --text-primary: #e0e0e0;
+    --text-secondary: #aaaaaa;
+    --text-muted: #777777;
+
+    /* Borders & Dividers */
+    --border-color: #444444;
+    --border-light: #3a3a3a;
+    --divider: #555555;
+
+    /* Accent - same in both themes */
+    --accent: #4fc3f7;
+    --accent-dark: #29b6f6;
+    --accent-bg: rgba(79, 195, 247, 0.2);
+
+    /* Status colors */
+    --success: #66bb6a;
+    --warning: #ffb74d;
+    --danger: #ef5350;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-page: 0 2px 12px rgba(0, 0, 0, 0.3);
+
+    /* Resize handles */
+    --resize-handle: #555555;
+    --resize-handle-hover: #4fc3f7;
+
+    /* Timeline */
+    --timeline-bg: #252525;
+    --timeline-item-bg: #2a2a2a;
+    --timeline-item-hover: #333333;
+}
+
+/* ===== THEME TRANSITION ===== */
+body,
+body * {
+    transition: background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+/* Disable transition on resize to avoid lag */
+.resizing,
+.resizing * {
+    transition: none !important;
+}

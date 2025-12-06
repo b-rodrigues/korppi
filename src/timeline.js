@@ -137,35 +137,8 @@ function setRestoreInProgress(inProgress) {
  * Initialize timeline UI
  */
 export function initTimeline() {
-    const toggleBtn = document.getElementById("timeline-toggle");
-    const container = document.getElementById("timeline-container");
-    const reviewBtn = document.getElementById("review-changes-btn");
+    // Timeline is now always visible in the right sidebar
     const sortSelect = document.getElementById("timeline-sort");
-
-    if (toggleBtn && container) {
-        toggleBtn.addEventListener("click", async (e) => {
-            e.stopPropagation(); // Prevent click from bubbling
-            const isVisible = container.style.display !== "none";
-            if (isVisible) {
-                container.style.display = "none";
-            } else {
-                container.style.display = "block";
-                // Load patches when opening
-                await refreshTimeline();
-            }
-        });
-
-        // Close timeline when clicking outside (but not in preview mode)
-        document.addEventListener("click", (e) => {
-            const isVisible = container.style.display !== "none";
-            const inPreviewMode = isPreviewActive();
-            if (isVisible &&
-                !inPreviewMode &&  // Don't close in preview mode
-                !container.contains(e.target)) {
-                container.style.display = "none";
-            }
-        });
-    }
 
     const filterAuthor = document.getElementById("filter-author");
     const filterStatus = document.getElementById("filter-status");
@@ -223,14 +196,6 @@ export function initTimeline() {
         });
     }
 
-    // Wire up Review Changes button
-    if (reviewBtn) {
-        reviewBtn.addEventListener("click", () => {
-            const { enterReviewMode } = require("./reconcile.js");
-            enterReviewMode();
-        });
-    }
-
     // Listen for patch status updates
     window.addEventListener('patch-status-updated', async () => {
         await refreshTimeline();
@@ -239,10 +204,6 @@ export function initTimeline() {
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
         await refreshTimeline();
-        // Show the Review Changes button
-        if (reviewBtn) {
-            reviewBtn.style.display = "block";
-        }
     });
 
     // Initial load
@@ -591,24 +552,23 @@ function showContentModal(patchId, content, diff) {
         modal = document.createElement("div");
         modal.id = "patch-content-modal";
         modal.className = "modal";
-        modal.style.cssText = "display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,0.4);";
 
         modal.innerHTML = `
-            <div class="modal-content" style="background-color:#fefefe;margin:5% auto;padding:0;border:1px solid #888;width:80%;max-width:800px;box-shadow:0 4px 8px rgba(0,0,0,0.2);">
-                <div class="modal-header" style="padding:15px;background-color:#f1f1f1;border-bottom:1px solid #ddd;">
-                    <span class="modal-close" style="color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer;">&times;</span>
-                    <h2 style="margin:0;">Patch Content</h2>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Patch Content</h2>
+                    <span class="modal-close">&times;</span>
                 </div>
-                <div class="modal-tabs" style="display:flex;background:#e1e1e1;border-bottom:1px solid #ccc;">
-                    <button class="tab-btn active" data-tab="content" style="flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-weight:bold;">Content</button>
-                    <button class="tab-btn" data-tab="diff" style="flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-weight:bold;">Diff</button>
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="content">Content</button>
+                    <button class="tab-btn" data-tab="diff">Diff</button>
                 </div>
-                <div class="modal-body" style="padding:20px;max-height:60vh;overflow-y:auto;">
-                    <pre id="patch-content" class="tab-content" style="display:block;background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;"></pre>
-                    <pre id="patch-diff" class="tab-content" style="display:none;background:#f5f5f5;padding:15px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;"></pre>
+                <div class="modal-body">
+                    <pre id="patch-content" class="tab-content visible"></pre>
+                    <pre id="patch-diff" class="tab-content"></pre>
                 </div>
-                <div class="modal-footer" style="padding:15px;background-color:#f1f1f1;border-top:1px solid #ddd;text-align:right;">
-                    <button class="modal-close-btn" style="padding:8px 16px;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+                <div class="modal-footer">
+                    <button class="modal-close-btn">Close</button>
                 </div>
             </div>
         `;
@@ -621,11 +581,11 @@ function showContentModal(patchId, content, diff) {
         modal.querySelector(".modal-close-btn").onclick = closeModal;
 
         // Click outside to close
-        window.onclick = (event) => {
+        modal.addEventListener("click", (event) => {
             if (event.target === modal) {
                 closeModal();
             }
-        };
+        });
 
         // Tab switching
         modal.querySelectorAll(".tab-btn").forEach(btn => {
@@ -635,20 +595,18 @@ function showContentModal(patchId, content, diff) {
                 // Update button states
                 modal.querySelectorAll(".tab-btn").forEach(b => {
                     b.classList.remove("active");
-                    b.style.backgroundColor = "transparent";
                 });
                 e.target.classList.add("active");
-                e.target.style.backgroundColor = "#f1f1f1";
 
                 // Show/hide content
-                modal.querySelectorAll(".tab-content").forEach(content => {
-                    content.style.display = "none";
+                modal.querySelectorAll(".tab-content").forEach(c => {
+                    c.classList.remove("visible");
                 });
 
                 if (tab === "content") {
-                    modal.querySelector("#patch-content").style.display = "block";
+                    modal.querySelector("#patch-content").classList.add("visible");
                 } else if (tab === "diff") {
-                    modal.querySelector("#patch-diff").style.display = "block";
+                    modal.querySelector("#patch-diff").classList.add("visible");
                 }
             });
         });
@@ -666,18 +624,16 @@ function showContentModal(patchId, content, diff) {
     // Reset to content tab
     modal.querySelectorAll(".tab-btn").forEach(b => {
         b.classList.remove("active");
-        b.style.backgroundColor = "transparent";
     });
     const contentBtn = modal.querySelector('[data-tab="content"]');
     if (contentBtn) {
         contentBtn.classList.add("active");
-        contentBtn.style.backgroundColor = "#f1f1f1";
     }
 
-    modal.querySelectorAll(".tab-content").forEach(content => {
-        content.style.display = "none";
+    modal.querySelectorAll(".tab-content").forEach(c => {
+        c.classList.remove("visible");
     });
-    modal.querySelector("#patch-content").style.display = "block";
+    modal.querySelector("#patch-content").classList.add("visible");
 
     // Show modal
     modal.style.display = "block";
@@ -709,8 +665,6 @@ export function renderPatchDetails(patch) {
  * Reset document to state before reconciliation
  */
 async function resetToOriginal() {
-    console.log("resetToOriginal called");
-
     const snapshot = localStorage.getItem('reconciliation-snapshot');
 
     if (!snapshot) {
@@ -718,7 +672,6 @@ async function resetToOriginal() {
         return;
     }
 
-    console.log("Showing confirmation dialog");
     let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted imported patches.");
 
     // Tauri's confirm returns a Promise, handle both cases
@@ -726,14 +679,9 @@ async function resetToOriginal() {
         userConfirmed = await userConfirmed;
     }
 
-    console.log("User confirmed:", userConfirmed);
-
     if (!userConfirmed) {
-        console.log("User cancelled reset");
         return;
     }
-
-    console.log("Proceeding with reset");
 
     try {
         const docId = getActiveDocumentId();

@@ -6,6 +6,7 @@ import { calculateCharDiff } from './diff-highlighter.js';
 import { getCachedProfile } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
+import { hexToRgba, escapeHtml } from './utils.js';
 import { getEditorContent } from './editor.js';
 
 let previewState = {
@@ -111,19 +112,14 @@ function showPreviewBanner() {
         const acceptBtn = banner.querySelector('.accept-patch-btn');
         const rejectBtn = banner.querySelector('.reject-patch-btn');
 
-        console.log("Accept button found:", acceptBtn);
-        console.log("Reject button found:", rejectBtn);
-
         if (acceptBtn) {
             acceptBtn.addEventListener('click', async () => {
-                console.log("Accept button clicked!");
                 await acceptCurrentPatch();
             });
         }
 
         if (rejectBtn) {
             rejectBtn.addEventListener('click', async () => {
-                console.log("Reject button clicked!");
                 await rejectCurrentPatch();
             });
         }
@@ -210,29 +206,7 @@ function clearPreview() {
     }
 }
 
-/**
- * Convert hex color to rgba
- * @param {string} hex - Hex color
- * @param {number} alpha - Alpha value
- * @returns {string} rgba string
- */
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Escape HTML characters
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Utility functions hexToRgba and escapeHtml are imported from utils.js
 
 /**
  * Accept the current patch being previewed
@@ -273,12 +247,6 @@ async function acceptCurrentPatch() {
 
         // Get the patch content being accepted (canonical)
         const patchContent = previewState.newText;
-
-        console.log("3-way merge:", {
-            base: baseSnapshot.substring(0, 50) + "...",
-            local: currentContent.substring(0, 50) + "...",
-            canonical: patchContent.substring(0, 50) + "..."
-        });
 
         // Perform merge
         const mergedContent = mergeText(baseSnapshot, currentContent, patchContent);
