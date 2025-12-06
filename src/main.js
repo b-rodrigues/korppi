@@ -188,6 +188,9 @@ window.addEventListener("DOMContentLoaded", async () => {
         exportDocxBtn.addEventListener("click", async () => {
             try {
                 const path = await exportAsDocx(currentMarkdown);
+                if (path) {
+                    console.log("DOCX exported successfully to:", path);
+                }
             } catch (err) {
                 console.error("DOCX export failed:", err);
                 alert("DOCX export failed: " + err);
