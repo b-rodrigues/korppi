@@ -265,7 +265,7 @@ function switchToTab(tab) {
     const commentsPanel = document.getElementById("comments-panel");
 
     if (tab === "timeline") {
-        if (timelineList) timelineList.style.display = "flex";
+        if (timelineList) timelineList.style.display = "block";
         if (timelineControls) timelineControls.style.display = "flex";
         if (commentsPanel) commentsPanel.style.display = "none";
     } else {
@@ -367,13 +367,11 @@ function renderCommentsList(comments) {
             await refreshComments();
         });
 
-        // Delete button (hard delete)
+        // Delete button (soft delete - marks as 'deleted' status)
         item.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
             e.stopPropagation();
-            if (confirm("Permanently delete this comment and all replies?")) {
-                await deleteComment(commentId);
-                await refreshComments();
-            }
+            await markCommentDeleted(commentId);
+            await refreshComments();
         });
 
         // Reply button
