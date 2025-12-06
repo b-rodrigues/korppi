@@ -56,7 +56,6 @@ export async function initEditor() {
     // ---------------------------------------------------------------------------
     //  Create the Milkdown editor with Yjs + semantic patch logging.
     // ---------------------------------------------------------------------------
-    console.log("Editor: Starting initialization...");
     try {
         editor = await Editor.make()
             .config((ctx) => {
@@ -74,7 +73,6 @@ export async function initEditor() {
             .use(commonmark)
             .use(listener)
             .create();
-        console.log("Editor: Created successfully");
     } catch (err) {
         console.error("Editor: Failed to create", err);
         return;

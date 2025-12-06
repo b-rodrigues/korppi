@@ -101,7 +101,6 @@ function updateDocumentUI() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-    console.log("Korppi starting...");
 
     // 1. Initialize UI Layout Components (sidebars, theme)
     initResizableSidebars();
@@ -176,9 +175,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         exportMdBtn.addEventListener("click", async () => {
             try {
                 const path = await exportAsMarkdown(currentMarkdown);
-                if (path) {
-                    console.log("Exported Markdown to:", path);
-                }
             } catch (err) {
                 console.error("Markdown export failed:", err);
                 alert("Markdown export failed: " + err);
@@ -234,9 +230,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // 6. Initialize Document Manager
     try {
-        console.log("Initializing document manager...");
         await initDocumentManager();
-        console.log("Document manager initialized");
         updateDocumentUI();
     } catch (err) {
         console.error("Failed to initialize document manager:", err);
@@ -250,14 +244,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // 8. Initialize Editor
     try {
-        console.log("Initializing editor...");
         const editor = await initEditor();
         // Initialize formatting toolbar with editor instance
         initFormattingToolbar(editor);
-        console.log("Editor initialized");
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }
-
-    console.log("Korppi ready!");
 });

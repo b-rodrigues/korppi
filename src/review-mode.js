@@ -296,9 +296,6 @@ function hideReviewBanner() {
 function renderSingleAuthorOverlay() {
     if (!reviewState.currentAuthor) return;
 
-    console.log("Rendering overlay for:", reviewState.currentAuthor);
-    console.log("Author patches:", reviewState.currentAuthorPatches);
-
     let overlay = document.getElementById('review-overlay');
 
     if (!overlay) {
@@ -322,8 +319,6 @@ function renderSingleAuthorOverlay() {
         ? acceptedPatches[acceptedPatches.length - 1].data.snapshot
         : reviewState.baseContent;
 
-    console.log("Base content length:", baseContent?.length);
-
     // Get the current author's latest snapshot
     const currentAuthorLatest = [...reviewState.currentAuthorPatches]
         .sort((a, b) => b.timestamp - a.timestamp)[0];
@@ -338,12 +333,8 @@ function renderSingleAuthorOverlay() {
     const authorColor = currentAuthorLatest.data?.authorColor || '#3498db';
     const reviewStatus = currentAuthorLatest.review_status || 'pending';
 
-    console.log("Author latest patch:", currentAuthorLatest.id, "content length:", newContent.length);
-    console.log("Review status:", reviewStatus);
-
     // Calculate diff
     const diffOps = calculateCharDiff(baseContent, newContent);
-    console.log("Diff ops:", diffOps.length);
 
     let html = '';
     for (const op of diffOps) {
@@ -364,8 +355,6 @@ function renderSingleAuthorOverlay() {
 
     overlay.innerHTML = `<pre class="review-content">${html}</pre>`;
     overlay.style.display = 'block';
-
-    console.log("Overlay rendered, display:", overlay.style.display);
 
     // Add hover listeners
     setupHoverPopups(overlay);

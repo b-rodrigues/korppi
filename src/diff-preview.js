@@ -112,19 +112,14 @@ function showPreviewBanner() {
         const acceptBtn = banner.querySelector('.accept-patch-btn');
         const rejectBtn = banner.querySelector('.reject-patch-btn');
 
-        console.log("Accept button found:", acceptBtn);
-        console.log("Reject button found:", rejectBtn);
-
         if (acceptBtn) {
             acceptBtn.addEventListener('click', async () => {
-                console.log("Accept button clicked!");
                 await acceptCurrentPatch();
             });
         }
 
         if (rejectBtn) {
             rejectBtn.addEventListener('click', async () => {
-                console.log("Reject button clicked!");
                 await rejectCurrentPatch();
             });
         }
@@ -252,12 +247,6 @@ async function acceptCurrentPatch() {
 
         // Get the patch content being accepted (canonical)
         const patchContent = previewState.newText;
-
-        console.log("3-way merge:", {
-            base: baseSnapshot.substring(0, 50) + "...",
-            local: currentContent.substring(0, 50) + "...",
-            canonical: patchContent.substring(0, 50) + "..."
-        });
 
         // Perform merge
         const mergedContent = mergeText(baseSnapshot, currentContent, patchContent);

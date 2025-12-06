@@ -670,8 +670,6 @@ export function renderPatchDetails(patch) {
  * Reset document to state before reconciliation
  */
 async function resetToOriginal() {
-    console.log("resetToOriginal called");
-
     const snapshot = localStorage.getItem('reconciliation-snapshot');
 
     if (!snapshot) {
@@ -679,7 +677,6 @@ async function resetToOriginal() {
         return;
     }
 
-    console.log("Showing confirmation dialog");
     let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted imported patches.");
 
     // Tauri's confirm returns a Promise, handle both cases
@@ -687,14 +684,9 @@ async function resetToOriginal() {
         userConfirmed = await userConfirmed;
     }
 
-    console.log("User confirmed:", userConfirmed);
-
     if (!userConfirmed) {
-        console.log("User cancelled reset");
         return;
     }
-
-    console.log("Proceeding with reset");
 
     try {
         const docId = getActiveDocumentId();
