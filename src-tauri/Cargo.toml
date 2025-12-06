@@ -29,5 +29,9 @@ uuid = { version = "1", features = ["v4"] }
 zip = "0.6"
 tempfile = "3"
 
+# DOCX export
+docx-rs = "0.4.18"
+pulldown-cmark = "0.13.0"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

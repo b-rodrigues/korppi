@@ -1,7 +1,7 @@
 import { initEditor } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
-import { exportAsMarkdown } from "./kmd-service.js";
+import { exportAsMarkdown, exportAsDocx } from "./kmd-service.js";
 import { forceSave } from "./yjs-setup.js";
 import { startReconciliation } from "./reconcile.js";
 import {
@@ -114,6 +114,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const saveDocBtn = document.getElementById("save-doc-btn");
     const reconcileBtn = document.getElementById("reconcile-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
+    const exportDocxBtn = document.getElementById("export-docx-btn");
     const newTabBtn = document.getElementById("new-tab-btn");
 
     if (newDocBtn) {
@@ -179,6 +180,17 @@ window.addEventListener("DOMContentLoaded", async () => {
             } catch (err) {
                 console.error("Markdown export failed:", err);
                 alert("Markdown export failed: " + err);
+            }
+        });
+    }
+
+    if (exportDocxBtn) {
+        exportDocxBtn.addEventListener("click", async () => {
+            try {
+                const path = await exportAsDocx(currentMarkdown);
+            } catch (err) {
+                console.error("DOCX export failed:", err);
+                alert("DOCX export failed: " + err);
             }
         });
     }
