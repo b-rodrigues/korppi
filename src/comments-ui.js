@@ -368,10 +368,10 @@ function renderCommentsList(comments) {
             await refreshComments();
         });
 
-        // Delete button (soft delete - marks as 'deleted' status)
+        // Delete button (permanent hard delete from database)
         item.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
             e.stopPropagation();
-            await markCommentDeleted(commentId);
+            await deleteComment(commentId);
             await refreshComments();
         });
 
@@ -519,6 +519,10 @@ function highlightCommentInEditor(comment) {
     const searchText = comment.selected_text;
     if (!searchText) return;
 
+    // Get author color (use author_color from comment, fallback to profile default)
+    const highlightColor = comment.author_color || '#3498db';
+    console.log('Highlight color for comment:', comment.id, 'author_color:', comment.author_color, 'using:', highlightColor);
+
     editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
         const doc = view.state.doc;
@@ -563,8 +567,8 @@ function highlightCommentInEditor(comment) {
             top: ${fromCoords.top}px;
             width: ${maxRight - minLeft}px;
             height: ${toCoords.bottom - fromCoords.top}px;
-            background: ${comment.author_color || '#4fc3f7'}33;
-            border: 2px solid ${comment.author_color || '#4fc3f7'};
+            background: ${highlightColor}33;
+            border: 2px solid ${highlightColor};
             pointer-events: none;
             z-index: 50;
             border-radius: 3px;
