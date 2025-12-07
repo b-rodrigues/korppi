@@ -3,6 +3,7 @@
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx } from "@milkdown/core";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
+import { gfm } from "@milkdown/preset-gfm";
 // Re-export editorViewCtx so other modules can use it with the editor instance
 export { editorViewCtx };
 
@@ -58,11 +59,18 @@ export function getMarkdown() {
  * Undo the last change (uses Yjs undo stack).
  */
 export function doUndo() {
+    console.log("doUndo called, editor:", !!editor);
     if (editor) {
-        editor.action((ctx) => {
-            const view = ctx.get(editorViewCtx);
-            undo(view.state, view.dispatch);
-        });
+        try {
+            editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                console.log("Undo - got view:", !!view);
+                const result = undo(view.state, view.dispatch);
+                console.log("Undo result:", result);
+            });
+        } catch (err) {
+            console.error("Undo error:", err);
+        }
     }
 }
 
@@ -70,11 +78,18 @@ export function doUndo() {
  * Redo the last undone change (uses Yjs redo stack).
  */
 export function doRedo() {
+    console.log("doRedo called, editor:", !!editor);
     if (editor) {
-        editor.action((ctx) => {
-            const view = ctx.get(editorViewCtx);
-            redo(view.state, view.dispatch);
-        });
+        try {
+            editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                console.log("Redo - got view:", !!view);
+                const result = redo(view.state, view.dispatch);
+                console.log("Redo result:", result);
+            });
+        } catch (err) {
+            console.error("Redo error:", err);
+        }
     }
 }
 
@@ -111,6 +126,7 @@ export async function initEditor() {
                 });
             })
             .use(commonmark)
+            .use(gfm)
             .use(listener)
             .create();
     } catch (err) {
@@ -183,6 +199,9 @@ export async function initEditor() {
 
         view.updateState(newState);
     });
+
+    // Return the editor instance for external use
+    return editor;
 }
 
 // Listen for Yjs document replacement (when switching docs)
