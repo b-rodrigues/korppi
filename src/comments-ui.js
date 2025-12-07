@@ -47,20 +47,89 @@ export function showContextMenu(x, y, selection) {
     contextMenu = document.createElement("div");
     contextMenu.className = "comment-context-menu";
     contextMenu.innerHTML = `
+        <button class="context-menu-item" data-action="bold">
+            <span class="icon"><b>B</b></span>
+            <span class="label">Bold</span>
+            <span class="shortcut">Ctrl+B</span>
+        </button>
+        <button class="context-menu-item" data-action="italic">
+            <span class="icon"><i>I</i></span>
+            <span class="label">Italic</span>
+            <span class="shortcut">Ctrl+I</span>
+        </button>
+        <button class="context-menu-item" data-action="strikethrough">
+            <span class="icon"><s>S</s></span>
+            <span class="label">Strikethrough</span>
+        </button>
+        <button class="context-menu-item" data-action="inline-code">
+            <span class="icon">&lt;/&gt;</span>
+            <span class="label">Inline Code</span>
+        </button>
+        <button class="context-menu-item" data-action="link">
+            <span class="icon">🔗</span>
+            <span class="label">Add Link</span>
+        </button>
+        <div class="context-menu-separator"></div>
+        <button class="context-menu-item" data-action="copy">
+            <span class="icon">📋</span>
+            <span class="label">Copy</span>
+            <span class="shortcut">Ctrl+C</span>
+        </button>
+        <button class="context-menu-item" data-action="search">
+            <span class="icon">🔍</span>
+            <span class="label">Search in Document</span>
+        </button>
+        <div class="context-menu-separator"></div>
         <button class="context-menu-item" data-action="add-comment">
             <span class="icon">💬</span>
             <span class="label">Add Comment</span>
         </button>
     `;
 
-    contextMenu.style.left = `${x}px`;
-    contextMenu.style.top = `${y}px`;
+    // Adjust position if too close to edge
+    const menuWidth = 200;
+    const menuHeight = 320;
+    const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
+    const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
+
+    contextMenu.style.left = `${adjustedX}px`;
+    contextMenu.style.top = `${adjustedY}px`;
     document.body.appendChild(contextMenu);
 
-    // Handle click
-    contextMenu.querySelector('[data-action="add-comment"]').addEventListener("click", () => {
+    // Handle clicks
+    contextMenu.addEventListener("click", async (e) => {
+        const item = e.target.closest('[data-action]');
+        if (!item) return;
+
+        const action = item.dataset.action;
         hideContextMenu();
-        showAddCommentModal(selection);
+
+        switch (action) {
+            case 'bold':
+                applyMark('strong');
+                break;
+            case 'italic':
+                applyMark('emphasis');
+                break;
+            case 'strikethrough':
+                applyMark('strike_through');
+                break;
+            case 'inline-code':
+                applyMark('inlineCode');
+                break;
+            case 'link':
+                await insertLink();
+                break;
+            case 'copy':
+                await navigator.clipboard.writeText(selection.text);
+                break;
+            case 'search':
+                highlightAllOccurrences(selection.text);
+                break;
+            case 'add-comment':
+                showAddCommentModal(selection);
+                break;
+        }
     });
 
     // Close on click outside
@@ -68,6 +137,145 @@ export function showContextMenu(x, y, selection) {
         document.addEventListener("click", hideContextMenuOnClickOutside);
     }, 10);
 }
+
+/**
+ * Apply a mark to the current selection
+ */
+function applyMark(markName) {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const markType = state.schema.marks[markName];
+
+        if (!markType) {
+            console.warn(`Mark type not found: ${markName}`);
+            return;
+        }
+
+        const { from, to } = state.selection;
+        if (from === to) return;
+
+        const tr = state.tr.addMark(from, to, markType.create());
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Insert a link on the current selection
+ */
+async function insertLink() {
+    if (!editor) return;
+
+    const url = prompt("Enter URL:", "https://");
+    if (!url) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const linkMark = state.schema.marks.link;
+
+        if (!linkMark) {
+            console.warn("Link mark not found in schema");
+            return;
+        }
+
+        const { from, to } = state.selection;
+        if (from === to) return;
+
+        const tr = state.tr.addMark(from, to, linkMark.create({ href: url }));
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Highlight all occurrences of the selected text in the document
+ */
+function highlightAllOccurrences(searchText) {
+    if (!editor || !searchText) return;
+
+    // Clear existing search highlights
+    document.querySelectorAll('.search-highlight-overlay').forEach(el => el.remove());
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const doc = view.state.doc;
+        const occurrences = [];
+
+        // Find all occurrences
+        doc.descendants((node, pos) => {
+            if (node.isText) {
+                const text = node.text;
+                let idx = 0;
+                while ((idx = text.indexOf(searchText, idx)) !== -1) {
+                    occurrences.push({
+                        from: pos + idx,
+                        to: pos + idx + searchText.length
+                    });
+                    idx += searchText.length;
+                }
+            }
+        });
+
+        // Create highlight overlays for each occurrence
+        occurrences.forEach((occ, i) => {
+            const fromCoords = view.coordsAtPos(occ.from);
+            const toCoords = view.coordsAtPos(occ.to);
+
+            const highlight = document.createElement('div');
+            highlight.className = 'search-highlight-overlay';
+            highlight.style.cssText = `
+                position: fixed;
+                left: ${fromCoords.left}px;
+                top: ${fromCoords.top}px;
+                width: ${toCoords.right - fromCoords.left}px;
+                height: ${toCoords.bottom - fromCoords.top}px;
+                background: rgba(255, 235, 59, 0.4);
+                border: 1px solid rgba(255, 193, 7, 0.8);
+                pointer-events: none;
+                z-index: 45;
+                border-radius: 2px;
+            `;
+            document.body.appendChild(highlight);
+
+            // Auto-remove after 3 seconds
+            setTimeout(() => highlight.remove(), 3000);
+        });
+
+        // Show count
+        if (occurrences.length > 1) {
+            showSearchToast(`Found ${occurrences.length} occurrences`);
+        }
+    });
+}
+
+/**
+ * Show a temporary toast notification
+ */
+function showSearchToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'search-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        background: var(--bg-sidebar);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1100;
+        box-shadow: var(--shadow-md);
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
+
 
 function hideContextMenuOnClickOutside(e) {
     if (contextMenu && !contextMenu.contains(e.target)) {
