@@ -130,6 +130,52 @@
 
       in
       {
+
+        packages = let
+          # compile the tauri rust binary
+          korppiBinary = system: pkgs.rustPlatform.buildRustPackage {
+            pname = "korppi-prototype";
+            version = "0.1.0";
+        
+            src = ./.;
+        
+            # Tauri’s Rust code lives in src-tauri
+            cargoToml = ./src-tauri/Cargo.toml;
+            cargoLock = ./src-tauri/Cargo.lock;
+        
+            # Node frontend is already built by Tauri
+            # (if you need to run npm here, I can add a buildPhase)
+            buildInputs = linuxDeps ++ commonDeps;
+          };
+        in {
+          korppi = flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system:
+            let
+              inherit pkgs;
+              korppiBin = korppiBinary system;
+            in {
+              # output 1: raw compiled binary
+              default = korppiBin;
+        
+              # output 2: AppImage
+              appimage = pkgs.appimageTools.wrapType2 {
+                name = "korppi";
+                src = korppiBin;
+                extraInstallCommands = ''
+                  mkdir -p $out/share/applications
+                  cat > $out/share/applications/korppi.desktop <<EOF
+                  [Desktop Entry]
+                  Name=Korppi
+                  Exec=korppi
+                  Type=Application
+                  Categories=Utility;
+                  EOF
+                '';
+              };
+            }
+          );
+        };
+
+
         devShells.default = pkgs.mkShell {
           buildInputs = commonDeps ++ darwinDeps ++ linuxDeps ++ [
             scripts.dev

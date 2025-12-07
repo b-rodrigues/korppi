@@ -39,21 +39,14 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev patchelf \
             xdg-utils libglib2.0-bin desktop-file-utils
 
-
       - name: Build AppImage
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
-          ARCH: ${{ matrix.arch_env }}
-        run: |
-          nix develop .# --impure --accept-flake-config -c \
-            bash -c "npm install && npm run tauri build -- --bundles appimage"
+          run: nix build .#korppi.${{ matrix.system }}.appimage --accept-flake-config
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: korppi-${{ matrix.system }}-appimage
-          path: src-tauri/target/**/release/bundle/appimage/*.AppImage
-          if-no-files-found: error
+          uses: actions/upload-artifact@v4
+          with:
+            name: korppi-${{ matrix.system }}-appimage
+            path: result/*.AppImage
 
 
   # ─────────────────────────────────────────────
