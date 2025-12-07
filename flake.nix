@@ -29,13 +29,12 @@
 
         darwinDeps = with pkgs; lib.optionals stdenv.isDarwin ([
           libiconv
-          darwin.cctools 
+          darwin.cctools
           apple-sdk
         ]);
 
         # Tauri 2.x dependencies for Linux
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
-          # Tauri dependencies
           webkitgtk_4_1
           gtk3
           cairo
@@ -44,48 +43,29 @@
           dbus
           openssl
           librsvg
-
-          # Additional UI libraries
           pango
           atk
           libsoup_3
-
-          # Development tools
           pkg-config
         ];
 
         # Common dependencies across all platforms
         commonDeps = with pkgs; [
-          # Rust toolchain
           rustToolchain
-
-          # Cargo tools
           cargo-watch
           cargo-edit
           cargo-outdated
           cargo-audit
           cargo-flamegraph
-
-          # Node.js ecosystem for frontend
           nodejs_20
           nodePackages.npm
-
-          # System libraries
           openssl
           zlib
-
-          # Build tools
           pkg-config
           cmake
-
-          # Development utilities
           just
           watchexec
-
-          # Git for version control
           git
-
-          # Testing and debugging
           lldb
         ];
 
@@ -130,52 +110,60 @@
 
       in
       {
-
-        packages = let
-          # compile the tauri rust binary
-          korppiBinary = system: pkgs.rustPlatform.buildRustPackage {
+        ############################################################
+        # PACKAGES
+        ############################################################
+        packages = rec {
+          # Builds the Rust Tauri backend (no linuxdeploy)
+          korppi-bin = pkgs.rustPlatform.buildRustPackage {
             pname = "korppi-prototype";
             version = "0.1.0";
-        
+
             src = ./.;
-        
-            # Tauri’s Rust code lives in src-tauri
+
             cargoToml = ./src-tauri/Cargo.toml;
             cargoLock = ./src-tauri/Cargo.lock;
-        
-            # Node frontend is already built by Tauri
-            # (if you need to run npm here, I can add a buildPhase)
-            buildInputs = linuxDeps ++ commonDeps;
+
+            nativeBuildInputs = [
+              pkgs.nodejs_20
+              pkgs.nodePackages.npm
+              pkgs.pkg-config
+              pkgs.cmake
+            ];
+
+            buildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
+
+            # Build Tauri frontend before cargo
+            preBuild = ''
+              npm ci
+              npm run build
+            '';
           };
-        in {
-          korppi = flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system:
-            let
-              inherit pkgs;
-              korppiBin = korppiBinary system;
-            in {
-              # output 1: raw compiled binary
-              default = korppiBin;
-        
-              # output 2: AppImage
-              appimage = pkgs.appimageTools.wrapType2 {
-                name = "korppi";
-                src = korppiBin;
-                extraInstallCommands = ''
-                  mkdir -p $out/share/applications
-                  cat > $out/share/applications/korppi.desktop <<EOF
-                  [Desktop Entry]
-                  Name=Korppi
-                  Exec=korppi
-                  Type=Application
-                  Categories=Utility;
-                  EOF
-                '';
-              };
-            }
-          );
+
+          # Wrap as AppImage using Nix — replaces linuxdeploy fully
+          appimage = pkgs.appimageTools.wrapType2 {
+            name = "korppi";
+            src = korppi-bin;
+
+            extraInstallCommands = ''
+              mkdir -p $out/share/applications
+              cat > $out/share/applications/korppi.desktop <<EOF
+              [Desktop Entry]
+              Name=Korppi
+              Exec=korppi
+              Type=Application
+              Categories=Utility;
+              EOF
+            '';
+          };
+
+          # Default package = built binary
+          default = korppi-bin;
         };
 
-
+        ############################################################
+        # DEV SHELL
+        ############################################################
         devShells.default = pkgs.mkShell {
           buildInputs = commonDeps ++ darwinDeps ++ linuxDeps ++ [
             scripts.dev
@@ -187,17 +175,14 @@
           ];
 
           shellHook = ''
-            # Set up environment
             export RUST_BACKTRACE=1
             export RUST_LOG=info
 
-            # Ensure openssl can be found
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
             export OPENSSL_DIR="${pkgs.openssl.dev}"
             export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
             export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
 
-            # Set up Tauri on Linux
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath linuxDeps}:$LD_LIBRARY_PATH"
               export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
@@ -216,16 +201,12 @@
             echo "   Platform:   ${system}"
             echo ""
             echo "🚀 Quick Commands:"
-            echo "   korppi-dev       - Start development server"
-            echo "   korppi-build     - Build for production"
-            echo "   korppi-test      - Run Rust tests"
-            echo "   korppi-check     - Run format/lint/test checks"
-            echo "   korppi-clean     - Clean all build artifacts"
-            echo "   korppi-update    - Update all dependencies"
-            echo ""
-            echo "🔧 Setup (first time):"
-            echo "   1. npm install"
-            echo "   2. korppi-dev"
+            echo "   korppi-dev"
+            echo "   korppi-build"
+            echo "   korppi-test"
+            echo "   korppi-check"
+            echo "   korppi-clean"
+            echo "   korppi-update"
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
@@ -246,4 +227,3 @@
       }
     );
 }
-

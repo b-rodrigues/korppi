@@ -48,7 +48,6 @@ jobs:
           name: korppi-${{ matrix.system }}-appimage
           path: result/*.AppImage
 
-
   # ─────────────────────────────────────────────
   # macOS (.dmg)
   # ─────────────────────────────────────────────
