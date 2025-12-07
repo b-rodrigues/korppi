@@ -34,12 +34,19 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+          sudo apt-get install -y \
+            libfuse2 libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            xdg-utils libglib2.0-bin desktop-file-utils
+
 
       - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          ARCH: ${{ matrix.arch_env }}
         run: |
           nix develop .# --impure --accept-flake-config -c \
-            bash -c "export APPIMAGE_EXTRACT_AND_RUN=1 && export ARCH=${{ matrix.arch_env }} && npm install && npm run tauri build -- --bundles appimage"
+            bash -c "npm install && npm run tauri build -- --bundles appimage"
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
