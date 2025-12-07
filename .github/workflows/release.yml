@@ -39,14 +39,15 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev patchelf \
             xdg-utils libglib2.0-bin desktop-file-utils
 
-      - name: Build AppImage
-        run: nix build .#appimage --accept-flake-config
+      - name: Build binary
+        run: nix build .#packages.${{ matrix.system }}.korppi-bin --accept-flake-config
 
-      - name: Upload AppImage
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-appimage
-          path: result/*.AppImage
+          name: korppi-${{ matrix.system }}
+          path: result/bin/*
+          if-no-files-found: error
 
 
   # ─────────────────────────────────────────────
