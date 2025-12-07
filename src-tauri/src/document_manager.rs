@@ -314,12 +314,24 @@ pub async fn open_document(
     }
     
     let doc_id = Uuid::new_v4().to_string();
-    let (yjs_state, history_path, meta) = extract_kmd_to_temp(&file_path, &doc_id)?;
+    let (yjs_state, history_path, mut meta) = extract_kmd_to_temp(&file_path, &doc_id)?;
+    
+    // Use filename as title if meta has default "Untitled Document"
+    let title = if meta.title == "Untitled Document" {
+        file_path.file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| meta.title.clone())
+    } else {
+        meta.title.clone()
+    };
+    
+    // Update meta.title to match
+    meta.title = title.clone();
     
     let handle = DocumentHandle {
         id: doc_id.clone(),
         path: Some(file_path.clone()),
-        title: meta.title.clone(),
+        title,
         is_modified: false,
         opened_at: Utc::now(),
     };
@@ -380,6 +392,13 @@ pub async fn save_document(
     // Update metadata
     meta.modified_at = Utc::now().to_rfc3339();
     meta.sync_state.last_export = Some(Utc::now().to_rfc3339());
+    
+    // Update title from filename if untitled (BEFORE bundling)
+    if meta.title == "Untitled Document" {
+        if let Some(stem) = save_path.file_stem() {
+            meta.title = stem.to_string_lossy().to_string();
+        }
+    }
     
     // Bundle to KMD
     bundle_to_kmd(&save_path, &yjs_state, &history_path, &meta)?;
