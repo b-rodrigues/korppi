@@ -543,6 +543,26 @@ textarea {
     background: var(--accent-bg);
 }
 
+.timeline-item.has-conflict {
+    border-left: 3px solid #f44336;
+    border-color: #f44336;
+    background: rgba(244, 67, 54, 0.1);
+}
+
+.timeline-item.has-conflict:hover {
+    background: rgba(244, 67, 54, 0.15);
+}
+
+.conflict-warning {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #f44336;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
 .timeline-item-header {
     display: flex;
     justify-content: space-between;
@@ -888,6 +908,93 @@ textarea {
 .diff-line.removed {
     background: rgba(244, 67, 54, 0.2);
     text-decoration: line-through;
+}
+
+/* ===== DIFF PREVIEW BANNER ===== */
+#diff-preview-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-sidebar);
+    border-bottom: 2px solid var(--accent);
+    padding: 8px 12px;
+    gap: 12px;
+    z-index: 10;
+}
+
+.preview-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.preview-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mode-btn {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+}
+
+.mode-btn:hover:not(.active) {
+    background: var(--btn-bg-hover);
+}
+
+/* ===== CONFLICT TABS ===== */
+.conflict-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 12px;
+}
+
+.conflict-tab {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    background: var(--bg-panel);
+    border: 1px solid #f44336;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.05s;
+    color: var(--text-primary);
+}
+
+.conflict-tab.active {
+    background: #f44336;
+    color: white;
+    font-weight: bold;
+}
+
+.conflict-tab:hover:not(.active) {
+    background: rgba(244, 67, 54, 0.2);
+    transform: translateY(-1px);
+}
+
+.conflict-warning-header {
+    color: #f44336;
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-right: 8px;
 }
 
 /* ===== CONTENT MODAL ===== */

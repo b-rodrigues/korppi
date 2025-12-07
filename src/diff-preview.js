@@ -8,13 +8,16 @@ import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { hexToRgba, escapeHtml } from './utils.js';
 import { getEditorContent } from './editor.js';
+import { getConflictState } from './timeline.js';
+import { getConflictGroup } from './conflict-detection.js';
 
 let previewState = {
     active: false,
     mode: 'highlight', // 'highlight' or 'diff'
     patchId: null,
     oldText: '',
-    newText: ''
+    newText: '',
+    conflictGroup: null // Array of patch IDs in the same conflict group
 };
 
 /**
@@ -24,12 +27,17 @@ let previewState = {
  * @param {string} newText - Current version text
  */
 export function enterPreview(patchId, oldText, newText) {
+    // Get conflict group if this patch is in conflict
+    const conflictState = getConflictState();
+    const conflictGroup = getConflictGroup(patchId, conflictState.conflictGroups);
+
     previewState = {
         active: true,
         mode: 'highlight',
         patchId,
         oldText,
-        newText
+        newText,
+        conflictGroup
     };
 
     showPreviewBanner();
@@ -45,7 +53,8 @@ export function exitPreview() {
         mode: 'highlight',
         patchId: null,
         oldText: '',
-        newText: ''
+        newText: '',
+        conflictGroup: null
     };
 
     hidePreviewBanner();
@@ -83,6 +92,7 @@ function showPreviewBanner() {
         banner.innerHTML = `
             <div class="preview-info">
                 <span class="preview-label">📋 Preview Mode: Patch #<span id="preview-patch-id"></span></span>
+                <div id="conflict-tabs" class="conflict-tabs"></div>
             </div>
             <div class="preview-controls">
                 <button class="mode-btn active" data-mode="highlight">🎨 Highlight</button>
@@ -130,6 +140,9 @@ function showPreviewBanner() {
     if (patchIdEl) {
         patchIdEl.textContent = previewState.patchId;
     }
+
+    // Update conflict tabs if this patch is in a conflict group
+    updateConflictTabs();
 
     banner.style.display = 'flex';
 }
@@ -302,4 +315,99 @@ async function rejectCurrentPatch() {
  */
 export function isPreviewActive() {
     return previewState.active;
+}
+
+/**
+ * Update the conflict tabs in the preview banner
+ */
+async function updateConflictTabs() {
+    const tabsContainer = document.getElementById('conflict-tabs');
+    if (!tabsContainer) return;
+
+    // Clear existing tabs
+    tabsContainer.innerHTML = '';
+
+    // Only show tabs if there's a conflict group
+    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
+        return;
+    }
+
+    // Show warning indicator
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'conflict-warning-header';
+    warningDiv.innerHTML = '⚠️ Conflicting patches:';
+    warningDiv.style.cssText = 'color:#f44336;font-weight:bold;font-size:0.9rem;margin-right:8px;';
+    tabsContainer.appendChild(warningDiv);
+
+    // Create tabs for each patch in the conflict group
+    for (const patchId of previewState.conflictGroup) {
+        const tab = document.createElement('button');
+        tab.className = 'conflict-tab';
+        tab.dataset.patchId = patchId;
+        tab.textContent = `Patch #${patchId}`;
+        
+        if (patchId === previewState.patchId) {
+            tab.classList.add('active');
+        }
+
+        tab.addEventListener('click', async () => {
+            await switchToConflictPatch(patchId);
+        });
+
+        tabsContainer.appendChild(tab);
+    }
+}
+
+/**
+ * Switch preview to a different patch in the conflict group
+ * @param {number} patchId - The patch ID to switch to
+ */
+async function switchToConflictPatch(patchId) {
+    if (patchId === previewState.patchId) return;
+
+    // Import fetchPatch from timeline
+    const { fetchPatch, fetchPatchList } = await import('./timeline.js');
+    
+    const patch = await fetchPatch(patchId);
+    if (!patch) {
+        alert("Failed to load patch");
+        return;
+    }
+
+    // Get current editor content as the "old" state
+    const currentContent = getEditorContent();
+
+    // Calculate what the merged result would be (3-way merge simulation)
+    const allPatches = await fetchPatchList();
+    const savePatchesOnly = allPatches
+        .filter(p => p.kind === "Save" && p.data?.snapshot)
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    const baseSnapshot = savePatchesOnly.length > 0
+        ? savePatchesOnly[0].data.snapshot
+        : '';
+
+    const patchContent = patch.data?.snapshot || '';
+
+    // Simulate what the merge would produce
+    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+
+    // Update preview state
+    previewState.patchId = patchId;
+    previewState.oldText = currentContent;
+    previewState.newText = mergedResult;
+
+    // Update UI
+    const patchIdEl = document.querySelector('#preview-patch-id');
+    if (patchIdEl) {
+        patchIdEl.textContent = patchId;
+    }
+
+    // Update tab states
+    document.querySelectorAll('.conflict-tab').forEach(tab => {
+        tab.classList.toggle('active', parseInt(tab.dataset.patchId) === patchId);
+    });
+
+    // Re-render preview
+    renderPreview();
 }
