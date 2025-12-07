@@ -16,7 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        system: [x86_64-linux, aarch64-linux]
+        include:
+          - system: x86_64-linux
+            arch_env: ""
+          - system: aarch64-linux
+            arch_env: "arm_aarch64"
 
     runs-on: ubuntu-latest
 
@@ -30,8 +34,10 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v4
 
       - name: Build AppImage
+        env:
+          ARCH: ${{ matrix.arch_env }}
         run: |
-          nix develop .# --impure --accept-flake-config -c \
+          nix develop .#${{ matrix.system }} --impure --accept-flake-config -c \
             bash -c "npm install && npm run tauri build -- --bundles appimage"
 
       - name: Upload AppImage
@@ -48,9 +54,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        system: [x86_64-darwin, aarch64-darwin]
+        include:
+          - system: x86_64-darwin
+            runner: macos-13
+          - system: aarch64-darwin
+            runner: macos-latest
 
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
@@ -63,8 +73,8 @@ jobs:
 
       - name: Build .dmg
         run: |
-          nix develop .# --impure --accept-flake-config -c \
-            npm run tauri build
+          nix develop .#${{ matrix.system }} --impure --accept-flake-config -c \
+            bash -c "npm install && npm run tauri build"
 
       - name: Upload dmg
         uses: actions/upload-artifact@v4
@@ -80,9 +90,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        include:
+          - arch: x86_64
+            target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - arch: aarch64
+            target: aarch64-pc-windows-msvc
+            runner: windows-latest
 
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
@@ -95,13 +111,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.arch == 'aarch64' && 'aarch64-pc-windows-msvc' || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies
         run: npm install
 
       - name: Build Windows binaries
-        run: npm run tauri build
+        run: npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
