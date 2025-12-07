@@ -46,8 +46,10 @@ export async function startReconciliation() {
         // Refresh the timeline to show imported patches (this will also trigger conflict detection)
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
         
-        // Show success message after timeline refresh (conflicts will be detected automatically)
-        alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);
+        // Use setTimeout to allow timeline refresh and conflict detection to complete first
+        setTimeout(() => {
+            alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);
+        }, 100);
 
     } catch (err) {
         console.error("Reconciliation failed:", err);

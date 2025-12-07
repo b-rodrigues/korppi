@@ -744,6 +744,9 @@ async function resetToOriginal() {
     }
 }
 
+// Track last alert time to prevent spam
+let lastConflictAlertTime = 0;
+
 /**
  * Show alert when conflicts are detected
  * @param {Array<Array<number>>} conflictGroups - Groups of conflicting patch IDs
@@ -751,13 +754,11 @@ async function resetToOriginal() {
  */
 function showConflictAlert(conflictGroups, patches) {
     // Only show alert once per timeline load (avoid spam on filters)
-    if (showConflictAlert.lastAlertTime) {
-        const timeSinceLastAlert = Date.now() - showConflictAlert.lastAlertTime;
-        if (timeSinceLastAlert < 5000) {
-            return; // Don't spam alerts
-        }
+    const timeSinceLastAlert = Date.now() - lastConflictAlertTime;
+    if (timeSinceLastAlert < 5000) {
+        return; // Don't spam alerts
     }
-    showConflictAlert.lastAlertTime = Date.now();
+    lastConflictAlertTime = Date.now();
 
     const groupCount = conflictGroups.length;
     let message = `⚠️ ${groupCount} conflict group${groupCount > 1 ? 's' : ''} detected.\n\n`;
