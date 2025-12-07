@@ -1,0 +1,60 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Build static site
+        run: |
+          chmod +x docs/build.sh
+          cd docs && ./build.sh
+
+      - name: Deploy to website branch
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Save the built site
+          cp -r docs/_site /tmp/_site
+          
+          # Switch to website branch (create if doesn't exist)
+          git checkout website 2>/dev/null || git checkout --orphan website
+          
+          # Clear everything except .git
+          git rm -rf . 2>/dev/null || true
+          find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+          
+          # Copy built site
+          cp -r /tmp/_site/* .
+          
+          # Create .nojekyll to bypass Jekyll processing
+          touch .nojekyll
+          
+          # Commit and push
+          git add -A
+          git commit -m "Deploy docs from ${GITHUB_SHA::8}" || echo "No changes to commit"
+          git push origin website --force

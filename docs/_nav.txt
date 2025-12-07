@@ -1,0 +1,30 @@
+# Korppi Documentation Navigation
+# Format: SECTION: title
+#         filename|Display Name
+#
+# To add a new page:
+# 1. Create docs/yourpage.md
+# 2. Add entry here under appropriate section
+# 3. Push to main branch
+
+SECTION: Getting Started
+installation|Installation
+quick-start|Quick Start
+first-document|Your First Document
+
+SECTION: Features
+formatting|Text Formatting
+comments|Comments & Reviews
+timeline|Timeline & History
+reconciliation|Reconciliation
+export|Export Options
+
+SECTION: Reference
+keyboard-shortcuts|Keyboard Shortcuts
+file-format|File Format (.kmd)
+configuration|Configuration
+
+SECTION: Help
+faq|FAQ
+troubleshooting|Troubleshooting
+contributing|Contributing
