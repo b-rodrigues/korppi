@@ -32,7 +32,7 @@ jobs:
       - name: Build AppImage
         run: |
           nix develop .# --impure --accept-flake-config -c \
-            npm run tauri build -- --bundles appimage
+            bash -c "npm install && npm run tauri build -- --bundles appimage"
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
