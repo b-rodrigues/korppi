@@ -1,6 +1,6 @@
 // editor.js — Clean unified version
 
-import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
+import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx } from "@milkdown/core";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 // Re-export editorViewCtx so other modules can use it with the editor instance
@@ -36,6 +36,22 @@ export function getEditorContent() {
         });
     }
     return content;
+}
+
+/**
+ * Get the current document content as Markdown.
+ * This extracts markdown on-demand using Milkdown's serializer.
+ */
+export function getMarkdown() {
+    let markdown = "";
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const serializer = ctx.get(serializerCtx);
+            markdown = serializer(view.state.doc);
+        });
+    }
+    return markdown;
 }
 
 export async function initEditor() {

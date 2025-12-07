@@ -1,4 +1,4 @@
-import { initEditor } from "./editor.js";
+import { initEditor, getMarkdown } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 import { exportAsMarkdown, exportAsDocx } from "./kmd-service.js";
@@ -23,6 +23,7 @@ import { initThemeToggle } from "./components/theme-toggle.js";
 import { initProfileButton } from "./components/profile-button.js";
 import { initFormattingToolbar } from "./components/formatting-toolbar.js";
 import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
+import { listComments } from "./comments-service.js";
 import { initWelcomeModal } from "./components/welcome-modal.js";
 
 // Store the current markdown content
@@ -32,6 +33,44 @@ let currentMarkdown = "";
 window.addEventListener("markdown-updated", (event) => {
     currentMarkdown = event.detail.markdown || "";
 });
+
+/**
+ * Check for pending patches and comments, warn user before export.
+ * Returns true if user confirms, false if cancelled.
+ */
+async function confirmExportWithWarnings() {
+    const warnings = [];
+
+    // Check for pending patches
+    try {
+        const patches = await fetchPatchList();
+        const pendingPatches = patches.filter(p => p.review_status === "pending");
+        if (pendingPatches.length > 0) {
+            warnings.push(`${pendingPatches.length} pending patch${pendingPatches.length > 1 ? 'es' : ''}`);
+        }
+    } catch (err) {
+        console.warn("Could not check patch status:", err);
+    }
+
+    // Check for comments
+    try {
+        const comments = await listComments();
+        const activeComments = comments.filter(c => c.status !== "deleted");
+        if (activeComments.length > 0) {
+            warnings.push(`${activeComments.length} comment${activeComments.length > 1 ? 's' : ''}`);
+        }
+    } catch (err) {
+        console.warn("Could not check comments:", err);
+    }
+
+    if (warnings.length === 0) {
+        return true; // No warnings, proceed
+    }
+
+    const message = `This document has ${warnings.join(" and ")} that will NOT be included in the export.\n\nMD/DOCX formats only export the current text content. To preserve patches and comments, use the KMD format instead.\n\nProceed with export?`;
+
+    return confirm(message);
+}
 
 /**
  * Show recent documents panel
@@ -108,7 +147,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initResizableSidebars();
     initThemeToggle();
     await initProfileButton();
-    
+
     // Initialize welcome modal after profile button is ready
     await initWelcomeModal();
 
@@ -180,7 +219,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (exportMdBtn) {
         exportMdBtn.addEventListener("click", async () => {
             try {
-                const path = await exportAsMarkdown(currentMarkdown);
+                // Warn about pending patches/comments
+                const proceed = await confirmExportWithWarnings();
+                if (!proceed) return;
+
+                const markdown = getMarkdown();
+                const path = await exportAsMarkdown(markdown);
             } catch (err) {
                 console.error("Markdown export failed:", err);
                 alert("Markdown export failed: " + err);
@@ -191,7 +235,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (exportDocxBtn) {
         exportDocxBtn.addEventListener("click", async () => {
             try {
-                const path = await exportAsDocx(currentMarkdown);
+                // Warn about pending patches/comments
+                const proceed = await confirmExportWithWarnings();
+                if (!proceed) return;
+
+                const markdown = getMarkdown();
+                const path = await exportAsDocx(markdown);
                 if (path) {
                     console.log("DOCX exported successfully to:", path);
                 }
