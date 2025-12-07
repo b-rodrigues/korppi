@@ -30,7 +30,7 @@
         darwinDeps = with pkgs; lib.optionals stdenv.isDarwin ([
           libiconv
           darwin.cctools
-        ] ++ (with darwin.apple_sdk.frameworks; [
+        ] ++ (with apple-sdk.frameworks; [
           Security
           CoreServices
           CoreFoundation
