@@ -29,19 +29,9 @@
 
         darwinDeps = with pkgs; lib.optionals stdenv.isDarwin ([
           libiconv
-          darwin.cctools
-        ] ++ (with apple-sdk.frameworks; [
-          Security
-          CoreServices
-          CoreFoundation
-          Foundation
-          AppKit
-          WebKit
-          Cocoa
-          IOKit
-          QuartzCore
-          Carbon
-        ]));
+          darwin.cctools 
+          apple-sdk
+        ]);
 
         # Tauri 2.x dependencies for Linux
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
