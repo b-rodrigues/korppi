@@ -120,9 +120,15 @@
             version = "0.1.0";
 
             src = ./.;
+          
+            # Point to the subdirectory containing Cargo.toml
+            cargoRoot = "src-tauri";
+          
+            # cargoLock must be an attrset with lockFile
+            cargoLock = {
+              lockFile = ./src-tauri/Cargo.lock;
+            };
 
-            cargoToml = ./src-tauri/Cargo.toml;
-            cargoLock = ./src-tauri/Cargo.lock;
 
             nativeBuildInputs = [
               pkgs.nodejs_20
