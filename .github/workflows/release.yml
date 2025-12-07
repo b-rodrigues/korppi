@@ -11,9 +11,6 @@ permissions:
   contents: write
 
 jobs:
-# ─────────────────────────────────────────────
-  # Linux (AppImage)
-  # ─────────────────────────────────────────────
   linux:
     strategy:
       fail-fast: false
@@ -37,6 +34,7 @@ jobs:
       - name: Build AppImage
         env:
           ARCH: ${{ matrix.arch_env }}
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           nix develop .# --impure --accept-flake-config -c \
             bash -c "npm install && npm run tauri build -- --bundles appimage"
