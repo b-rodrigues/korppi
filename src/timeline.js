@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { forceSave, restoreDocumentState } from "./yjs-setup.js";
-import { getActiveDocumentId } from "./document-manager.js";
+import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
 import { detectLineRange, formatLineRange } from "./line-range-detector.js";
@@ -204,6 +204,13 @@ export function initTimeline() {
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
         await refreshTimeline();
+    });
+
+    // Listen for document changes (open, switch, new)
+    onDocumentChange(async (event, doc) => {
+        if (event === "open" || event === "new" || event === "activeChange") {
+            await refreshTimeline();
+        }
     });
 
     // Initial load
