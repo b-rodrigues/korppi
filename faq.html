@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Faq - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" class="current">FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Faq</h1>
+            </header>
+
+            <article class="content">
+<h1 id="frequently-asked-questions">Frequently Asked Questions</h1>
+<p>Common questions about Korppi.</p>
+<hr />
+<h2 id="general">General</h2>
+<h3 id="what-is-korppi">What is Korppi?</h3>
+<p>Korppi is a markdown editor with built-in version history and
+reconciliation features. It's designed for writers who need to track
+changes, collaborate, and maintain document history.</p>
+<h3 id="why-korppi">Why "Korppi"?</h3>
+<p>Korppi means "raven" in Finnish. Ravens are known for their
+intelligence and memory—fitting for an editor that remembers
+everything!</p>
+<h3 id="is-korppi-free">Is Korppi free?</h3>
+<p>Yes! Korppi is free and open source software, released under the MIT
+license.</p>
+<h3 id="what-platforms-does-korppi-support">What platforms does Korppi
+support?</h3>
+<ul>
+<li><strong>Linux</strong> (AppImage, Debian package)</li>
+<li><strong>macOS</strong> (DMG)</li>
+<li><strong>Windows</strong> (MSI installer)</li>
+</ul>
+<hr />
+<h2 id="documents">Documents</h2>
+<h3 id="whats-a-kmd-file">What's a .kmd file?</h3>
+<p>A <code>.kmd</code> (Korppi Markdown Document) file is Korppi's
+native format. It's a ZIP archive containing your markdown content,
+version history, comments, and metadata. See <a
+href="file-format.html">File Format</a> for details.</p>
+<h3 id="can-i-open-regular-md-files">Can I open regular .md files?</h3>
+<p>Currently, Korppi uses its own <code>.kmd</code> format. You can:</p>
+<ul>
+<li>Create a new document and paste markdown content</li>
+<li>Export to <code>.md</code> at any time</li>
+</ul>
+<p>Direct <code>.md</code> import is planned for a future release.</p>
+<h3 id="how-do-i-share-documents-with-non-korppi-users">How do I share
+documents with non-Korppi users?</h3>
+<p>Export your document:</p>
+<ul>
+<li><strong>Export MD</strong> for markdown files</li>
+<li><strong>Export DOCX</strong> for Word documents</li>
+</ul>
+<h3 id="i-accidentally-closed-without-saving-can-i-recover-my-work">I
+accidentally closed without saving. Can I recover my work?</h3>
+<p>If you had <strong>Autosave</strong> enabled, check the recent
+documents list—your last autosave should be there.</p>
+<p>If not, check for temporary files in your system's temp
+directory.</p>
+<hr />
+<h2 id="features">Features</h2>
+<h3 id="how-is-this-different-from-git">How is this different from
+Git?</h3>
+<p>Git is designed for code with line-based tracking. Korppi is designed
+for prose:</p>
+<ul>
+<li><strong>Semantic patches</strong> - Understands document
+structure</li>
+<li><strong>Visual timeline</strong> - No command line needed</li>
+<li><strong>Comments</strong> - Built-in review system</li>
+<li><strong>Rich formatting</strong> - Full markdown support</li>
+</ul>
+<h3 id="can-multiple-people-edit-at-once">Can multiple people edit at
+once?</h3>
+<p>Real-time collaboration is planned but not yet implemented.
+Currently, use the <strong>Reconciliation</strong> feature to merge
+changes from different authors.</p>
+<h3 id="do-comments-appear-in-exported-files">Do comments appear in
+exported files?</h3>
+<ul>
+<li><strong>Markdown export:</strong> Comments are stripped (pure
+content only)</li>
+<li><strong>DOCX export:</strong> Comments as Word comments (coming
+soon)</li>
+</ul>
+<h3 id="can-i-customize-keyboard-shortcuts">Can I customize keyboard
+shortcuts?</h3>
+<p>Not yet, but it's on the roadmap!</p>
+<hr />
+<h2 id="timeline--history">Timeline &amp; History</h2>
+<h3 id="how-far-back-does-the-history-go">How far back does the history
+go?</h3>
+<p>Korppi saves your complete edit history within each <code>.kmd</code>
+file. There's no limit—all patches are preserved.</p>
+<h3 id="can-i-delete-history">Can I delete history?</h3>
+<p>Currently, no. History is considered valuable data. A future release
+may add the option to compact history.</p>
+<h3 id="whats-a-pending-patch">What's a "pending" patch?</h3>
+<p>Pending patches are changes imported via reconciliation that haven't
+been reviewed yet. You can approve or reject them.</p>
+<h3 id="i-restored-an-old-version-can-i-undo-that">I restored an old
+version. Can I undo that?</h3>
+<p>Use <code>Ctrl+Z</code> (Undo) immediately after restore, or
+reconcile with a backup of your newer version.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="korppi-wont-start">Korppi won't start</h3>
+<p>See <a href="troubleshooting.html">Troubleshooting</a> for
+platform-specific solutions.</p>
+<h3 id="my-document-looks-corrupted">My document looks corrupted</h3>
+<p>Try:</p>
+<ol type="1">
+<li>Check if the <code>.kmd</code> file opens (it's a ZIP file)</li>
+<li>Extract <code>content.md</code> manually</li>
+<li>Open in a new Korppi document</li>
+</ol>
+<h3 id="export-isnt-working">Export isn't working</h3>
+<p>Check for:</p>
+<ul>
+<li>Disk space</li>
+<li>Write permissions in the target folder</li>
+<li>Special characters in filename</li>
+</ul>
+<h3 id="the-editor-is-slow">The editor is slow</h3>
+<p>For very large documents (50,000+ words):</p>
+<ul>
+<li>Split into multiple documents</li>
+<li>Reduce timeline history (coming soon)</li>
+<li>Check available RAM</li>
+</ul>
+<hr />
+<h2 id="development">Development</h2>
+<h3 id="how-do-i-report-bugs">How do I report bugs?</h3>
+<p>Open an issue on <a
+href="https://github.com/b-rodrigues/korppi/issues">GitHub</a>.</p>
+<h3 id="can-i-contribute">Can I contribute?</h3>
+<p>Yes! See <a href="contributing.html">Contributing</a> for
+guidelines.</p>
+<h3 id="whats-korppi-built-with">What's Korppi built with?</h3>
+<ul>
+<li><strong>Frontend:</strong> JavaScript, HTML, CSS</li>
+<li><strong>Editor:</strong> Milkdown (ProseMirror)</li>
+<li><strong>Backend:</strong> Rust (Tauri)</li>
+<li><strong>Sync:</strong> Yjs (CRDT)</li>
+</ul>
+<hr />
+<h2 id="still-have-questions">Still Have Questions?</h2>
+<ul>
+<li>Check <a href="troubleshooting.html">Troubleshooting</a></li>
+<li>Open a <a href="https://github.com/b-rodrigues/korppi/issues">GitHub
+Issue</a></li>
+<li>Read the source code!</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

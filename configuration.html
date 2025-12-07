@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Configuration - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" class="current">Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Configuration</h1>
+            </header>
+
+            <article class="content">
+<h1 id="configuration">Configuration</h1>
+<p>Customize Korppi to fit your workflow.</p>
+<hr />
+<h2 id="preferences-section">Preferences Section</h2>
+<p>The <strong>Preferences</strong> section is at the top of the left
+sidebar:</p>
+<ul>
+<li>Profile settings</li>
+<li>Theme toggle</li>
+<li>Autosave configuration</li>
+</ul>
+<hr />
+<h2 id="profile-settings">Profile Settings</h2>
+<h3 id="setting-your-name">Setting Your Name</h3>
+<ol type="1">
+<li>Click your <strong>profile avatar</strong> (top left)</li>
+<li>Enter your name</li>
+<li>Your name appears on:
+<ul>
+<li>Comments you create</li>
+<li>Document metadata</li>
+<li>Timeline patches</li>
+</ul></li>
+</ol>
+<h3 id="choosing-a-color">Choosing a Color</h3>
+<ol type="1">
+<li>Click your profile avatar</li>
+<li>Select a color</li>
+<li>This color is used for:
+<ul>
+<li>Comment highlights</li>
+<li>Author identification</li>
+</ul></li>
+</ol>
+<hr />
+<h2 id="theme">Theme</h2>
+<p>Toggle between light and dark themes:</p>
+<ol type="1">
+<li>Click the <strong>Theme</strong> button in Preferences</li>
+<li>Switch between:
+<ul>
+<li>☀️ <strong>Light</strong> - Classic bright theme</li>
+<li>🌙 <strong>Dark</strong> - Easy on the eyes</li>
+</ul></li>
+</ol>
+<p>Theme preference is saved automatically.</p>
+<hr />
+<h2 id="autosave">Autosave</h2>
+<p>Never lose work with automatic saving:</p>
+<h3 id="enable-autosave">Enable Autosave</h3>
+<ol type="1">
+<li>Find the <strong>Autosave</strong> checkbox in Preferences</li>
+<li>Check it to enable</li>
+</ol>
+<h3 id="set-interval">Set Interval</h3>
+<p>Choose how often to autosave:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Interval</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1 min</td>
+<td>Frequent savers</td>
+</tr>
+<tr class="even">
+<td>2 min</td>
+<td>Active editing</td>
+</tr>
+<tr class="odd">
+<td>5 min</td>
+<td>Standard use (default)</td>
+</tr>
+<tr class="even">
+<td>10 min</td>
+<td>Light editing</td>
+</tr>
+<tr class="odd">
+<td>15 min</td>
+<td>Reading/reviewing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-it-works">How It Works</h3>
+<ul>
+<li>Autosave only triggers if there are unsaved changes</li>
+<li>A brief "✓ Autosaved" notification appears</li>
+<li>Document is saved to its current path</li>
+</ul>
+<p>⚠️ <strong>Note:</strong> New unsaved documents must be saved
+manually first.</p>
+<hr />
+<h2 id="sidebar-widths">Sidebar Widths</h2>
+<p>Resize sidebars to your preference:</p>
+<ol type="1">
+<li><strong>Hover</strong> on the border between sidebar and editor</li>
+<li><strong>Drag</strong> left or right</li>
+<li>Release to set the new width</li>
+</ol>
+<p>Your sidebar widths are remembered between sessions.</p>
+<hr />
+<h2 id="recent-documents">Recent Documents</h2>
+<p>Korppi remembers your recently opened documents:</p>
+<ul>
+<li>Shown in the welcome panel</li>
+<li>Click to quickly reopen</li>
+<li>Click <strong>Clear</strong> to remove history</li>
+</ul>
+<hr />
+<h2 id="settings-storage">Settings Storage</h2>
+<p>Preferences are stored locally:</p>
+<ul>
+<li><strong>Browser storage:</strong> Theme, sidebar widths</li>
+<li><strong>Document file:</strong> Per-document settings</li>
+</ul>
+<hr />
+<h2 id="command-line-options">Command Line Options</h2>
+<p>When launching Korppi from terminal:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Open a specific file</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">korppi</span> /path/to/document.kmd</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Open in current directory</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">korppi</span> .</span></code></pre></div>
+<hr />
+<h2 id="environment-variables">Environment Variables</h2>
+<p><em>Advanced configuration via environment variables is planned for
+future releases.</em></p>
+<hr />
+<h2 id="configuration-file">Configuration File</h2>
+<p><em>A global configuration file is planned for future
+releases.</em></p>
+<p>Planned options:</p>
+<ul>
+<li>Default theme</li>
+<li>Default autosave interval</li>
+<li>Custom keyboard shortcuts</li>
+<li>Editor preferences</li>
+</ul>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="quick-start.html">Quick Start</a> - Initial setup</li>
+<li><a href="first-document.html">First Document</a> - Document
+settings</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

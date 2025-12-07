@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Quick Start - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" class="current">Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Quick Start</h1>
+            </header>
+
+            <article class="content">
+<h1 id="quick-start-guide">Quick Start Guide</h1>
+<p>Get writing with Korppi in just 5 minutes!</p>
+<hr />
+<h2 id="step-1-create-your-first-document">Step 1: Create Your First
+Document</h2>
+<ol type="1">
+<li>Launch Korppi</li>
+<li>Click <strong>New</strong> in the left sidebar (or press
+<code>Ctrl+N</code>)</li>
+<li>Start typing in the editor!</li>
+</ol>
+<p>The editor uses <strong>Markdown</strong> formatting, so you can
+write naturally:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu"># My Document Title</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>This is a paragraph with **bold** and *italic* text.</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">## A Section</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bullet point one</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bullet point two</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bullet point three</span></code></pre></div>
+<hr />
+<h2 id="step-2-save-your-work">Step 2: Save Your Work</h2>
+<ol type="1">
+<li>Click <strong>Save</strong> in the sidebar (or press
+<code>Ctrl+S</code>)</li>
+<li>Choose a location and filename</li>
+<li>Your document is saved as a <code>.kmd</code> file</li>
+</ol>
+<blockquote>
+<p><strong>Tip:</strong> Enable <strong>Autosave</strong> in the
+Preferences section to automatically save every few minutes!</p>
+</blockquote>
+<hr />
+<h2 id="step-3-format-your-text">Step 3: Format Your Text</h2>
+<h3 id="using-the-toolbar">Using the Toolbar</h3>
+<p>The left sidebar has formatting buttons for:</p>
+<ul>
+<li><strong>B</strong> - Bold</li>
+<li><em>I</em> - Italic</li>
+<li><del>S</del> - Strikethrough</li>
+<li><code>Code</code> - Inline code</li>
+<li>H1/H2/H3 - Headings</li>
+<li>Lists, quotes, and more!</li>
+</ul>
+<h3 id="using-markdown">Using Markdown</h3>
+<p>Just type markdown syntax directly:</p>
+<table>
+<thead>
+<tr class="header">
+<th>What you type</th>
+<th>What you get</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>**bold**</code></td>
+<td><strong>bold</strong></td>
+</tr>
+<tr class="even">
+<td><code>*italic*</code></td>
+<td><em>italic</em></td>
+</tr>
+<tr class="odd">
+<td><code># Heading</code></td>
+<td>Heading</td>
+</tr>
+<tr class="even">
+<td><code>- item</code></td>
+<td>• item</td>
+</tr>
+<tr class="odd">
+<td><code>`code`</code></td>
+<td><code>code</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="step-4-use-context-menus">Step 4: Use Context Menus</h2>
+<p><strong>Right-click</strong> on selected text to see formatting
+options:</p>
+<ul>
+<li>Bold, Italic, Strikethrough</li>
+<li>Add links</li>
+<li>Copy, Search in document</li>
+<li>Add comments</li>
+</ul>
+<p><strong>Right-click</strong> without selection for:</p>
+<ul>
+<li>Paste</li>
+<li>Insert table, image, code block</li>
+<li>Select all</li>
+</ul>
+<hr />
+<h2 id="step-5-explore-the-timeline">Step 5: Explore the Timeline</h2>
+<p>The <strong>Timeline</strong> panel on the right shows your
+document's history:</p>
+<ol type="1">
+<li>Every significant change appears as a "patch"</li>
+<li>Click a patch to preview that version</li>
+<li>Use Preview/Restore to go back in time</li>
+</ol>
+<hr />
+<h2 id="step-6-export-your-document">Step 6: Export Your Document</h2>
+<p>When you're ready to share:</p>
+<ol type="1">
+<li>Click <strong>Export MD</strong> to export as Markdown</li>
+<li>Click <strong>Export DOCX</strong> to export as Word document</li>
+</ol>
+<hr />
+<h2 id="essential-shortcuts">Essential Shortcuts</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Shortcut</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Ctrl+N</code></td>
+<td>New document</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl+O</code></td>
+<td>Open document</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl+S</code></td>
+<td>Save document</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl+Z</code></td>
+<td>Undo</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl+Y</code></td>
+<td>Redo</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl+B</code></td>
+<td>Bold</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl+I</code></td>
+<td>Italic</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl+F</code></td>
+<td>Find</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl+H</code></td>
+<td>Find &amp; Replace</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="whats-next">What's Next?</h2>
+<ul>
+<li>Learn about <a href="formatting.html">Text Formatting</a></li>
+<li>Explore the <a href="timeline.html">Timeline &amp; History</a></li>
+<li>Set up your <a href="configuration.html">Profile</a></li>
+</ul>
+<hr />
+<p><em>Happy writing! 🐦</em></p>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

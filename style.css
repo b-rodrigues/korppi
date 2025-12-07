@@ -1,0 +1,487 @@
+/* =============================================
+   KORPPI DOCUMENTATION - 90s RETRO STYLE
+   Homebrew freeware aesthetic
+   ============================================= */
+
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Base - Classic web font stack */
+body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 16px;
+    line-height: 1.6;
+    background: #ffffcc;
+    color: #000080;
+    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffff99' fill-opacity='0.4'%3E%3Cpath d='M0 0h20v20H0V0zm20 20h20v20H20V20z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Layout */
+.page-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 220px;
+    background: #000080;
+    color: #00ffff;
+    padding: 0;
+    flex-shrink: 0;
+    border-right: 4px double #ffff00;
+}
+
+.sidebar-header {
+    background: #ff00ff;
+    padding: 16px 12px;
+    text-align: center;
+    border-bottom: 3px solid #ffff00;
+}
+
+.sidebar-header a {
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: bold;
+    font-family: "Comic Sans MS", "Chalkboard SE", cursive;
+    text-shadow: 2px 2px #000000;
+    letter-spacing: 2px;
+}
+
+.sidebar-header a:hover {
+    color: #ffff00;
+}
+
+.sidebar-section {
+    border-bottom: 1px dashed #00ffff;
+}
+
+.sidebar-title {
+    background: #000066;
+    color: #00ff00;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: "Courier New", monospace;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 8px 0;
+}
+
+.sidebar li {
+    padding: 0;
+}
+
+.sidebar a {
+    display: block;
+    padding: 6px 12px 6px 20px;
+    color: #00ffff;
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+}
+
+.sidebar a:hover {
+    background: #000066;
+    color: #ffff00;
+    border-left-color: #ff00ff;
+}
+
+.sidebar a.current {
+    background: #0000aa;
+    color: #ffffff;
+    font-weight: bold;
+    border-left-color: #00ff00;
+}
+
+/* Main content */
+.main-content {
+    flex: 1;
+    padding: 24px 40px;
+    max-width: 900px;
+}
+
+/* Header */
+.page-header {
+    border-bottom: 3px double #000080;
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+}
+
+.page-header h1 {
+    font-family: "Comic Sans MS", "Chalkboard SE", cursive;
+    font-size: 32px;
+    color: #800080;
+    text-shadow: 2px 2px #ffccff;
+    margin: 0;
+}
+
+.page-header .tagline {
+    font-style: italic;
+    color: #666666;
+    margin-top: 8px;
+}
+
+/* Content styling */
+.content h1 {
+    font-size: 28px;
+    color: #800080;
+    border-bottom: 2px solid #ff00ff;
+    padding-bottom: 8px;
+    margin: 32px 0 16px 0;
+    font-family: "Comic Sans MS", cursive;
+}
+
+.content h2 {
+    font-size: 22px;
+    color: #000080;
+    border-left: 4px solid #00ff00;
+    padding-left: 12px;
+    margin: 28px 0 12px 0;
+    background: linear-gradient(90deg, #ccffcc 0%, transparent 100%);
+}
+
+.content h3 {
+    font-size: 18px;
+    color: #008080;
+    margin: 20px 0 10px 0;
+}
+
+.content p {
+    margin: 12px 0;
+    text-align: justify;
+}
+
+.content ul,
+.content ol {
+    margin: 12px 0 12px 32px;
+}
+
+.content li {
+    margin: 6px 0;
+}
+
+.content li::marker {
+    color: #ff00ff;
+}
+
+/* Links */
+.content a {
+    color: #0000ff;
+    text-decoration: underline;
+}
+
+.content a:visited {
+    color: #800080;
+}
+
+.content a:hover {
+    color: #ff0000;
+    background: #ffff00;
+}
+
+/* Code */
+.content code {
+    font-family: "Courier New", Courier, monospace;
+    background: #000000;
+    color: #00ff00;
+    padding: 2px 6px;
+    border: 1px solid #00ff00;
+    font-size: 14px;
+}
+
+.content pre {
+    background: #000000;
+    color: #00ff00;
+    padding: 16px;
+    border: 3px inset #333333;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.content pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+/* Blockquotes */
+.content blockquote {
+    background: #ffffee;
+    border-left: 4px solid #ff6600;
+    border-right: 4px solid #ff6600;
+    padding: 12px 20px;
+    margin: 16px 0;
+    font-style: italic;
+}
+
+/* Tables */
+.content table {
+    border-collapse: collapse;
+    margin: 16px 0;
+    width: 100%;
+    border: 3px outset #808080;
+}
+
+.content th {
+    background: #000080;
+    color: #ffffff;
+    padding: 8px 12px;
+    text-align: left;
+    border: 1px solid #000000;
+}
+
+.content td {
+    padding: 8px 12px;
+    border: 1px solid #808080;
+    background: #ffffff;
+}
+
+.content tr:nth-child(even) td {
+    background: #f0f0ff;
+}
+
+/* Images */
+.content img {
+    max-width: 100%;
+    border: 3px outset #808080;
+    margin: 16px 0;
+}
+
+/* Special boxes */
+.note,
+.warning,
+.tip {
+    padding: 16px;
+    margin: 16px 0;
+    border: 2px solid;
+}
+
+.note {
+    background: #eeeeff;
+    border-color: #0000ff;
+}
+
+.warning {
+    background: #ffeeee;
+    border-color: #ff0000;
+}
+
+.tip {
+    background: #eeffee;
+    border-color: #00aa00;
+}
+
+/* Horizontal rule */
+.content hr {
+    border: none;
+    border-top: 2px dashed #ff00ff;
+    margin: 32px 0;
+}
+
+/* Footer */
+.footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 3px double #000080;
+    text-align: center;
+    font-size: 12px;
+    color: #666666;
+}
+
+.footer .counter {
+    margin-top: 12px;
+}
+
+.footer .counter img {
+    border: 1px solid #000000;
+}
+
+.footer .badges {
+    margin-top: 16px;
+}
+
+.footer .badges span {
+    display: inline-block;
+    background: #000080;
+    color: #ffffff;
+    padding: 4px 8px;
+    margin: 2px;
+    font-size: 10px;
+    font-family: "Courier New", monospace;
+}
+
+/* Under construction */
+.under-construction {
+    background: #ffff00;
+    color: #000000;
+    padding: 12px;
+    text-align: center;
+    border: 2px solid #ff0000;
+    margin: 16px 0;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    51%,
+    100% {
+        opacity: 0.7;
+    }
+}
+
+/* Marquee effect (CSS only) */
+.marquee {
+    background: #ff00ff;
+    color: #ffffff;
+    padding: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.marquee span {
+    display: inline-block;
+    animation: marquee 15s linear infinite;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(100%);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Welcome box */
+.welcome-box {
+    background: linear-gradient(135deg, #ff99ff 0%, #9999ff 50%, #99ffff 100%);
+    border: 4px ridge #ff00ff;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.welcome-box h2 {
+    color: #800080;
+    margin: 0 0 12px 0;
+    font-family: "Comic Sans MS", cursive;
+    font-size: 28px;
+}
+
+/* Download button */
+.download-btn {
+    display: inline-block;
+    background: linear-gradient(180deg, #00cc00 0%, #008800 100%);
+    color: #ffffff;
+    padding: 12px 24px;
+    text-decoration: none;
+    border: 3px outset #00ff00;
+    font-weight: bold;
+    font-size: 18px;
+    font-family: "Arial Black", sans-serif;
+    margin: 16px 0;
+}
+
+.download-btn:hover {
+    background: linear-gradient(180deg, #00ff00 0%, #00aa00 100%);
+    border-style: inset;
+}
+
+/* Feature list with icons */
+.feature-list {
+    list-style: none;
+    margin: 16px 0;
+    padding: 0;
+}
+
+.feature-list li {
+    padding: 8px 0 8px 32px;
+    background-repeat: no-repeat;
+    background-position: 0 8px;
+    background-size: 20px;
+    border-bottom: 1px dotted #cc99cc;
+}
+
+.feature-list li::before {
+    content: "★ ";
+    color: #ff00ff;
+}
+
+/* Guestbook style */
+.guestbook {
+    background: #ffffff;
+    border: 2px inset #808080;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+/* Hit counter style */
+.hit-counter {
+    font-family: "Courier New", monospace;
+    background: #000000;
+    color: #00ff00;
+    padding: 4px 12px;
+    display: inline-block;
+    border: 2px inset #333333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .page-wrapper {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 4px double #ffff00;
+    }
+
+    .main-content {
+        padding: 16px;
+    }
+}
+
+/* Rainbow text */
+.rainbow {
+    background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: bold;
+}
+
+/* Spinning element */
+.spin {
+    display: inline-block;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Formatting - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" class="current">Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Formatting</h1>
+            </header>
+
+            <article class="content">
+<h1 id="text-formatting">Text Formatting</h1>
+<p>Korppi supports full Markdown formatting with a visual toolbar.</p>
+<hr />
+<h2 id="inline-formatting">Inline Formatting</h2>
+<h3 id="bold">Bold</h3>
+<ul>
+<li><strong>Toolbar:</strong> Click <strong>B</strong></li>
+<li><strong>Shortcut:</strong> <code>Ctrl+B</code></li>
+<li><strong>Markdown:</strong> <code>**bold text**</code></li>
+</ul>
+<h3 id="italic">Italic</h3>
+<ul>
+<li><strong>Toolbar:</strong> Click <em>I</em></li>
+<li><strong>Shortcut:</strong> <code>Ctrl+I</code></li>
+<li><strong>Markdown:</strong> <code>*italic text*</code></li>
+</ul>
+<h3 id="strikethrough">Strikethrough</h3>
+<ul>
+<li><strong>Toolbar:</strong> Click <del>S</del></li>
+<li><strong>Markdown:</strong> <code>~~strikethrough~~</code></li>
+</ul>
+<h3 id="inline-code">Inline Code</h3>
+<ul>
+<li><strong>Toolbar:</strong> Click <code>`</code></li>
+<li><strong>Markdown:</strong> <code>`code`</code></li>
+</ul>
+<hr />
+<h2 id="headings">Headings</h2>
+<p>Use headings to structure your document:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu"># Heading 1 (largest)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">## Heading 2</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">### Heading 3</span></span></code></pre></div>
+<p>Use the toolbar buttons <strong>H1</strong>, <strong>H2</strong>,
+<strong>H3</strong>, or type the <code>#</code> symbols directly.</p>
+<hr />
+<h2 id="links">Links</h2>
+<h3 id="adding-a-link">Adding a Link</h3>
+<ol type="1">
+<li>Select text</li>
+<li>Right-click → <strong>Add Link</strong></li>
+<li>Enter the URL</li>
+<li>Click OK</li>
+</ol>
+<p>Or use Markdown: <code>[link text](https://example.com)</code></p>
+<hr />
+<h2 id="lists">Lists</h2>
+<h3 id="bullet-lists">Bullet Lists</h3>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>First item</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Second item</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Third item</span></code></pre></div>
+<p>Click the <strong>•</strong> button in the toolbar.</p>
+<h3 id="numbered-lists">Numbered Lists</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>First item</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Second item</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Third item</span></code></pre></div>
+<p>Click the <strong>1.</strong> button in the toolbar.</p>
+<hr />
+<h2 id="blockquotes">Blockquotes</h2>
+<p>Use blockquotes for citations or callouts:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; This is a quote.</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; It can span multiple lines.</span></span></code></pre></div>
+<p>Click the <strong>"</strong> button in the toolbar.</p>
+<hr />
+<h2 id="code-blocks">Code Blocks</h2>
+<p>For multi-line code, use fenced code blocks:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="in">```javascript</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">hello</span>() {</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">console</span><span class="op">.</span><span class="fu">log</span>(<span class="st">&quot;Hello, world!&quot;</span>)<span class="op">;</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div>
+<p>Specify the language after the opening fence for syntax
+highlighting.</p>
+<hr />
+<h2 id="tables">Tables</h2>
+<p>Create tables using the toolbar or markdown:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>| Column 1 | Column 2 | Column 3 |</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>|----------|----------|----------|</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>| Cell 1   | Cell 2   | Cell 3   |</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>| Cell 4   | Cell 5   | Cell 6   |</span></code></pre></div>
+<p><strong>Insert via Context Menu:</strong></p>
+<ol type="1">
+<li>Right-click in the editor (no selection)</li>
+<li>Click <strong>Insert Table</strong></li>
+<li>Choose rows and columns</li>
+</ol>
+<hr />
+<h2 id="horizontal-rules">Horizontal Rules</h2>
+<p>Insert a divider line:</p>
+<ul>
+<li><strong>Toolbar:</strong> Click <strong>—</strong></li>
+<li><strong>Markdown:</strong> <code>---</code> on its own line</li>
+</ul>
+<hr />
+<h2 id="images">Images</h2>
+<p>To insert an image:</p>
+<ol type="1">
+<li>Right-click → <strong>Insert Image</strong></li>
+<li>Select an image file</li>
+<li>The image is embedded in your document</li>
+</ol>
+<hr />
+<h2 id="clearing-formatting">Clearing Formatting</h2>
+<p>To remove all formatting from selected text:</p>
+<ol type="1">
+<li>Select the text</li>
+<li>Click the <strong>⌀</strong> button in the toolbar</li>
+</ol>
+<hr />
+<h2 id="context-menu">Context Menu</h2>
+<p><strong>Right-click on selected text</strong> for quick
+formatting:</p>
+<ul>
+<li>Bold, Italic, Strikethrough</li>
+<li>Inline Code</li>
+<li>Add Link</li>
+<li>Copy</li>
+<li>Search in Document</li>
+<li>Add Comment</li>
+</ul>
+<p><strong>Right-click without selection</strong> for:</p>
+<ul>
+<li>Paste</li>
+<li>Paste as Plain Text</li>
+<li>Horizontal Rule</li>
+<li>Insert Table</li>
+<li>Insert Image</li>
+<li>Code Block</li>
+<li>Select All</li>
+</ul>
+<hr />
+<h2 id="keyboard-shortcuts-summary">Keyboard Shortcuts Summary</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Formatting</th>
+<th>Shortcut</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Bold</td>
+<td><code>Ctrl+B</code></td>
+</tr>
+<tr class="even">
+<td>Italic</td>
+<td><code>Ctrl+I</code></td>
+</tr>
+<tr class="odd">
+<td>Undo</td>
+<td><code>Ctrl+Z</code></td>
+</tr>
+<tr class="even">
+<td>Redo</td>
+<td><code>Ctrl+Y</code></td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="keyboard-shortcuts.html">Keyboard Shortcuts</a> for the
+complete list.</p>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

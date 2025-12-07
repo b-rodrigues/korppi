@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Troubleshooting - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" class="current">Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Troubleshooting</h1>
+            </header>
+
+            <article class="content">
+<h1 id="troubleshooting">Troubleshooting</h1>
+<p>Solutions to common problems.</p>
+<hr />
+<h2 id="installation-issues">Installation Issues</h2>
+<h3 id="linux-appimage-wont-run">Linux: AppImage Won't Run</h3>
+<p><strong>Problem:</strong> Double-clicking the AppImage does
+nothing.</p>
+<p><strong>Solution:</strong></p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make it executable</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> +x korppi_<span class="pp">*</span>.AppImage</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run from terminal to see errors</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./korppi_*.AppImage</span></span></code></pre></div>
+<h3 id="linux-missing-libraries">Linux: Missing Libraries</h3>
+<p><strong>Problem:</strong> Error about missing WebKit or GTK.</p>
+<p><strong>Solution:</strong></p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ubuntu/Debian</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Fedora</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> dnf install webkit2gtk4.1-devel</span></code></pre></div>
+<h3 id="macos-app-is-damaged">macOS: "App is damaged"</h3>
+<p><strong>Problem:</strong> macOS says the app is damaged and can't be
+opened.</p>
+<p><strong>Solution:</strong></p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove quarantine attribute</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xattr</span> <span class="at">-cr</span> /Applications/Korppi.app</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Or right-click → Open (bypasses Gatekeeper)</span></span></code></pre></div>
+<h3 id="windows-smartscreen-warning">Windows: SmartScreen Warning</h3>
+<p><strong>Problem:</strong> Windows Defender SmartScreen blocks the
+installer.</p>
+<p><strong>Solution:</strong></p>
+<ol type="1">
+<li>Click "More info"</li>
+<li>Click "Run anyway"</li>
+<li>This is normal for new/unsigned apps</li>
+</ol>
+<hr />
+<h2 id="startup-issues">Startup Issues</h2>
+<h3 id="blank-window">Blank Window</h3>
+<p><strong>Problem:</strong> Korppi opens but shows a blank white
+screen.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Wait a few seconds (initial load can be slow)</li>
+<li>Try <code>Ctrl+Shift+R</code> to force reload</li>
+<li>Check if running from a network drive (try local)</li>
+<li>Disable hardware acceleration in system settings</li>
+</ol>
+<h3 id="crashes-on-launch">Crashes on Launch</h3>
+<p><strong>Problem:</strong> Korppi crashes immediately.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check system requirements</li>
+<li>Update graphics drivers</li>
+<li>Try launching from terminal for error messages:
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./korppi_*.AppImage</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">/Applications/Korppi.app/Contents/MacOS/Korppi</span></span></code></pre></div></li>
+<li>Check for conflicting antivirus software</li>
+</ol>
+<hr />
+<h2 id="document-issues">Document Issues</h2>
+<h3 id="cant-open-document">Can't Open Document</h3>
+<p><strong>Problem:</strong> Error when opening a <code>.kmd</code>
+file.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check file permissions</li>
+<li>Verify the file isn't corrupted:
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">unzip</span> <span class="at">-t</span> document.kmd</span></code></pre></div></li>
+<li>Try extracting content manually:
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">unzip</span> <span class="at">-p</span> document.kmd content.md <span class="op">&gt;</span> recovered.md</span></code></pre></div></li>
+</ol>
+<h3 id="document-wont-save">Document Won't Save</h3>
+<p><strong>Problem:</strong> Saving fails with an error.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check disk space</li>
+<li>Verify write permissions for the folder</li>
+<li>Try "Save As" to a different location</li>
+<li>Check if another program has the file locked</li>
+</ol>
+<h3 id="lost-changes">Lost Changes</h3>
+<p><strong>Problem:</strong> Recent edits are missing.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check tab indicator—red dot means unsaved</li>
+<li>Look for autosave backup (if enabled)</li>
+<li>Check the timeline for recent patches</li>
+<li>Look in system temp directory for recovery files</li>
+</ol>
+<hr />
+<h2 id="editor-issues">Editor Issues</h2>
+<h3 id="cant-type-in-editor">Can't Type in Editor</h3>
+<p><strong>Problem:</strong> Clicking in editor does nothing.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Click directly on the white page area</li>
+<li>Check if a modal dialog is covering the editor</li>
+<li>Try <code>Ctrl+Shift+R</code> to reload</li>
+<li>Check if browser zoom is extreme (reset to 100%)</li>
+</ol>
+<h3 id="formatting-not-working">Formatting Not Working</h3>
+<p><strong>Problem:</strong> Bold/italic shortcuts do nothing.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Make sure text is selected</li>
+<li>Try the toolbar buttons instead</li>
+<li>Check for conflicting browser extensions</li>
+<li>Reload with <code>Ctrl+Shift+R</code></li>
+</ol>
+<h3 id="slow-performance">Slow Performance</h3>
+<p><strong>Problem:</strong> Editor lags when typing.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Large documents (50K+ words) can be slow</li>
+<li>Try splitting into multiple documents</li>
+<li>Close other resource-heavy applications</li>
+<li>Check if timeline has many patches</li>
+</ol>
+<hr />
+<h2 id="export-issues">Export Issues</h2>
+<h3 id="docx-export-fails">DOCX Export Fails</h3>
+<p><strong>Problem:</strong> Word export produces an error or empty
+file.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check available disk space</li>
+<li>Make sure document isn't empty</li>
+<li>Try exporting a simple test document first</li>
+<li>Report the issue with error details</li>
+</ol>
+<h3 id="markdown-export-loses-formatting">Markdown Export Loses
+Formatting</h3>
+<p><strong>Problem:</strong> Exported <code>.md</code> file looks
+wrong.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>This is expected—some Korppi features don't translate</li>
+<li>Comments are stripped (expected behavior)</li>
+<li>Check if the issue is in the viewer, not the file</li>
+<li>Open the <code>.md</code> in a text editor to verify content</li>
+</ol>
+<hr />
+<h2 id="timeline-issues">Timeline Issues</h2>
+<h3 id="no-patches-appear">No Patches Appear</h3>
+<p><strong>Problem:</strong> Timeline is empty despite editing.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Patches appear after saving</li>
+<li>Try making a larger edit</li>
+<li>Check if you're viewing a new document</li>
+<li>Reload the document</li>
+</ol>
+<h3 id="cant-restore-version">Can't Restore Version</h3>
+<p><strong>Problem:</strong> Restore button doesn't work.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Make sure a patch is selected</li>
+<li>Check for error messages</li>
+<li>Try preview first</li>
+<li>Save current doc, reload, try again</li>
+</ol>
+<hr />
+<h2 id="comments-issues">Comments Issues</h2>
+<h3 id="comments-dont-appear">Comments Don't Appear</h3>
+<p><strong>Problem:</strong> Added comment but can't see it.</p>
+<p><strong>Solutions:</strong></p>
+<ol type="1">
+<li>Check the Comments panel (right sidebar)</li>
+<li>Look for highlight on the text</li>
+<li>Check comment filter (show "All")</li>
+<li>Reload document</li>
+</ol>
+<hr />
+<h2 id="getting-more-help">Getting More Help</h2>
+<h3 id="collect-debug-info">Collect Debug Info</h3>
+<p>When reporting issues, include:</p>
+<ol type="1">
+<li><strong>Korppi version:</strong> (About menu or package.json)</li>
+<li><strong>Operating system:</strong> (Linux distro/version, macOS
+version, Windows version)</li>
+<li><strong>Error messages:</strong> (from terminal if available)</li>
+<li><strong>Steps to reproduce:</strong> (what exactly you did)</li>
+</ol>
+<h3 id="report-an-issue">Report an Issue</h3>
+<ol type="1">
+<li>Go to <a href="https://github.com/b-rodrigues/korppi/issues">GitHub
+Issues</a></li>
+<li>Check if issue already exists</li>
+<li>Create new issue with template</li>
+<li>Include debug info above</li>
+</ol>
+<h3 id="developer-console">Developer Console</h3>
+<p>For JavaScript errors:</p>
+<pre><code>Ctrl+Right-Click anywhere → Inspect Element</code></pre>
+<p>This opens the browser dev tools where you can see console
+errors.</p>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="faq.html">FAQ</a> - General questions</li>
+<li><a href="installation.html">Installation</a> - Setup
+instructions</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

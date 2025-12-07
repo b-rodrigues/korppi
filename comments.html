@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Comments - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" class="current">Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Comments</h1>
+            </header>
+
+            <article class="content">
+<h1 id="comments--reviews">Comments &amp; Reviews</h1>
+<p>Korppi includes a powerful commenting system for reviews and
+collaboration.</p>
+<hr />
+<h2 id="adding-comments">Adding Comments</h2>
+<h3 id="method-1-context-menu">Method 1: Context Menu</h3>
+<ol type="1">
+<li>Select the text you want to comment on</li>
+<li>Right-click</li>
+<li>Click <strong>Add Comment</strong></li>
+<li>Type your comment</li>
+<li>Press Enter or click outside to save</li>
+</ol>
+<h3 id="method-2-keyboard-shortcut">Method 2: Keyboard Shortcut</h3>
+<ol type="1">
+<li>Select text</li>
+<li>Press a keyboard shortcut (if configured)</li>
+<li>Type your comment</li>
+</ol>
+<hr />
+<h2 id="comment-highlights">Comment Highlights</h2>
+<p>When you add a comment:</p>
+<ul>
+<li>The text is highlighted in your author color</li>
+<li>Hover over highlighted text to see the comment</li>
+<li>Click the highlight to expand the full comment thread</li>
+</ul>
+<hr />
+<h2 id="the-comments-panel">The Comments Panel</h2>
+<p>The right sidebar contains the <strong>Comments</strong> section:</p>
+<ul>
+<li>Shows all comments in the document</li>
+<li>Sorted by position in document</li>
+<li>Each comment shows:
+<ul>
+<li>Author name and color</li>
+<li>Comment text</li>
+<li>Date/time</li>
+<li>Status (unresolved/resolved/deleted)</li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="comment-status">Comment Status</h2>
+<h3 id="unresolved">Unresolved</h3>
+<p>New comments start as <strong>unresolved</strong>. They appear in the
+pending count in the status bar.</p>
+<h3 id="resolved">Resolved</h3>
+<p>Mark a comment as resolved when it's been addressed:</p>
+<ol type="1">
+<li>Click the comment</li>
+<li>Click <strong>Resolve</strong></li>
+</ol>
+<p>Resolved comments are grayed out but still visible.</p>
+<h3 id="deleted">Deleted</h3>
+<p>Remove a comment:</p>
+<ol type="1">
+<li>Click the comment</li>
+<li>Click <strong>Delete</strong></li>
+</ol>
+<p>Deleted comments can be <strong>restored</strong> if needed.</p>
+<hr />
+<h2 id="author-colors">Author Colors</h2>
+<p>Each author has a unique color:</p>
+<ul>
+<li>Set your color in Profile settings</li>
+<li>Colors make it easy to identify who wrote what</li>
+<li>Comment highlights use the author's color</li>
+</ul>
+<hr />
+<h2 id="filtering-comments">Filtering Comments</h2>
+<p>In the comments panel:</p>
+<ul>
+<li><strong>All</strong> - Show all comments</li>
+<li><strong>Unresolved</strong> - Only show open comments</li>
+<li><strong>Resolved</strong> - Only show addressed comments</li>
+</ul>
+<hr />
+<h2 id="comment-threads">Comment Threads</h2>
+<p>Comments support threading for discussions:</p>
+<ol type="1">
+<li>Click an existing comment</li>
+<li>Add a reply</li>
+<li>The thread expands below the original</li>
+</ol>
+<hr />
+<h2 id="pending-comments-counter">Pending Comments Counter</h2>
+<p>The status bar (bottom left) shows pending items:</p>
+<pre><code>💬 3 comments</code></pre>
+<p>This counts <strong>unresolved</strong> comments, helping you track
+what needs attention.</p>
+<hr />
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="for-writers">For Writers</h3>
+<ul>
+<li>Use comments to leave notes to yourself</li>
+<li>Mark sections that need review</li>
+<li>Track research sources</li>
+</ul>
+<h3 id="for-reviewers">For Reviewers</h3>
+<ul>
+<li>Be specific about what needs changing</li>
+<li>Reference line numbers or text</li>
+<li>Resolve comments when addressed</li>
+</ul>
+<h3 id="for-collaboration">For Collaboration</h3>
+<ul>
+<li>Set distinct profile colors</li>
+<li>Use clear, actionable language</li>
+<li>Resolve comments when complete</li>
+</ul>
+<hr />
+<h2 id="exporting-with-comments">Exporting with Comments</h2>
+<p>When you export:</p>
+<ul>
+<li><strong>Markdown:</strong> Comments are stripped</li>
+<li><strong>DOCX:</strong> Comments appear as Word comments (coming
+soon)</li>
+</ul>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="timeline.html">Timeline &amp; History</a> - See when
+comments were added</li>
+<li><a href="configuration.html">Configuration</a> - Set your author
+profile</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

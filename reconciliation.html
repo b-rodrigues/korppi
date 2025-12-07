@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Reconciliation - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" class="current">Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Reconciliation</h1>
+            </header>
+
+            <article class="content">
+<h1 id="reconciliation">Reconciliation</h1>
+<p>Import and merge changes from other versions of your document.</p>
+<hr />
+<h2 id="what-is-reconciliation">What is Reconciliation?</h2>
+<p><strong>Reconciliation</strong> lets you:</p>
+<ul>
+<li>Import changes from another <code>.kmd</code> file</li>
+<li>See what's different between versions</li>
+<li>Selectively accept or reject changes</li>
+</ul>
+<p>It's perfect for:</p>
+<ul>
+<li>Merging feedback from reviewers</li>
+<li>Combining work from multiple authors</li>
+<li>Recovering changes from an old version</li>
+</ul>
+<hr />
+<h2 id="starting-reconciliation">Starting Reconciliation</h2>
+<ol type="1">
+<li>Open your main document</li>
+<li>Click <strong>Reconcile</strong> in the left sidebar</li>
+<li>Select the other <code>.kmd</code> file to import from</li>
+<li>Korppi analyzes differences</li>
+</ol>
+<hr />
+<h2 id="the-reconciliation-process">The Reconciliation Process</h2>
+<h3 id="step-1-analysis">Step 1: Analysis</h3>
+<p>Korppi compares:</p>
+<ul>
+<li>Your current document (target)</li>
+<li>The imported document (source)</li>
+</ul>
+<p>It finds all differences and creates patches.</p>
+<h3 id="step-2-review">Step 2: Review</h3>
+<p>New patches appear in the timeline as <strong>pending</strong>.</p>
+<h3 id="step-3-decision">Step 3: Decision</h3>
+<p>For each patch, you can:</p>
+<ul>
+<li><strong>Approve</strong> - Apply the change</li>
+<li><strong>Reject</strong> - Discard the change</li>
+<li><strong>Skip</strong> - Decide later</li>
+</ul>
+<hr />
+<h2 id="types-of-changes">Types of Changes</h2>
+<h3 id="additions">Additions</h3>
+<p>New content added in the source document.</p>
+<ul>
+<li>Shown as green in diff view</li>
+<li>Approving adds the content to your document</li>
+</ul>
+<h3 id="deletions">Deletions</h3>
+<p>Content that was removed in the source.</p>
+<ul>
+<li>Shown as red in diff view</li>
+<li>Approving removes it from your document</li>
+</ul>
+<h3 id="modifications">Modifications</h3>
+<p>Content that was changed.</p>
+<ul>
+<li>Shows both old and new versions</li>
+<li>Approving replaces old with new</li>
+</ul>
+<hr />
+<h2 id="the-diff-preview">The Diff Preview</h2>
+<p>When reviewing a patch:</p>
+<ol type="1">
+<li>Click the patch in the timeline</li>
+<li>View the <strong>Details</strong> panel</li>
+<li>See exactly what changed</li>
+</ol>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode diff"><code class="sourceCode diff"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="st">- The old text was here</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="va">+ The new text replaces it</span></span></code></pre></div>
+<hr />
+<h2 id="bulk-actions">Bulk Actions</h2>
+<p>After reconciliation:</p>
+<ul>
+<li><strong>Approve All</strong> - Accept every pending patch</li>
+<li><strong>Reject All</strong> - Discard every pending patch</li>
+<li><strong>Reset</strong> - Return to state before reconciliation</li>
+</ul>
+<p>⚠️ Use bulk actions carefully!</p>
+<hr />
+<h2 id="conflict-resolution">Conflict Resolution</h2>
+<p>When the same line changed in both documents:</p>
+<ol type="1">
+<li>Korppi detects the conflict</li>
+<li>Both versions are shown</li>
+<li>You choose which to keep (or edit manually)</li>
+</ol>
+<hr />
+<h2 id="line-based-review">Line-Based Review</h2>
+<p>Filter patches by the lines they affect:</p>
+<ol type="1">
+<li>In the timeline, click the line filter</li>
+<li>Enter a range (e.g., 1-50)</li>
+<li>Only patches affecting those lines appear</li>
+</ol>
+<p>Great for reviewing changes to specific sections!</p>
+<hr />
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="before-reconciling">Before Reconciling</h3>
+<ul>
+<li>Save your current document</li>
+<li>Make a backup if the changes are significant</li>
+</ul>
+<h3 id="during-review">During Review</h3>
+<ul>
+<li>Preview each patch before deciding</li>
+<li>Consider the context of changes</li>
+<li>Take your time with complex edits</li>
+</ul>
+<h3 id="after-reconciling">After Reconciling</h3>
+<ul>
+<li>Review your document holistically</li>
+<li>Check that formatting survived</li>
+<li>Save when satisfied</li>
+</ul>
+<hr />
+<h2 id="common-workflows">Common Workflows</h2>
+<h3 id="reviewer-feedback">Reviewer Feedback</h3>
+<ol type="1">
+<li>Send <code>.kmd</code> to reviewer</li>
+<li>They make edits and return it</li>
+<li>Reconcile to import their changes</li>
+<li>Accept/reject each suggestion</li>
+</ol>
+<h3 id="multiple-authors">Multiple Authors</h3>
+<ol type="1">
+<li>Each author works on their copy</li>
+<li>One author imports the other's changes</li>
+<li>Resolve any conflicts</li>
+<li>Share the merged version</li>
+</ol>
+<h3 id="version-recovery">Version Recovery</h3>
+<ol type="1">
+<li>Open your current document</li>
+<li>Reconcile from an old backup</li>
+<li>Cherry-pick the content you need</li>
+</ol>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="timeline.html">Timeline &amp; History</a> - Understanding
+patches</li>
+<li><a href="file-format.html">File Format</a> - About .kmd files</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

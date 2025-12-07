@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Timeline - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" class="current">Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Timeline</h1>
+            </header>
+
+            <article class="content">
+<h1 id="timeline--history">Timeline &amp; History</h1>
+<p>Every change you make is tracked in Korppi's timeline.</p>
+<hr />
+<h2 id="what-is-the-timeline">What is the Timeline?</h2>
+<p>The Timeline is your document's history. It shows:</p>
+<ul>
+<li>Every significant edit as a "patch"</li>
+<li>When changes were made</li>
+<li>What was added, removed, or modified</li>
+</ul>
+<p>Think of it as <strong>version control for writers</strong>.</p>
+<hr />
+<h2 id="the-timeline-panel">The Timeline Panel</h2>
+<p>Find the timeline in the <strong>right sidebar</strong>:</p>
+<pre><code>┌─────────────────────┐
+│  TIMELINE           │
+├─────────────────────┤
+│  Dec 7, 2:30 PM     │
+│  Added introduction │
+│                     │
+│  Dec 7, 2:15 PM     │
+│  Created document   │
+└─────────────────────┘</code></pre>
+<hr />
+<h2 id="understanding-patches">Understanding Patches</h2>
+<h3 id="what-creates-a-patch">What Creates a Patch?</h3>
+<p>Patches are created automatically when you:</p>
+<ul>
+<li>Pause typing for a moment</li>
+<li>Make a significant change</li>
+<li>Switch focus away from the editor</li>
+</ul>
+<h3 id="patch-information">Patch Information</h3>
+<p>Each patch shows:</p>
+<ul>
+<li><strong>Timestamp</strong> - When it was created</li>
+<li><strong>Description</strong> - What changed</li>
+<li><strong>Status</strong> - Pending, approved, or rejected</li>
+<li><strong>Lines affected</strong> - Which parts of the document</li>
+</ul>
+<hr />
+<h2 id="viewing-history">Viewing History</h2>
+<h3 id="preview-a-version">Preview a Version</h3>
+<ol type="1">
+<li>Click any patch in the timeline</li>
+<li>The <strong>Details</strong> panel expands</li>
+<li>Click <strong>Preview</strong> to see that version</li>
+</ol>
+<p>The editor shows the document as it was at that point.</p>
+<h3 id="exit-preview">Exit Preview</h3>
+<p>Click <strong>Exit Preview</strong> or select a different patch to
+return to the current version.</p>
+<hr />
+<h2 id="restoring-versions">Restoring Versions</h2>
+<h3 id="restore-a-past-version">Restore a Past Version</h3>
+<ol type="1">
+<li>Select a patch</li>
+<li>Click <strong>Restore</strong></li>
+<li>Confirm the action</li>
+</ol>
+<p>⚠️ <strong>Warning:</strong> This replaces your current document with
+the historical version!</p>
+<h3 id="what-gets-restored">What Gets Restored</h3>
+<ul>
+<li>Document content at that point</li>
+<li>Formatting and structure</li>
+</ul>
+<h3 id="what-doesnt-get-restored">What Doesn't Get Restored</h3>
+<ul>
+<li>Comments (they maintain their own state)</li>
+<li>Future patches (they're preserved)</li>
+</ul>
+<hr />
+<h2 id="patch-status">Patch Status</h2>
+<h3 id="pending">Pending</h3>
+<p>New patches from reconciliation are "pending" until you review
+them:</p>
+<ul>
+<li><strong>Approve</strong> - Accept the change</li>
+<li><strong>Reject</strong> - Discard the change</li>
+</ul>
+<h3 id="approved">Approved</h3>
+<p>Patches you've accepted. They're part of your document history.</p>
+<h3 id="rejected">Rejected</h3>
+<p>Changes you've declined. They're hidden but not deleted.</p>
+<hr />
+<h2 id="filtering-the-timeline">Filtering the Timeline</h2>
+<h3 id="by-status">By Status</h3>
+<p>Use the dropdown to filter:</p>
+<ul>
+<li><strong>All</strong> - Show everything</li>
+<li><strong>Pending</strong> - Only unreviewed</li>
+<li><strong>Approved</strong> - Only accepted</li>
+</ul>
+<h3 id="by-line-range">By Line Range</h3>
+<p>Filter patches that affect specific lines:</p>
+<ol type="1">
+<li>Open line range filter</li>
+<li>Enter start and end lines</li>
+<li>Only matching patches appear</li>
+</ol>
+<hr />
+<h2 id="sorting-options">Sorting Options</h2>
+<p>Sort patches by:</p>
+<ul>
+<li><strong>Newest First</strong> - Most recent at top</li>
+<li><strong>Oldest First</strong> - Chronological order</li>
+<li><strong>By Line Order</strong> - Sorted by affected lines</li>
+</ul>
+<hr />
+<h2 id="pending-patches-counter">Pending Patches Counter</h2>
+<p>The status bar shows:</p>
+<pre><code>📋 5 patches</code></pre>
+<p>This counts <strong>pending</strong> patches that need review.</p>
+<hr />
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="regular-checkpoints">Regular Checkpoints</h3>
+<ul>
+<li>Save frequently to create restore points</li>
+<li>Major edits create clear patches</li>
+</ul>
+<h3 id="review-pending-patches">Review Pending Patches</h3>
+<ul>
+<li>Check the timeline after reconciliation</li>
+<li>Approve or reject imported changes</li>
+</ul>
+<h3 id="use-preview">Use Preview</h3>
+<ul>
+<li>Always preview before restoring</li>
+<li>Check what you'll lose vs. gain</li>
+</ul>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="reconciliation.html">Reconciliation</a> - Importing
+changes</li>
+<li><a href="comments.html">Comments</a> - Adding review comments</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Export - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" class="current">Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Export</h1>
+            </header>
+
+            <article class="content">
+<h1 id="export-options">Export Options</h1>
+<p>Share your documents in different formats.</p>
+<hr />
+<h2 id="available-formats">Available Formats</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Format</th>
+<th>Extension</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Markdown</td>
+<td><code>.md</code></td>
+<td>Technical docs, GitHub, static sites</td>
+</tr>
+<tr class="even">
+<td>Word</td>
+<td><code>.docx</code></td>
+<td>Business docs, printing, sharing</td>
+</tr>
+<tr class="odd">
+<td>Korppi</td>
+<td><code>.kmd</code></td>
+<td>Native format with full history</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="export-to-markdown">Export to Markdown</h2>
+<ol type="1">
+<li>Click <strong>Export MD</strong> in the sidebar</li>
+<li>Choose a location</li>
+<li>Enter a filename</li>
+<li>Click Save</li>
+</ol>
+<h3 id="whats-exported">What's Exported</h3>
+<ul>
+<li>Full markdown content</li>
+<li>Formatting preserved</li>
+<li>Code blocks with language hints</li>
+</ul>
+<h3 id="whats-not-exported">What's NOT Exported</h3>
+<ul>
+<li>Comments (stripped)</li>
+<li>Timeline history</li>
+<li>Document metadata</li>
+</ul>
+<hr />
+<h2 id="export-to-word-docx">Export to Word (DOCX)</h2>
+<ol type="1">
+<li>Click <strong>Export DOCX</strong> in the sidebar</li>
+<li>Choose a location</li>
+<li>Enter a filename</li>
+<li>Click Save</li>
+</ol>
+<h3 id="formatting-support">Formatting Support</h3>
+<p>✅ Supported:</p>
+<ul>
+<li>Headings (H1-H6)</li>
+<li>Bold, italic, strikethrough</li>
+<li>Lists (bullet and numbered)</li>
+<li>Blockquotes</li>
+<li>Tables</li>
+<li>Code blocks</li>
+<li>Horizontal rules</li>
+<li>Links</li>
+</ul>
+<p>⚠️ Partial/Coming:</p>
+<ul>
+<li>Images (embedded)</li>
+<li>Comments (as Word comments)</li>
+</ul>
+<h3 id="use-cases">Use Cases</h3>
+<ul>
+<li>Sharing with non-technical colleagues</li>
+<li>Printing documents</li>
+<li>Submitting to publishers</li>
+<li>Business reports</li>
+</ul>
+<hr />
+<h2 id="export-warnings">Export Warnings</h2>
+<p>Before exporting, Korppi may warn you about:</p>
+<h3 id="pending-patches">Pending Patches</h3>
+<pre><code>You have 3 pending patches.
+Export anyway?</code></pre>
+<p>Pending patches mean unreviewed changes from reconciliation.</p>
+<h3 id="unresolved-comments">Unresolved Comments</h3>
+<pre><code>You have 5 unresolved comments.
+Export anyway?</code></pre>
+<p>Comments won't appear in exported files.</p>
+<hr />
+<h2 id="tips-for-clean-exports">Tips for Clean Exports</h2>
+<h3 id="before-exporting">Before Exporting</h3>
+<ol type="1">
+<li>Review and resolve pending patches</li>
+<li>Address or resolve comments</li>
+<li>Preview your document</li>
+<li>Check formatting looks correct</li>
+</ol>
+<h3 id="markdown-best-practices">Markdown Best Practices</h3>
+<ul>
+<li>Use consistent heading hierarchy</li>
+<li>Add blank lines between sections</li>
+<li>Preview in a markdown viewer</li>
+</ul>
+<h3 id="word-best-practices">Word Best Practices</h3>
+<ul>
+<li>Test complex tables</li>
+<li>Check code block formatting</li>
+<li>Verify images appear correctly</li>
+</ul>
+<hr />
+<h2 id="the-kmd-format">The .kmd Format</h2>
+<p>When you save normally (Ctrl+S), Korppi uses its native
+<code>.kmd</code> format:</p>
+<h3 id="whats-included">What's Included</h3>
+<ul>
+<li>Complete markdown content</li>
+<li>Full timeline history</li>
+<li>All comments and threads</li>
+<li>Author metadata</li>
+<li>Yjs document state</li>
+</ul>
+<h3 id="file-structure">File Structure</h3>
+<p>A <code>.kmd</code> file is actually a ZIP archive:</p>
+<pre><code>document.kmd/
+├── content.md      # Your markdown
+├── patches.json    # Timeline data
+├── comments.json   # Comments
+├── meta.json       # Document metadata
+└── ystate.bin      # Yjs sync state</code></pre>
+<h3 id="benefits">Benefits</h3>
+<ul>
+<li>Version history travels with the file</li>
+<li>Comments survive transfer</li>
+<li>No external database needed</li>
+</ul>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="file-format.html">File Format</a> - Deep dive into
+.kmd</li>
+<li><a href="timeline.html">Timeline</a> - Understanding history</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-07</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>
