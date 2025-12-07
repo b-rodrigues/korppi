@@ -48,6 +48,17 @@ jobs:
           name: korppi-${{ matrix.system }}-appimage
           path: result/*.AppImage
 
+
+      - name: Build AppImage
+        run: nix build .#packages.${{ matrix.system }}.appimage --accept-flake-config
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: korppi-${{ matrix.system }}-appimage
+          path: result/*.AppImage
+
+
   # ─────────────────────────────────────────────
   # macOS (.dmg)
   # ─────────────────────────────────────────────
