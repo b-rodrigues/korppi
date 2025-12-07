@@ -43,6 +43,9 @@ jobs:
             xdg-utils libglib2.0-bin desktop-file-utils
 
       - name: Build binary
+        env:
+          CARGO_BUILD_JOBS: "2"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "4" 
         run: nix build .#packages.${{ matrix.system }}.korppi-bin --accept-flake-config
 
       - name: Upload binary
