@@ -155,11 +155,6 @@
             export RUST_BACKTRACE=1
             export RUST_LOG=info
 
-            # Add this for macOS
-            env = pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
-              SDKROOT = "${pkgs.apple-sdk_11}/sdks/MacOSX11.3.sdk";
-            };
-
             # Ensure openssl can be found
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
             export OPENSSL_DIR="${pkgs.openssl.dev}"
