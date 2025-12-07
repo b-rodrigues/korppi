@@ -93,6 +93,10 @@ export function initFormattingToolbar(editor) {
             toolbar.appendChild(button);
         }
     });
+
+    // Listen for insert requests from context menu
+    window.addEventListener('insert-table-request', () => insertTableCommand());
+    window.addEventListener('insert-image-request', () => insertImageCommand());
 }
 
 /**

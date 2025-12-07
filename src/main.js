@@ -145,6 +145,20 @@ function updateDocumentUI() {
 
 window.addEventListener("DOMContentLoaded", async () => {
 
+    // Disable default browser context menu globally
+    // (The editor has its own custom context menu)
+    // Ctrl+Right-click allows browser dev menu for debugging
+    document.addEventListener("contextmenu", (e) => {
+        // Ctrl+Right-click: allow browser dev menu for debugging
+        if (e.ctrlKey) return;
+
+        // Allow context menu inside editor (handled by comments-ui.js)
+        if (e.target.closest("#editor")) return;
+
+        // Prevent default browser context menu everywhere else
+        e.preventDefault();
+    });
+
     // 1. Initialize UI Layout Components (sidebars, theme)
     initResizableSidebars();
     initThemeToggle();

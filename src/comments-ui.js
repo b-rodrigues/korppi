@@ -817,14 +817,19 @@ export function initEditorContextMenu() {
     if (!editorEl) return;
 
     editorEl.addEventListener("contextmenu", (e) => {
+        // Ctrl+Right-click: allow browser dev menu
+        if (e.ctrlKey) {
+            return; // Don't prevent default
+        }
+
+        e.preventDefault();
+
         // Check if there's a selection
         const selection = window.getSelection();
         const selectedText = selection?.toString().trim();
 
         if (selectedText && selectedText.length > 0 && editor) {
-            e.preventDefault();
-
-            // Get ProseMirror selection positions
+            // Text selected: show formatting context menu
             editor.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
                 const { from, to } = view.state.selection;
@@ -835,7 +840,195 @@ export function initEditorContextMenu() {
                     text: selectedText
                 });
             });
+        } else if (editor) {
+            // No selection: show insert context menu
+            editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const { from } = view.state.selection;
+
+                showInsertContextMenu(e.clientX, e.clientY, from);
+            });
         }
+    });
+}
+
+/**
+ * Show context menu for inserting content (when no text is selected)
+ */
+function showInsertContextMenu(x, y, cursorPos) {
+    hideContextMenu();
+
+    contextMenu = document.createElement("div");
+    contextMenu.className = "comment-context-menu";
+    contextMenu.innerHTML = `
+        <button class="context-menu-item" data-action="paste">
+            <span class="icon">📋</span>
+            <span class="label">Paste</span>
+            <span class="shortcut">Ctrl+V</span>
+        </button>
+        <button class="context-menu-item" data-action="paste-plain">
+            <span class="icon">📄</span>
+            <span class="label">Paste as Plain Text</span>
+        </button>
+        <div class="context-menu-separator"></div>
+        <button class="context-menu-item" data-action="insert-hr">
+            <span class="icon">―</span>
+            <span class="label">Horizontal Rule</span>
+        </button>
+        <button class="context-menu-item" data-action="insert-table">
+            <span class="icon">▦</span>
+            <span class="label">Insert Table</span>
+        </button>
+        <button class="context-menu-item" data-action="insert-image">
+            <span class="icon">🖼️</span>
+            <span class="label">Insert Image</span>
+        </button>
+        <button class="context-menu-item" data-action="insert-codeblock">
+            <span class="icon">&lt;/&gt;</span>
+            <span class="label">Code Block</span>
+        </button>
+        <div class="context-menu-separator"></div>
+        <button class="context-menu-item" data-action="select-all">
+            <span class="icon">☐</span>
+            <span class="label">Select All</span>
+            <span class="shortcut">Ctrl+A</span>
+        </button>
+    `;
+
+    // Adjust position if too close to edge
+    const menuWidth = 200;
+    const menuHeight = 280;
+    const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
+    const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
+
+    contextMenu.style.left = `${adjustedX}px`;
+    contextMenu.style.top = `${adjustedY}px`;
+    document.body.appendChild(contextMenu);
+
+    // Handle clicks
+    contextMenu.addEventListener("click", async (e) => {
+        const item = e.target.closest('[data-action]');
+        if (!item) return;
+
+        const action = item.dataset.action;
+        hideContextMenu();
+
+        switch (action) {
+            case 'paste':
+                await pasteFromClipboard(false);
+                break;
+            case 'paste-plain':
+                await pasteFromClipboard(true);
+                break;
+            case 'insert-hr':
+                insertHorizontalRule();
+                break;
+            case 'insert-table':
+                // Trigger the table dialog from formatting toolbar
+                window.dispatchEvent(new CustomEvent('insert-table-request'));
+                break;
+            case 'insert-image':
+                window.dispatchEvent(new CustomEvent('insert-image-request'));
+                break;
+            case 'insert-codeblock':
+                insertCodeBlock();
+                break;
+            case 'select-all':
+                selectAllText();
+                break;
+        }
+    });
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener("click", hideContextMenuOnClickOutside);
+    }, 10);
+}
+
+/**
+ * Paste from clipboard
+ */
+async function pasteFromClipboard(plainText) {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text || !editor) return;
+
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from, to } = state.selection;
+
+            const tr = state.tr.insertText(text, from, to);
+            dispatch(tr);
+            view.focus();
+        });
+    } catch (err) {
+        console.error("Failed to paste:", err);
+    }
+}
+
+/**
+ * Insert horizontal rule at cursor
+ */
+function insertHorizontalRule() {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const hrType = state.schema.nodes.hr || state.schema.nodes.horizontal_rule;
+
+        if (!hrType) {
+            console.warn("Horizontal rule node not found");
+            return;
+        }
+
+        const { from } = state.selection;
+        const tr = state.tr.insert(from, hrType.create());
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Insert code block at cursor
+ */
+function insertCodeBlock() {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const codeBlockType = state.schema.nodes.code_block || state.schema.nodes.fence;
+
+        if (!codeBlockType) {
+            console.warn("Code block node not found");
+            return;
+        }
+
+        const { from } = state.selection;
+        const tr = state.tr.insert(from, codeBlockType.create(null, state.schema.text("")));
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Select all text in editor
+ */
+function selectAllText() {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const { doc } = state;
+
+        const tr = state.tr.setSelection(
+            state.selection.constructor.create(doc, 0, doc.content.size)
+        );
+        dispatch(tr);
+        view.focus();
     });
 }
 
