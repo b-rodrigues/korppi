@@ -27,6 +27,7 @@ import { initFormattingToolbar } from "./components/formatting-toolbar.js";
 import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
 import { listComments } from "./comments-service.js";
 import { initWelcomeModal } from "./components/welcome-modal.js";
+import { initSearch } from "./search.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -281,6 +282,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initConflictUI();
     initKeyboardShortcuts();
     initDocumentTabs();
+    initSearch();
 
     // 4. Initialize Recent Documents Panel Buttons
     const newDocumentBtn = document.getElementById("new-document-btn");
