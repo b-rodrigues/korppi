@@ -163,6 +163,15 @@ export function setActiveDocument(id) {
 }
 
 /**
+ * Check if active document has unsaved changes
+ * @returns {boolean} True if document has unsaved changes
+ */
+export function hasUnsavedChanges() {
+    const doc = getActiveDocument();
+    return doc?.modified === true;
+}
+
+/**
  * Get recent documents list
  * @returns {Promise<Array>} List of recent documents
  */

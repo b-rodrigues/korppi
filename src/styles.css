@@ -1180,6 +1180,46 @@ textarea {
     color: var(--danger);
 }
 
+.search-replace-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.search-replace-row #replace-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 12px;
+    min-width: 200px;
+}
+
+.search-replace-row #replace-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.search-action-btn {
+    padding: 5px 10px;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.search-action-btn:hover {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+}
+
 .search-options {
     display: flex;
     gap: 12px;

@@ -28,6 +28,8 @@ import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
 import { listComments } from "./comments-service.js";
 import { initWelcomeModal } from "./components/welcome-modal.js";
 import { initSearch } from "./search.js";
+import { initAutosave } from "./autosave.js";
+import { initWordCount } from "./word-count.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -283,6 +285,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     initKeyboardShortcuts();
     initDocumentTabs();
     initSearch();
+    initAutosave();
+    initWordCount();
 
     // 4. Initialize Recent Documents Panel Buttons
     const newDocumentBtn = document.getElementById("new-document-btn");

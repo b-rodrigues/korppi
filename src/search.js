@@ -6,6 +6,7 @@ import { editor, editorViewCtx, getEditorContent } from "./editor.js";
 let searchState = {
     active: false,
     query: "",
+    replaceText: "",
     isRegex: false,
     caseSensitive: false,
     results: [],
@@ -24,6 +25,12 @@ export function initSearch() {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
             e.preventDefault();
             showSearchPanel();
+        }
+
+        // Ctrl+H for Find & Replace
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "h") {
+            e.preventDefault();
+            showSearchPanel(true); // Show with replace expanded
         }
 
         // Escape to close search
@@ -45,14 +52,20 @@ export function initSearch() {
 
 /**
  * Show the search panel
+ * @param {boolean} showReplace - Whether to show the replace row expanded
  */
-export function showSearchPanel() {
+export function showSearchPanel(showReplace = false) {
     if (searchPanel) {
         // Already visible, focus the input
         const input = searchPanel.querySelector("#search-input");
         if (input) {
             input.focus();
             input.select();
+        }
+        // Toggle replace visibility if requested
+        if (showReplace) {
+            const replaceRow = searchPanel.querySelector(".search-replace-row");
+            if (replaceRow) replaceRow.style.display = "flex";
         }
         return;
     }
@@ -63,11 +76,17 @@ export function showSearchPanel() {
     searchPanel.innerHTML = `
         <div class="search-container">
             <div class="search-input-row">
-                <input type="text" id="search-input" placeholder="Search..." autocomplete="off" />
+                <input type="text" id="search-input" placeholder="Find..." autocomplete="off" />
                 <span id="search-count" class="search-count">0/0</span>
                 <button id="search-prev" class="search-nav-btn" title="Previous (Shift+F3)">▲</button>
                 <button id="search-next" class="search-nav-btn" title="Next (F3)">▼</button>
+                <button id="toggle-replace" class="search-nav-btn" title="Toggle Replace (Ctrl+H)">↔</button>
                 <button id="search-close" class="search-close-btn" title="Close (Esc)">✕</button>
+            </div>
+            <div class="search-replace-row" style="display: ${showReplace ? 'flex' : 'none'};">
+                <input type="text" id="replace-input" placeholder="Replace with..." autocomplete="off" />
+                <button id="replace-one" class="search-action-btn" title="Replace current match">Replace</button>
+                <button id="replace-all" class="search-action-btn" title="Replace all matches">Replace All</button>
             </div>
             <div class="search-options">
                 <label class="search-option">
@@ -96,15 +115,23 @@ export function showSearchPanel() {
 
     // Wire up event handlers
     const input = searchPanel.querySelector("#search-input");
+    const replaceInput = searchPanel.querySelector("#replace-input");
     const regexCheckbox = searchPanel.querySelector("#search-regex");
     const caseCheckbox = searchPanel.querySelector("#search-case");
     const prevBtn = searchPanel.querySelector("#search-prev");
     const nextBtn = searchPanel.querySelector("#search-next");
+    const toggleReplaceBtn = searchPanel.querySelector("#toggle-replace");
+    const replaceOneBtn = searchPanel.querySelector("#replace-one");
+    const replaceAllBtn = searchPanel.querySelector("#replace-all");
     const closeBtn = searchPanel.querySelector("#search-close");
 
     input.addEventListener("input", () => {
         searchState.query = input.value;
         performSearch();
+    });
+
+    replaceInput.addEventListener("input", () => {
+        searchState.replaceText = replaceInput.value;
     });
 
     input.addEventListener("keydown", (e) => {
@@ -131,6 +158,24 @@ export function showSearchPanel() {
     prevBtn.addEventListener("click", navigateToPrevious);
     nextBtn.addEventListener("click", navigateToNext);
     closeBtn.addEventListener("click", hideSearchPanel);
+
+    // Toggle replace row visibility
+    toggleReplaceBtn.addEventListener("click", () => {
+        const replaceRow = searchPanel.querySelector(".search-replace-row");
+        if (replaceRow) {
+            replaceRow.style.display = replaceRow.style.display === "none" ? "flex" : "none";
+        }
+    });
+
+    // Replace current match
+    replaceOneBtn.addEventListener("click", () => {
+        replaceCurrentMatch();
+    });
+
+    // Replace all matches
+    replaceAllBtn.addEventListener("click", () => {
+        replaceAllMatches();
+    });
 
     // Focus input
     setTimeout(() => {
@@ -389,4 +434,93 @@ function updateSearchCount(error = null) {
  */
 export function isSearchActive() {
     return searchState.active;
+}
+
+/**
+ * Replace the current match
+ */
+function replaceCurrentMatch() {
+    if (searchState.results.length === 0 || searchState.currentIndex < 0) return;
+    if (!editor) return;
+
+    const result = searchState.results[searchState.currentIndex];
+    const replaceText = searchState.replaceText;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        // Replace the text at the current match position
+        const tr = state.tr.replaceWith(
+            result.from,
+            result.to,
+            state.schema.text(replaceText)
+        );
+        dispatch(tr);
+
+        // Re-search to update results
+        setTimeout(() => {
+            performSearch();
+            // Navigate to next match (or stay at current position if possible)
+        }, 10);
+    });
+}
+
+/**
+ * Replace all matches
+ */
+function replaceAllMatches() {
+    if (searchState.results.length === 0) return;
+    if (!editor) return;
+
+    const replaceText = searchState.replaceText;
+    const count = searchState.results.length;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        // Replace from end to start to maintain correct positions
+        const sortedResults = [...searchState.results].sort((a, b) => b.from - a.from);
+
+        let tr = state.tr;
+        for (const result of sortedResults) {
+            tr = tr.replaceWith(
+                result.from,
+                result.to,
+                state.schema.text(replaceText)
+            );
+        }
+        dispatch(tr);
+
+        // Clear search and show toast
+        setTimeout(() => {
+            performSearch();
+            showReplaceToast(`Replaced ${count} occurrence${count > 1 ? 's' : ''}`);
+        }, 10);
+    });
+}
+
+/**
+ * Show a toast notification for replace operations
+ */
+function showReplaceToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'search-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        background: var(--bg-sidebar);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1100;
+        box-shadow: var(--shadow-md);
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
 }

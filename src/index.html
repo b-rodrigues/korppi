@@ -24,18 +24,44 @@
         <div class="main-content">
             <!-- Left Sidebar -->
             <aside class="left-sidebar">
-                <!-- Profile Section -->
-                <div class="profile-section">
-                    <button id="profile-button" class="profile-button" title="Profile Settings">
-                        ?
-                    </button>
-                    <div class="profile-info">
-                        <div id="profile-name-display" class="profile-name">Set up profile</div>
+                <!-- Preferences Section -->
+                <div class="sidebar-section preferences-section">
+                    <div class="sidebar-section-title">Preferences</div>
+
+                    <!-- Profile Row -->
+                    <div class="preference-row profile-row">
+                        <button id="profile-button" class="profile-button" title="Profile Settings">
+                            ?
+                        </button>
+                        <div class="profile-info">
+                            <div id="profile-name-display" class="profile-name">Set up profile</div>
+                        </div>
                     </div>
-                    <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
-                        <span class="icon">🌙</span>
-                        <span class="label">Dark</span>
-                    </button>
+
+                    <!-- Theme Toggle -->
+                    <div class="preference-row">
+                        <span class="pref-icon">🎨</span>
+                        <span class="pref-label">Theme</span>
+                        <button id="theme-toggle" class="theme-toggle-compact" title="Toggle theme">
+                            <span class="icon">🌙</span>
+                            <span class="label">Dark</span>
+                        </button>
+                    </div>
+
+                    <!-- Autosave -->
+                    <div class="preference-row">
+                        <label class="config-toggle">
+                            <input type="checkbox" id="autosave-toggle" />
+                            <span class="toggle-label">Autosave</span>
+                        </label>
+                        <select id="autosave-interval" class="compact-select" disabled>
+                            <option value="1">1 min</option>
+                            <option value="2">2 min</option>
+                            <option value="5" selected>5 min</option>
+                            <option value="10">10 min</option>
+                            <option value="15">15 min</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Formatting Toolbar -->
@@ -94,6 +120,24 @@
                             <span class="icon">📄</span>
                             <span class="label">Export DOCX</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Status Bar -->
+                <div class="sidebar-section status-bar-section">
+                    <div class="status-bar-display">
+                        <div class="status-row">
+                            <span id="word-count">0 words</span>
+                            <span class="separator">•</span>
+                            <span id="char-count">0 chars</span>
+                        </div>
+                        <div class="status-row pending-items">
+                            <span id="pending-patches" class="pending-badge" title="Pending patches to review">📋 0
+                                patches</span>
+                            <span class="separator">•</span>
+                            <span id="pending-comments" class="pending-badge" title="Unresolved comments">💬 0
+                                comments</span>
+                        </div>
                     </div>
                 </div>
             </aside>
