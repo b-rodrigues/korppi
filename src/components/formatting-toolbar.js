@@ -20,16 +20,13 @@ export function initFormattingToolbar(editor) {
     if (!toolbar) return;
 
     // Define format buttons
-    // markName = inline mark (toggleMark)
-    // nodeType = block type (setBlockType for headings)
-    // listType = list node (wrapInList for lists)
-    // wrapType = wrapper node (wrapIn for blockquote)
     const buttons = [
         // Inline marks
         { id: 'bold', icon: 'B', title: 'Bold (Ctrl+B)', markName: 'strong' },
         { id: 'italic', icon: 'I', title: 'Italic (Ctrl+I)', markName: 'emphasis', style: 'font-style: italic;' },
         { id: 'strike', icon: 'S', title: 'Strikethrough', markName: 'strike_through', style: 'text-decoration: line-through;' },
         { id: 'code', icon: '`', title: 'Inline Code', markName: 'inlineCode', style: 'font-family: monospace;' },
+        { id: 'clear', icon: '⌀', title: 'Clear Formatting', action: 'clearFormat' },
         { type: 'separator' },
         // Block types (headings)
         { id: 'h1', icon: 'H1', title: 'Heading 1', nodeType: 'heading', attrs: { level: 1 } },
@@ -41,12 +38,16 @@ export function initFormattingToolbar(editor) {
         { id: 'bullet', icon: '•', title: 'Bullet List', listType: 'bullet_list' },
         { id: 'number', icon: '1.', title: 'Numbered List', listType: 'ordered_list' },
         { type: 'separator' },
-        // Wrappers
+        // Wrappers and blocks
         { id: 'quote', icon: '"', title: 'Block Quote', wrapType: 'blockquote' },
         { id: 'codeblock', icon: '<>', title: 'Code Block', nodeType: 'code_block' },
+        { id: 'hr', icon: '—', title: 'Horizontal Rule', action: 'insertHr' },
         { type: 'separator' },
-        // Link (special handling)
+        // Insert elements
         { id: 'link', icon: '🔗', title: 'Insert Link', action: 'link' },
+        { id: 'image', icon: '🖼️', title: 'Insert Image', action: 'image' },
+        { id: 'table', icon: '⊞', title: 'Insert Table', action: 'table' },
+        { id: 'break', icon: '↵', title: 'Hard Break', action: 'hardbreak' },
     ];
 
     toolbar.innerHTML = '';
@@ -65,7 +66,7 @@ export function initFormattingToolbar(editor) {
 
             // Use mousedown to prevent stealing focus from editor
             button.addEventListener('mousedown', (e) => {
-                e.preventDefault(); // Prevent focus change
+                e.preventDefault();
 
                 if (btn.markName) {
                     toggleMarkCommand(btn.markName);
@@ -77,6 +78,16 @@ export function initFormattingToolbar(editor) {
                     wrapInCommand(btn.wrapType);
                 } else if (btn.action === 'link') {
                     insertLinkCommand();
+                } else if (btn.action === 'image') {
+                    insertImageCommand();
+                } else if (btn.action === 'table') {
+                    insertTableCommand();
+                } else if (btn.action === 'hardbreak') {
+                    insertHardBreakCommand();
+                } else if (btn.action === 'insertHr') {
+                    insertHorizontalRuleCommand();
+                } else if (btn.action === 'clearFormat') {
+                    clearFormattingCommand();
                 }
             });
 
@@ -86,7 +97,7 @@ export function initFormattingToolbar(editor) {
 }
 
 /**
- * Toggle a mark (bold, italic, etc.) using ProseMirror's toggleMark command
+ * Toggle a mark (bold, italic, etc.)
  */
 function toggleMarkCommand(markName) {
     if (!editorInstance) return;
@@ -119,16 +130,13 @@ function setBlockTypeCommand(nodeTypeName, attrs = {}) {
         const nodeType = state.schema.nodes[nodeTypeName];
         if (!nodeType) {
             console.warn(`Node type "${nodeTypeName}" not found in schema`);
-            console.log("Available nodes:", Object.keys(state.schema.nodes));
             return;
         }
 
-        // Check if we're already in this block type - if so, convert to paragraph
         const { $from } = state.selection;
         const currentNode = $from.parent;
 
         if (nodeTypeName === 'heading' && currentNode.type.name === 'heading' && currentNode.attrs.level === attrs.level) {
-            // Already a heading of this level - convert to paragraph
             const paragraphType = state.schema.nodes.paragraph;
             if (paragraphType) {
                 setBlockType(paragraphType)(state, dispatch);
@@ -152,15 +160,12 @@ function toggleListCommand(listTypeName) {
         const { state, dispatch } = view;
 
         const listType = state.schema.nodes[listTypeName];
-        const listItemType = state.schema.nodes.listItem;
 
         if (!listType) {
             console.warn(`List type "${listTypeName}" not found in schema`);
-            console.log("Available nodes:", Object.keys(state.schema.nodes));
             return;
         }
 
-        // Check if we're already in a list - if so, lift out
         const { $from } = state.selection;
         let inList = false;
         for (let d = $from.depth; d > 0; d--) {
@@ -171,10 +176,8 @@ function toggleListCommand(listTypeName) {
         }
 
         if (inList) {
-            // Already in this list type - lift out
             lift(state, dispatch);
         } else {
-            // Wrap in list
             wrapInList(listType)(state, dispatch);
         }
 
@@ -195,11 +198,9 @@ function wrapInCommand(wrapTypeName) {
         const wrapType = state.schema.nodes[wrapTypeName];
         if (!wrapType) {
             console.warn(`Node type "${wrapTypeName}" not found in schema`);
-            console.log("Available nodes:", Object.keys(state.schema.nodes));
             return;
         }
 
-        // Check if we're already in a blockquote - if so, lift out
         const { $from } = state.selection;
         let inWrap = false;
         for (let d = $from.depth; d > 0; d--) {
@@ -229,7 +230,6 @@ function insertLinkCommand() {
         const view = ctx.get(editorViewCtx);
         const { state, dispatch } = view;
 
-        // Check if there's a selection
         const { from, to } = state.selection;
         if (from === to) {
             alert("Please select some text to create a link");
@@ -237,14 +237,12 @@ function insertLinkCommand() {
             return;
         }
 
-        // Prompt for URL
         const url = prompt("Enter URL:");
         if (!url) {
             view.focus();
             return;
         }
 
-        // Get the link mark type
         const linkType = state.schema.marks.link;
         if (!linkType) {
             console.warn("Link mark type not found in schema");
@@ -252,8 +250,260 @@ function insertLinkCommand() {
             return;
         }
 
-        // Apply link mark to selection
         const tr = state.tr.addMark(from, to, linkType.create({ href: url }));
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Insert image - prompts for URL and alt text
+ */
+function insertImageCommand() {
+    if (!editorInstance) return;
+
+    editorInstance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        const url = prompt("Enter image URL:");
+        if (!url) {
+            view.focus();
+            return;
+        }
+
+        const alt = prompt("Enter alt text (optional):", "") || "";
+
+        const imageType = state.schema.nodes.image;
+        if (!imageType) {
+            console.warn("Image node type not found in schema");
+            view.focus();
+            return;
+        }
+
+        const { from } = state.selection;
+        const imageNode = imageType.create({ src: url, alt: alt });
+        const tr = state.tr.insert(from, imageNode);
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Insert a table - shows dialog for rows/columns
+ */
+function insertTableCommand() {
+    if (!editorInstance) return;
+
+    // Show table dialog
+    showTableDialog((numRows, numCols) => {
+        editorInstance.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from } = state.selection;
+            const schema = state.schema;
+
+            // Get table node types from schema
+            const tableType = schema.nodes.table;
+            const tableRowType = schema.nodes.table_row;
+            const tableHeaderRowType = schema.nodes.table_header_row;
+            const tableCellType = schema.nodes.table_cell;
+            const tableHeaderType = schema.nodes.table_header;
+            const paragraphType = schema.nodes.paragraph;
+
+            if (!tableType || !tableRowType || !tableCellType) {
+                console.warn("Table node types not found in schema");
+                alert("Table insertion not supported in current editor configuration");
+                view.focus();
+                return;
+            }
+
+            // Helper to create cell content (paragraph with text)
+            const createCellContent = (text) => {
+                if (paragraphType) {
+                    return paragraphType.create(null, text ? schema.text(text) : null);
+                }
+                return text ? schema.text(text) : null;
+            };
+
+            // Build table rows
+            const rows = [];
+
+            // Header row
+            const headerCellType = tableHeaderType || tableCellType;
+            const headerCells = [];
+            for (let c = 0; c < numCols; c++) {
+                headerCells.push(headerCellType.create(null, createCellContent(`Header ${c + 1}`)));
+            }
+            const headerRowNodeType = tableHeaderRowType || tableRowType;
+            rows.push(headerRowNodeType.create(null, headerCells));
+
+            // Data rows
+            for (let r = 1; r < numRows; r++) {
+                const cells = [];
+                for (let c = 0; c < numCols; c++) {
+                    const cellNum = (r - 1) * numCols + c + 1;
+                    cells.push(tableCellType.create(null, createCellContent(`Cell ${cellNum}`)));
+                }
+                rows.push(tableRowType.create(null, cells));
+            }
+
+            // Create table node
+            const tableNode = tableType.create(null, rows);
+
+            // Insert the table
+            const tr = state.tr.insert(from, tableNode);
+            dispatch(tr);
+            view.focus();
+        });
+    });
+}
+
+/**
+ * Show table dialog for rows/columns
+ */
+function showTableDialog(callback) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 280px;">
+            <div class="modal-header">
+                <h2>Insert Table</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="table-rows">Rows (including header):</label>
+                    <input type="number" id="table-rows" min="2" max="20" value="3" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="table-cols">Columns:</label>
+                    <input type="number" id="table-cols" min="1" max="10" value="3" style="width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="table-cancel" class="btn-secondary">Cancel</button>
+                <button id="table-insert" class="btn-primary">Insert</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const rowsInput = overlay.querySelector('#table-rows');
+    const colsInput = overlay.querySelector('#table-cols');
+    const insertBtn = overlay.querySelector('#table-insert');
+    const cancelBtn = overlay.querySelector('#table-cancel');
+
+    // Focus rows input
+    rowsInput.focus();
+    rowsInput.select();
+
+    const cleanup = () => {
+        document.body.removeChild(overlay);
+    };
+
+    insertBtn.addEventListener('click', () => {
+        const rows = parseInt(rowsInput.value) || 3;
+        const cols = parseInt(colsInput.value) || 3;
+        cleanup();
+        callback(Math.max(2, Math.min(20, rows)), Math.max(1, Math.min(10, cols)));
+    });
+
+    cancelBtn.addEventListener('click', cleanup);
+
+    // Handle Enter key
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            insertBtn.click();
+        } else if (e.key === 'Escape') {
+            cleanup();
+        }
+    };
+
+    rowsInput.addEventListener('keydown', handleKeydown);
+    colsInput.addEventListener('keydown', handleKeydown);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup();
+    });
+}
+
+
+/**
+ * Insert hard break (line break within paragraph)
+ */
+function insertHardBreakCommand() {
+    if (!editorInstance) return;
+
+    editorInstance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        const hardbreakType = state.schema.nodes.hardbreak;
+        if (!hardbreakType) {
+            console.warn("Hardbreak node type not found in schema");
+            view.focus();
+            return;
+        }
+
+        const { from } = state.selection;
+        const tr = state.tr.insert(from, hardbreakType.create());
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Insert horizontal rule
+ */
+function insertHorizontalRuleCommand() {
+    if (!editorInstance) return;
+
+    editorInstance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        const hrType = state.schema.nodes.hr;
+        if (!hrType) {
+            console.warn("HR node type not found in schema");
+            view.focus();
+            return;
+        }
+
+        const { from } = state.selection;
+        const tr = state.tr.insert(from, hrType.create());
+        dispatch(tr);
+        view.focus();
+    });
+}
+
+/**
+ * Clear all marks from selection
+ */
+function clearFormattingCommand() {
+    if (!editorInstance) return;
+
+    editorInstance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+
+        const { from, to } = state.selection;
+        if (from === to) {
+            view.focus();
+            return;
+        }
+
+        // Remove all marks from selection
+        let tr = state.tr;
+        for (const markName of Object.keys(state.schema.marks)) {
+            const markType = state.schema.marks[markName];
+            tr = tr.removeMark(from, to, markType);
+        }
         dispatch(tr);
         view.focus();
     });
