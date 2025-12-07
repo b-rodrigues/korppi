@@ -2,8 +2,9 @@
 // Real-time word, character, and pending items count
 
 import { getEditorContent } from "./editor.js";
-import { fetchPatchList } from "./timeline.js";
+import { fetchPatchList, hasSnapshotContent } from "./timeline.js";
 import { listComments } from "./comments-service.js";
+import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 
 let updateTimeout = null;
 let pendingUpdateTimeout = null;
@@ -12,23 +13,30 @@ let pendingUpdateTimeout = null;
  * Initialize word count and status bar functionality
  */
 export function initWordCount() {
-    // Initial update
+    // Initial update (may be 0 if no document open yet)
     updateWordCount();
     updatePendingCounts();
 
-    // Listen for content changes
+    // Listen for content changes (typing)
     window.addEventListener("markdown-updated", () => {
         // Debounce updates
         if (updateTimeout) clearTimeout(updateTimeout);
         updateTimeout = setTimeout(updateWordCount, 300);
     });
 
-    // Also update on document change
-    window.addEventListener("document-changed", () => {
-        setTimeout(() => {
+    // Listen for document changes via document-manager (most reliable)
+    onDocumentChange((event, doc) => {
+        // Update immediately when a document is opened or switched
+        if (event === "open" || event === "activeChange" || event === "new") {
             updateWordCount();
             updatePendingCounts();
-        }, 100);
+        }
+    });
+
+    // Also listen for window event as backup
+    window.addEventListener("document-changed", () => {
+        updateWordCount();
+        updatePendingCounts();
     });
 
     // Listen for timeline/comment updates
@@ -84,10 +92,31 @@ async function updatePendingCounts() {
     const patchesEl = document.getElementById("pending-patches");
     const commentsEl = document.getElementById("pending-comments");
 
+    // Check if there's an active document
+    const docId = getActiveDocumentId();
+
+    if (!docId) {
+        // No document open - reset counters to 0
+        if (patchesEl) {
+            patchesEl.textContent = "📋 0 patches";
+            patchesEl.classList.remove("has-pending");
+            patchesEl.title = "No document open";
+        }
+        if (commentsEl) {
+            commentsEl.textContent = "💬 0 comments";
+            commentsEl.classList.remove("has-pending");
+            commentsEl.title = "No document open";
+        }
+        return;
+    }
+
     // Update pending patches
     try {
         const patches = await fetchPatchList();
-        const pendingPatches = patches.filter(p => p.review_status === "pending");
+
+        // Filter to only patches with snapshots (same as timeline)
+        const validPatches = patches.filter(p => hasSnapshotContent(p));
+        const pendingPatches = validPatches.filter(p => p.review_status === "pending");
         const count = pendingPatches.length;
 
         if (patchesEl) {

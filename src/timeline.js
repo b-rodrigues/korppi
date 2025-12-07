@@ -32,7 +32,7 @@ export async function fetchPatch(id) {
 /**
  * Check if a patch has snapshot content available for restoration
  */
-function hasSnapshotContent(patch) {
+export function hasSnapshotContent(patch) {
     if (!patch || !patch.data) return false;
     // The snapshot field contains the text content - use optional chaining for safety
     const snapshot = patch.data?.snapshot;
