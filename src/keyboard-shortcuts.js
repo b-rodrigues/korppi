@@ -1,14 +1,16 @@
 // src/keyboard-shortcuts.js
 // Keyboard shortcuts for document operations
 
-import { 
-    newDocument, 
-    openDocument, 
-    saveDocument, 
+import {
+    newDocument,
+    openDocument,
+    saveDocument,
     closeDocument,
-    getActiveDocumentId 
+    getActiveDocumentId,
+    getOpenDocuments
 } from "./document-manager.js";
 import { switchToNextTab, switchToPreviousTab } from "./document-tabs.js";
+import { doUndo, doRedo } from "./editor.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
 
 /**
@@ -25,9 +27,9 @@ export function initKeyboardShortcuts() {
 async function handleKeyDown(e) {
     // Check for Ctrl (Windows/Linux) or Cmd (Mac)
     const isMod = e.ctrlKey || e.metaKey;
-    
+
     if (!isMod) return;
-    
+
     switch (e.key.toLowerCase()) {
         case "n":
             // Ctrl/Cmd + N: New document
@@ -38,7 +40,7 @@ async function handleKeyDown(e) {
                 console.error("Failed to create new document:", err);
             }
             break;
-            
+
         case "o":
             // Ctrl/Cmd + O: Open document
             e.preventDefault();
@@ -50,7 +52,7 @@ async function handleKeyDown(e) {
                 }
             }
             break;
-            
+
         case "s":
             // Ctrl/Cmd + S: Save document
             // Ctrl/Cmd + Shift + S: Save As
@@ -61,7 +63,7 @@ async function handleKeyDown(e) {
                     console.warn("No active document to save");
                     return;
                 }
-                
+
                 if (e.shiftKey) {
                     // Save As - pass null to trigger the save dialog
                     // For a true "Save As", we need to pass a special indicator
@@ -77,7 +79,7 @@ async function handleKeyDown(e) {
                 }
             }
             break;
-            
+
         case "w":
             // Ctrl/Cmd + W: Close document
             e.preventDefault();
@@ -87,7 +89,7 @@ async function handleKeyDown(e) {
                     console.warn("No active document to close");
                     return;
                 }
-                
+
                 // Try to close, will return false if unsaved changes
                 const closed = await closeDocument(activeId, false);
                 if (!closed) {
@@ -95,7 +97,7 @@ async function handleKeyDown(e) {
                     const { getOpenDocuments } = await import("./document-manager.js");
                     const docs = getOpenDocuments();
                     const doc = docs.get(activeId);
-                    
+
                     const result = await confirm(
                         `Save changes to "${doc?.title || 'Untitled'}" before closing?`,
                         {
@@ -103,7 +105,7 @@ async function handleKeyDown(e) {
                             kind: "warning",
                         }
                     );
-                    
+
                     if (result) {
                         // Save then close
                         await saveDocument(activeId);
@@ -115,7 +117,19 @@ async function handleKeyDown(e) {
                 console.error("Failed to close document:", err);
             }
             break;
-            
+
+        case "z":
+            // Ctrl/Cmd + Z: Undo
+            e.preventDefault();
+            doUndo();
+            break;
+
+        case "y":
+            // Ctrl/Cmd + Y: Redo (Microsoft Word style)
+            e.preventDefault();
+            doRedo();
+            break;
+
         case "tab":
             // Ctrl/Cmd + Tab: Switch to next tab
             // Ctrl/Cmd + Shift + Tab: Switch to previous tab

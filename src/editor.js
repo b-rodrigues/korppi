@@ -7,7 +7,7 @@ import { commonmark } from "@milkdown/preset-commonmark";
 export { editorViewCtx };
 
 import { Plugin } from "@milkdown/prose/state";
-import { ySyncPlugin, yUndoPlugin } from "y-prosemirror";
+import { ySyncPlugin, yUndoPlugin, undo, redo } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
 
 import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence, switchDocument, loadDocumentState } from "./yjs-setup.js";
@@ -52,6 +52,30 @@ export function getMarkdown() {
         });
     }
     return markdown;
+}
+
+/**
+ * Undo the last change (uses Yjs undo stack).
+ */
+export function doUndo() {
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            undo(view.state, view.dispatch);
+        });
+    }
+}
+
+/**
+ * Redo the last undone change (uses Yjs redo stack).
+ */
+export function doRedo() {
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            redo(view.state, view.dispatch);
+        });
+    }
 }
 
 export async function initEditor() {

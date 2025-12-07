@@ -46,6 +46,23 @@
                     </div>
                 </div>
 
+                <!-- Edit Actions -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Edit</div>
+                    <div class="action-buttons">
+                        <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)">
+                            <span class="icon">↶</span>
+                            <span class="label">Undo</span>
+                            <span class="shortcut">Ctrl+Z</span>
+                        </button>
+                        <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)">
+                            <span class="icon">↷</span>
+                            <span class="label">Redo</span>
+                            <span class="shortcut">Ctrl+Y</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Document Actions -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Document</div>
@@ -226,6 +243,23 @@
                     <span>Don't show this again</span>
                 </label>
                 <button id="welcome-close-btn" class="btn-text">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Confirmation Modal -->
+    <div id="save-confirm-modal" class="modal" style="display: none;">
+        <div class="modal-content save-confirm-modal-content">
+            <div class="modal-header">
+                <h2>⚠️ Unsaved Changes</h2>
+            </div>
+            <div class="modal-body">
+                <p id="save-confirm-message">Do you want to save your changes?</p>
+            </div>
+            <div class="modal-footer save-confirm-buttons">
+                <button id="save-confirm-save-btn" class="btn-primary">Save</button>
+                <button id="save-confirm-dontsave-btn" class="btn-secondary">Don't Save</button>
+                <button id="save-confirm-cancel-btn" class="btn-text">Cancel</button>
             </div>
         </div>
     </div>

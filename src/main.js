@@ -1,9 +1,11 @@
-import { initEditor, getMarkdown } from "./editor.js";
+import { initEditor, getMarkdown, doUndo, doRedo } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 import { exportAsMarkdown, exportAsDocx } from "./kmd-service.js";
 import { forceSave } from "./yjs-setup.js";
 import { startReconciliation } from "./reconcile.js";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { showSaveConfirmModal } from "./components/save-confirm-modal.js";
 import {
     initDocumentManager,
     newDocument,
@@ -159,6 +161,16 @@ window.addEventListener("DOMContentLoaded", async () => {
     const exportMdBtn = document.getElementById("export-md-btn");
     const exportDocxBtn = document.getElementById("export-docx-btn");
     const newTabBtn = document.getElementById("new-tab-btn");
+    const undoBtn = document.getElementById("undo-btn");
+    const redoBtn = document.getElementById("redo-btn");
+
+    // Wire up Undo/Redo buttons
+    if (undoBtn) {
+        undoBtn.addEventListener("click", () => doUndo());
+    }
+    if (redoBtn) {
+        redoBtn.addEventListener("click", () => doRedo());
+    }
 
     if (newDocBtn) {
         newDocBtn.addEventListener("click", async () => {
@@ -322,4 +334,74 @@ window.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }
+
+    // 9. Handle window close with unsaved changes prompt
+    const appWindow = getCurrentWindow();
+    await appWindow.onCloseRequested(async (event) => {
+        // Check for any unsaved documents
+        const docs = getOpenDocuments();
+        const unsavedDocs = Array.from(docs.values()).filter(d => d.is_modified);
+
+        if (unsavedDocs.length > 0) {
+            // Prevent default close - we'll handle it
+            event.preventDefault();
+
+            // Build message based on number of unsaved docs
+            const docNames = unsavedDocs.map(d => d.title).join('", "');
+            const message = unsavedDocs.length === 1
+                ? `Do you want to save changes to "${unsavedDocs[0].title}"?`
+                : `Do you want to save changes to ${unsavedDocs.length} documents?\n"${docNames}"`;
+
+            // Show custom modal with Save / Don't Save / Cancel buttons
+            const result = await showSaveConfirmModal(message);
+            console.log("Save modal result:", result);
+
+            if (result === 'cancel') {
+                // User clicked Cancel - return to app without doing anything
+                console.log("User cancelled quit");
+                return;
+            }
+
+            if (result === 'save') {
+                // User clicked "Save" - save all documents then quit
+                try {
+                    for (const doc of unsavedDocs) {
+                        await saveDocument(doc.id);
+                    }
+                    console.log("All documents saved");
+                } catch (err) {
+                    console.error("Failed to save documents:", err);
+                    // If save fails, don't close - let user try again
+                    return;
+                }
+            }
+            // result === 'dontsave' means quit without saving
+            console.log("Proceeding to quit...");
+
+            // Force save Yjs internal state
+            try {
+                await forceSave();
+                console.log("Yjs state saved");
+            } catch (err) {
+                console.error("Failed to save Yjs state:", err);
+            }
+
+            // Now close the window
+            console.log("Destroying window...");
+            try {
+                await appWindow.destroy();
+            } catch (err) {
+                console.error("Failed to destroy window:", err);
+                // Try close as fallback
+                await appWindow.close();
+            }
+        } else {
+            // No unsaved changes, just save Yjs state
+            try {
+                await forceSave();
+            } catch (err) {
+                console.error("Failed to save Yjs state:", err);
+            }
+        }
+    });
 });

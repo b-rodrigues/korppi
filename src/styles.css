@@ -424,6 +424,43 @@ textarea {
     color: var(--text-primary);
 }
 
+/* ===== SAVE CONFIRM MODAL ===== */
+.save-confirm-modal-content {
+    max-width: 400px;
+}
+
+.save-confirm-modal-content .modal-header h2 {
+    color: var(--warning);
+}
+
+.save-confirm-modal-content .modal-body p {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.save-confirm-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.save-confirm-buttons .btn-primary {
+    min-width: 80px;
+}
+
+.save-confirm-buttons .btn-secondary {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+.save-confirm-buttons .btn-secondary:hover {
+    opacity: 0.9;
+    background: var(--danger);
+    color: white;
+}
+
 /* ===== FORM ===== */
 .form-group {
     margin-bottom: 16px;
