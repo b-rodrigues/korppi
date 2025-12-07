@@ -30,10 +30,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v9
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v4
+        uses: DeterminateSystems/determinate-nix-action@v3
 
       - name: Build AppImage
         env:
@@ -58,8 +55,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - system: x86_64-darwin
-            runner: macos-13
           - system: aarch64-darwin
             runner: macos-latest
 
@@ -69,10 +64,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v9
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v4
+        uses: DeterminateSystems/determinate-nix-action@v3
 
       - name: Build .dmg
         run: |
