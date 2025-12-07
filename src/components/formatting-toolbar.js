@@ -14,7 +14,6 @@ let editorInstance = null;
  */
 export function initFormattingToolbar(editor) {
     editorInstance = editor;
-    console.log("Formatting toolbar initialized with editor:", !!editor);
 
     const toolbar = document.querySelector('.format-toolbar');
     if (!toolbar) return;

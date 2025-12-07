@@ -323,3 +323,143 @@ pub fn restore_comment(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        init_comments_table(&conn).unwrap();
+        conn
+    }
+
+    fn insert_test_comment(conn: &Connection, author: &str, content: &str) -> i64 {
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            r#"INSERT INTO comments (timestamp, author, author_color, start_anchor, end_anchor, selected_text, content)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
+            params![timestamp, author, "#ff0000", "anchor_start", "anchor_end", "selected", content],
+        ).unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn test_init_comments_table() {
+        let conn = Connection::open_in_memory().unwrap();
+        let result = init_comments_table(&conn);
+        assert!(result.is_ok());
+
+        // Verify table exists
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='comments'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_insert_comment() {
+        let conn = create_test_db();
+        let id = insert_test_comment(&conn, "TestUser", "Test comment");
+        assert!(id > 0);
+    }
+
+    #[test]
+    fn test_comment_default_status() {
+        let conn = create_test_db();
+        let id = insert_test_comment(&conn, "TestUser", "Test comment");
+
+        let status: String = conn
+            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(status, "unresolved");
+    }
+
+    #[test]
+    fn test_resolve_comment() {
+        let conn = create_test_db();
+        let id = insert_test_comment(&conn, "TestUser", "Test comment");
+
+        conn.execute("UPDATE comments SET status = 'resolved' WHERE id = ?1", params![id]).unwrap();
+
+        let status: String = conn
+            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(status, "resolved");
+    }
+
+    #[test]
+    fn test_mark_deleted() {
+        let conn = create_test_db();
+        let id = insert_test_comment(&conn, "TestUser", "Test comment");
+
+        conn.execute("UPDATE comments SET status = 'deleted' WHERE id = ?1", params![id]).unwrap();
+
+        let status: String = conn
+            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(status, "deleted");
+    }
+
+    #[test]
+    fn test_restore_comment() {
+        let conn = create_test_db();
+        let id = insert_test_comment(&conn, "TestUser", "Test comment");
+
+        // Delete then restore
+        conn.execute("UPDATE comments SET status = 'deleted' WHERE id = ?1", params![id]).unwrap();
+        conn.execute("UPDATE comments SET status = 'unresolved' WHERE id = ?1", params![id]).unwrap();
+
+        let status: String = conn
+            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(status, "unresolved");
+    }
+
+    #[test]
+    fn test_comment_with_reply() {
+        let conn = create_test_db();
+        let parent_id = insert_test_comment(&conn, "Author1", "Parent comment");
+
+        // Insert reply
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            r#"INSERT INTO comments (timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, parent_id)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            params![timestamp, "Author2", "#00ff00", "anchor_start", "anchor_end", "selected", "Reply", parent_id],
+        ).unwrap();
+        let reply_id = conn.last_insert_rowid();
+
+        // Verify parent_id is set
+        let fetched_parent: Option<i64> = conn
+            .query_row("SELECT parent_id FROM comments WHERE id = ?1", params![reply_id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fetched_parent, Some(parent_id));
+    }
+
+    #[test]
+    fn test_delete_cascades_to_replies() {
+        let conn = create_test_db();
+        let parent_id = insert_test_comment(&conn, "Author1", "Parent");
+
+        // Add reply
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            r#"INSERT INTO comments (timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, parent_id)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            params![timestamp, "Author2", "#00ff00", "a", "b", "s", "Reply", parent_id],
+        ).unwrap();
+
+        // Mark parent as deleted (should cascade)
+        conn.execute(
+            "UPDATE comments SET status = 'deleted' WHERE id = ?1 OR parent_id = ?1",
+            params![parent_id],
+        ).unwrap();
+
+        // Both should be deleted
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM comments WHERE status = 'deleted'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+}

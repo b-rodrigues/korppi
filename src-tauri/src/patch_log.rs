@@ -8,15 +8,16 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 use zip::ZipArchive;
 
-fn db_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path().app_data_dir().unwrap();
+fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let mut path = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     std::fs::create_dir_all(&path).ok();
     path.push("korppi_history.db");
-    path
+    Ok(path)
 }
 
 fn get_conn(app: &AppHandle) -> Result<Connection, String> {
-    let path = db_path(app);
+    let path = db_path(app)?;
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
     conn.execute_batch(
         r#"

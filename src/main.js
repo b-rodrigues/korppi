@@ -354,11 +354,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 
             // Show custom modal with Save / Don't Save / Cancel buttons
             const result = await showSaveConfirmModal(message);
-            console.log("Save modal result:", result);
 
             if (result === 'cancel') {
                 // User clicked Cancel - return to app without doing anything
-                console.log("User cancelled quit");
                 return;
             }
 
@@ -368,7 +366,6 @@ window.addEventListener("DOMContentLoaded", async () => {
                     for (const doc of unsavedDocs) {
                         await saveDocument(doc.id);
                     }
-                    console.log("All documents saved");
                 } catch (err) {
                     console.error("Failed to save documents:", err);
                     // If save fails, don't close - let user try again
@@ -376,18 +373,15 @@ window.addEventListener("DOMContentLoaded", async () => {
                 }
             }
             // result === 'dontsave' means quit without saving
-            console.log("Proceeding to quit...");
 
             // Force save Yjs internal state
             try {
                 await forceSave();
-                console.log("Yjs state saved");
             } catch (err) {
                 console.error("Failed to save Yjs state:", err);
             }
 
             // Now close the window
-            console.log("Destroying window...");
             try {
                 await appWindow.destroy();
             } catch (err) {

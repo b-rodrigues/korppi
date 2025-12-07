@@ -140,29 +140,32 @@ pub struct SyncState {
 }
 
 /// Get the path to the Yjs document file
-fn get_yjs_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path().app_data_dir().unwrap();
+fn get_yjs_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let mut path = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("document.yjs");
-    path
+    Ok(path)
 }
 
 /// Get the path to the history database
-fn get_history_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path().app_data_dir().unwrap();
+fn get_history_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let mut path = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("korppi_history.db");
-    path
+    Ok(path)
 }
 
 /// Get the path to the document metadata file
-fn get_meta_path(app: &AppHandle) -> PathBuf {
-    let mut path = app.path().app_data_dir().unwrap();
+fn get_meta_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let mut path = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("document_meta.json");
-    path
+    Ok(path)
 }
 
 /// Load or create document metadata
 fn load_or_create_meta(app: &AppHandle) -> Result<DocumentMeta, String> {
-    let meta_path = get_meta_path(app);
+    let meta_path = get_meta_path(app)?;
     if meta_path.exists() {
         let content = fs::read_to_string(&meta_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&content).map_err(|e| e.to_string())
@@ -173,7 +176,7 @@ fn load_or_create_meta(app: &AppHandle) -> Result<DocumentMeta, String> {
 
 /// Save document metadata
 fn save_meta(app: &AppHandle, meta: &DocumentMeta) -> Result<(), String> {
-    let meta_path = get_meta_path(app);
+    let meta_path = get_meta_path(app)?;
     let content = serde_json::to_string_pretty(meta).map_err(|e| e.to_string())?;
     fs::write(&meta_path, content).map_err(|e| e.to_string())
 }
@@ -251,8 +254,8 @@ pub fn is_path_safe(path: &str) -> bool {
 /// Export the current document as a KMD file
 #[tauri::command]
 pub fn export_kmd(app: AppHandle, path: String) -> Result<DocumentMeta, String> {
-    let yjs_path = get_yjs_path(&app);
-    let history_path = get_history_path(&app);
+    let yjs_path = get_yjs_path(&app)?;
+    let history_path = get_history_path(&app)?;
 
     // Load or create document metadata
     let mut meta = load_or_create_meta(&app)?;
@@ -493,8 +496,8 @@ pub fn import_kmd(app: AppHandle, path: String) -> Result<DocumentMeta, String> 
         serde_json::from_str(&content).map_err(|e| format!("Invalid meta.json: {}", e))?
     };
 
-    let yjs_path = get_yjs_path(&app);
-    let history_path = get_history_path(&app);
+    let yjs_path = get_yjs_path(&app)?;
+    let history_path = get_history_path(&app)?;
 
     // Ensure app data directory exists
     if let Some(parent) = yjs_path.parent() {

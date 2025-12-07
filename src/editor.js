@@ -59,14 +59,11 @@ export function getMarkdown() {
  * Undo the last change (uses Yjs undo stack).
  */
 export function doUndo() {
-    console.log("doUndo called, editor:", !!editor);
     if (editor) {
         try {
             editor.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
-                console.log("Undo - got view:", !!view);
-                const result = undo(view.state, view.dispatch);
-                console.log("Undo result:", result);
+                undo(view.state, view.dispatch);
             });
         } catch (err) {
             console.error("Undo error:", err);
@@ -78,20 +75,18 @@ export function doUndo() {
  * Redo the last undone change (uses Yjs redo stack).
  */
 export function doRedo() {
-    console.log("doRedo called, editor:", !!editor);
     if (editor) {
         try {
             editor.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
-                console.log("Redo - got view:", !!view);
-                const result = redo(view.state, view.dispatch);
-                console.log("Redo result:", result);
+                redo(view.state, view.dispatch);
             });
         } catch (err) {
             console.error("Redo error:", err);
         }
     }
 }
+
 
 export async function initEditor() {
     try {
