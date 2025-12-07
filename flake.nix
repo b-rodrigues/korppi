@@ -27,20 +27,21 @@
           ];
         };
 
-        # Platform-specific system libraries
-        darwinDeps = with pkgs; lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.CoreServices
-          darwin.apple_sdk.frameworks.CoreFoundation
-          darwin.apple_sdk.frameworks.Foundation
-          darwin.apple_sdk.frameworks.AppKit
-          darwin.apple_sdk.frameworks.WebKit
-          darwin.apple_sdk.frameworks.Cocoa
-          darwin.apple_sdk.frameworks.IOKit
-          darwin.apple_sdk.frameworks.QuartzCore
-          darwin.apple_sdk.frameworks.Carbon
+        darwinDeps = with pkgs; lib.optionals stdenv.isDarwin ([
           libiconv
-        ];
+          darwin.cctools
+        ] ++ (with darwin.apple_sdk.frameworks; [
+          Security
+          CoreServices
+          CoreFoundation
+          Foundation
+          AppKit
+          WebKit
+          Cocoa
+          IOKit
+          QuartzCore
+          Carbon
+        ]));
 
         # Tauri 2.x dependencies for Linux
         linuxDeps = with pkgs; lib.optionals stdenv.isLinux [
@@ -153,6 +154,11 @@
             # Set up environment
             export RUST_BACKTRACE=1
             export RUST_LOG=info
+
+            # Add this for macOS
+            env = pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
+              SDKROOT = "${pkgs.apple-sdk_11}/sdks/MacOSX11.3.sdk";
+            };
 
             # Ensure openssl can be found
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
