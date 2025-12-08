@@ -4,11 +4,37 @@ use std::collections::HashMap;
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 use zip::ZipArchive;
 
 use crate::comments::{Comment, init_comments_table};
+
+/// Generate a deterministic patch UID from content
+/// Uses SHA256 hash of author + timestamp + snapshot content
+/// Returns first 16 hex characters for brevity
+pub fn generate_patch_uid(author: &str, timestamp: i64, data: &serde_json::Value) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(author.as_bytes());
+    hasher.update(b"|");
+    hasher.update(timestamp.to_string().as_bytes());
+    hasher.update(b"|");
+    
+    // Include snapshot content if present for more accurate deduplication
+    if let Some(snapshot) = data.get("snapshot").and_then(|s| s.as_str()) {
+        hasher.update(snapshot.as_bytes());
+    } else {
+        // Fallback to full data JSON for non-snapshot patches
+        if let Ok(data_str) = serde_json::to_string(data) {
+            hasher.update(data_str.as_bytes());
+        }
+    }
+    
+    let hash = hasher.finalize();
+    // Return first 16 hex characters
+    format!("{:x}", hash)[..16].to_string()
+}
 
 fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
     let mut path = app.path().app_data_dir()
@@ -63,6 +89,8 @@ pub struct Patch {
     pub data: serde_json::Value,
     #[serde(default = "default_review_status")]
     pub review_status: String,
+    #[serde(default)]
+    pub patch_uid: Option<String>,
 }
 
 fn default_review_status() -> String {
@@ -109,6 +137,7 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
                 kind: row.get(3)?,
                 data,
                 review_status: "pending".to_string(),
+                patch_uid: None,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -141,6 +170,7 @@ pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
                 kind: row.get(3)?,
                 data,
                 review_status: "pending".to_string(),
+                patch_uid: None,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -310,15 +340,42 @@ pub fn import_patches_from_document(
     let target_conn = Connection::open(&target_history_path)
         .map_err(|e| e.to_string())?;
     
-    // Import patches into target
+    // Add patch_uid column to existing tables (migration for older databases)
+    target_conn.execute("ALTER TABLE patches ADD COLUMN patch_uid TEXT", []).ok();
+    target_conn.execute("CREATE INDEX IF NOT EXISTS idx_patches_patch_uid ON patches(patch_uid)", []).ok();
+    
+    // Import patches into target, skipping duplicates by patch_uid
     let mut imported_patches = Vec::new();
     
     for (source_patch_id, timestamp, author, kind, data_str) in source_patches {
+        // Parse data to generate patch_uid
+        let data: serde_json::Value = serde_json::from_str(&data_str)
+            .unwrap_or(serde_json::Value::Null);
+        
+        // Generate deterministic patch UID for this patch
+        let patch_uid = generate_patch_uid(&author, timestamp, &data);
+        
+        // Check if this patch already exists by patch_uid (fast hash comparison)
+        let exists: bool = target_conn
+            .query_row(
+                "SELECT 1 FROM patches WHERE patch_uid = ?1",
+                params![&patch_uid],
+                |_| Ok(true)
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .unwrap_or(false);
+        
+        if exists {
+            // Skip this patch, it's already in the target
+            continue;
+        }
+        
         // Insert patch with 'pending' review status (imported patches need review)
         target_conn
             .execute(
-                "INSERT INTO patches (timestamp, author, kind, data, review_status) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![timestamp, author, kind, data_str, "pending"],
+                "INSERT INTO patches (timestamp, author, kind, data, review_status, patch_uid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![timestamp, &author, &kind, &data_str, "pending", &patch_uid],
             )
             .map_err(|e| e.to_string())?;
         
@@ -334,10 +391,6 @@ pub fn import_patches_from_document(
                 .map_err(|e| e.to_string())?;
         }
         
-        // Parse data for return value
-        let data: serde_json::Value = serde_json::from_str(&data_str)
-            .unwrap_or(serde_json::Value::Null);
-        
         imported_patches.push(Patch {
             id: new_patch_id,
             timestamp,
@@ -345,6 +398,7 @@ pub fn import_patches_from_document(
             kind,
             data,
             review_status: "pending".to_string(),
+            patch_uid: Some(patch_uid),
         });
     }
     

@@ -598,7 +598,8 @@ pub fn record_document_patch(
             author      TEXT    NOT NULL,
             kind        TEXT    NOT NULL,
             data        TEXT    NOT NULL,
-            review_status TEXT  DEFAULT 'pending'
+            review_status TEXT  DEFAULT 'pending',
+            patch_uid   TEXT
         );
 
         CREATE TABLE IF NOT EXISTS snapshots (
@@ -611,15 +612,22 @@ pub fn record_document_patch(
 
         CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
         CREATE INDEX IF NOT EXISTS idx_patches_review_status ON patches(review_status);
+        CREATE INDEX IF NOT EXISTS idx_patches_patch_uid ON patches(patch_uid);
         "#,
     ).map_err(|e| e.to_string())?;
     
+    // Add patch_uid column to existing tables (migration)
+    conn.execute("ALTER TABLE patches ADD COLUMN patch_uid TEXT", []).ok();
+    
     let data_str = serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
+    
+    // Generate deterministic patch UID
+    let patch_uid = crate::patch_log::generate_patch_uid(&patch.author, patch.timestamp, &patch.data);
     
     // Current user's patches are auto-accepted (so we can distinguish from imported patches)
     conn.execute(
-        "INSERT INTO patches (timestamp, author, kind, data, review_status) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![patch.timestamp, patch.author, patch.kind, data_str, "accepted"],
+        "INSERT INTO patches (timestamp, author, kind, data, review_status, patch_uid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![patch.timestamp, patch.author, patch.kind, data_str, "accepted", patch_uid],
     ).map_err(|e| e.to_string())?;
     
     let patch_id = conn.last_insert_rowid();
@@ -658,7 +666,7 @@ pub fn list_document_patches(
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
     let mut stmt = conn
-        .prepare("SELECT id, timestamp, author, kind, data, review_status FROM patches ORDER BY id ASC")
+        .prepare("SELECT id, timestamp, author, kind, data, review_status, patch_uid FROM patches ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
     
     let rows = stmt
@@ -674,6 +682,7 @@ pub fn list_document_patches(
                 kind: row.get(3)?,
                 data,
                 review_status: row.get(5).unwrap_or_else(|_| "pending".to_string()),
+                patch_uid: row.get(6).ok(),
             })
         })
         .map_err(|e| e.to_string())?;
