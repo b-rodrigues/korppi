@@ -12,58 +12,43 @@
 
 1. Download the `.AppImage` file from the releases page
 2. Make it executable:
-   ```bash
-   chmod +x korppi_*.AppImage
-   ```
+
+```bash
+chmod +x korppi_*.AppImage
+```
+
 3. Run it:
-   ```bash
-   ./korppi_*.AppImage
-   ```
+
+```bash
+./korppi_*.AppImage
+```
 
 ### Option 2: Building from Source
 
 Requirements:
-- Node.js 18+ and npm
-- Rust 1.70+
-- System dependencies (see below)
+
+- Nix
 
 ```bash
 # Clone the repository
 git clone https://github.com/b-rodrigues/korppi.git
 cd korppi
 
-# Install dependencies
+# Drop into the development shell
+nix develop
+
+# Install Node.js dependencies
 npm install
 
-# Run in development mode
-npm run tauri dev
+# Build an appimage
+npm run tauri build -- --bundles appimage
 
-# Or build for production
-npm run tauri build
-```
+# Build a deb (untested)
+npm run tauri build -- --bundles deb
 
-#### Linux Dependencies
-
-On Ubuntu/Debian:
-```bash
-sudo apt install libwebkit2gtk-4.1-dev \
-    build-essential \
-    curl \
-    wget \
-    file \
-    libssl-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev
-```
-
-On Fedora:
-```bash
-sudo dnf install webkit2gtk4.1-devel \
-    openssl-devel \
-    curl \
-    wget \
-    file \
-    librsvg2-devel
+# Build an rpm (untested)
+# Note: On Debian/Ubuntu, you may need to install 'rpm' first: sudo apt install rpm
+npm run tauri build -- --bundles rpm
 ```
 
 ---
@@ -73,15 +58,20 @@ sudo dnf install webkit2gtk4.1-devel \
 1. Download the `.dmg` file from the releases page
 2. Open the DMG file
 3. Drag Korppi to your Applications folder
-4. Right-click and select "Open" (first time only, to bypass Gatekeeper)
+4. Because the app is not signed or notarized, macOS will block it the first time.
+   Open a terminal and run this command:
+   ```
+   xattr -cr /Applications/Korppi.app
+   ```
 
 ---
 
 ## Installing on Windows
 
-1. Download the `.msi` installer from the releases page
+1. Download the `.exe` installer from the releases page 
+   (unless you have an ARM device, download the `x86-setup.exe`)
 2. Run the installer
-3. Follow the installation wizard
+3. Follow the installation wizard (admin rights are **not required**)
 4. Launch Korppi from the Start menu
 
 ---

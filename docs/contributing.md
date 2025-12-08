@@ -34,7 +34,7 @@ Documentation lives in `docs/`:
 
 ### Write Code
 
-Ready to code? Start with issues labeled `good first issue`.
+LLM written code welcome!
 
 ---
 
@@ -42,9 +42,10 @@ Ready to code? Start with issues labeled `good first issue`.
 
 ### Prerequisites
 
-- **Node.js 18+** and npm
-- **Rust 1.70+** (install via [rustup](https://rustup.rs))
-- System dependencies (see [Installation](installation.html))
+The repository ships with a Nix flake that provides the right tooling
+to hack on Korppi. The only prerequisite is Nix. If you don't use
+Nix (booooo) you need to set up the toolchain yourself. I won't provide
+any support for this.
 
 ### Clone & Install
 
@@ -53,22 +54,15 @@ Ready to code? Start with issues labeled `good first issue`.
 git clone https://github.com/b-rodrigues/korppi.git
 cd korppi
 
-# Install npm dependencies
-npm install
+# Drop into the development shell
+nix develop
 ```
 
 ### Run in Development
 
 ```bash
-# Start development server with hot reload
-npm run tauri dev
-```
-
-### Build for Production
-
-```bash
-# Create production build
-npm run tauri build
+# Start development server with hot reload (inside the nix shell)
+korppi-dev
 ```
 
 ---
@@ -158,13 +152,8 @@ Test these areas before submitting:
 
 ### Running Tests
 
-```bash
-# JavaScript tests (if any)
-npm test
-
-# Rust tests
-cd src-tauri && cargo test
-```
+Tests run on CI when you open a PR. It is of course obvious
+that a PR that breaks a test won't get merged.
 
 ---
 

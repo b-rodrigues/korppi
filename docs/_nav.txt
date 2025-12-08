@@ -14,8 +14,8 @@ first-document|Your First Document
 
 SECTION: Features
 formatting|Text Formatting
-comments|Comments & Reviews
-timeline|Timeline & History
+comments|Comments and Reviews
+timeline|Timeline and History
 reconciliation|Reconciliation
 export|Export Options
 

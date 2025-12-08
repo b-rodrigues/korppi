@@ -7,8 +7,12 @@ Get writing with Korppi in just 5 minutes!
 ## Step 1: Create Your First Document
 
 1. Launch Korppi
-2. Click **New** in the left sidebar (or press `Ctrl+N`)
-3. Start typing in the editor!
+2. The welcome screen invites you to configure your user profile (which you
+   should, so people can put a face on an edit when you'll send them the
+   document)
+3. Click **New** in the left sidebar (or press `Ctrl+N`)
+4. Start typing in the editor!
+5. All your edits are automatically saves as *patches*
 
 The editor uses **Markdown** formatting, so you can write naturally:
 
@@ -31,8 +35,10 @@ This is a paragraph with **bold** and *italic* text.
 1. Click **Save** in the sidebar (or press `Ctrl+S`)
 2. Choose a location and filename
 3. Your document is saved as a `.kmd` file
+4. Send this `.kmd` file to colleagues: they will have access to the complete
+   history of your file and can add their edits!
 
-> **Tip:** Enable **Autosave** in the Preferences section to automatically save every few minutes!
+> **Tip:** Enable **Autosave** to automatically save every few minutes!
 
 ---
 
@@ -84,6 +90,16 @@ The **Timeline** panel on the right shows your document's history:
 1. Every significant change appears as a "patch"
 2. Click a patch to preview that version
 3. Use Preview/Restore to go back in time
+
+As your colleagues send you their versions of the file, you will be able
+to *reconcile* versions into one main document!
+
+## Step 6: Reconcile versions
+
+Clicking on "Reconcile" will prompt you to import all the different version
+of the document into your current session. Doing so imports all the history
+of your colleagues as patches into the timeline. You will then have
+the possibility to accept or reject their changes.
 
 ---
 

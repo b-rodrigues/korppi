@@ -8,7 +8,7 @@ Import and merge changes from other versions of your document.
 
 **Reconciliation** lets you:
 
-- Import changes from another `.kmd` file
+- Import changes and comments from another `.kmd` file
 - See what's different between versions
 - Selectively accept or reject changes
 
@@ -94,24 +94,12 @@ When reviewing a patch:
 
 ---
 
-## Bulk Actions
-
-After reconciliation:
-
-- **Approve All** - Accept every pending patch
-- **Reject All** - Discard every pending patch
-- **Reset** - Return to state before reconciliation
-
-⚠️ Use bulk actions carefully!
-
----
-
 ## Conflict Resolution
 
 When the same line changed in both documents:
 
 1. Korppi detects the conflict
-2. Both versions are shown
+2. All versions are shown
 3. You choose which to keep (or edit manually)
 
 ---
@@ -144,7 +132,6 @@ Great for reviewing changes to specific sections!
 ### After Reconciling
 
 - Review your document holistically
-- Check that formatting survived
 - Save when satisfied
 
 ---

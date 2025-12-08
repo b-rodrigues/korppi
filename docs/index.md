@@ -13,16 +13,29 @@
 
 ## What is Korppi?
 
-**Korppi** (Finnish for "raven") is a powerful desktop markdown editor built for writers, researchers, and technical authors who need more than just a text editor.
+**Korppi** (Finnish for "raven") is a powerful desktop markdown editor built for
+writers, researchers, and technical authors who need more than just a text
+editor.
 
-Unlike traditional editors, Korppi remembers **every change you make** and lets you travel through time to see how your document evolved!
+Unlike traditional editors, Korppi remembers **every change you make** and lets
+you travel through time to see how your document evolved!
+
+Korppi is a text editor that tries to focus on one problem, and one problem
+only: how to easily integrate changes from various collaborators into a main
+document. It is meant for business users that aren’t familiar with Git and use
+Microsoft Office’s *track changes* functionality for asynchronous collaboration.
+
+The idea is to first use Korppi to **just focus on the content** and gather
+feedback and input from coworkers. Then, use Korppi's user-friendly
+reconciliation features to merge all the input in the same document, **export to
+Word format** and continue with the layout there!
 
 <div class="feature-list">
 
 - **Timeline Tracking** - See every edit as a visual timeline
-- **Smart Reconciliation** - Import changes from other versions
+- **Smart Reconciliation** - Import changes from other versions, and easily handle conflicts
 - **Rich Formatting** - Full markdown with tables, code, images
-- **Comments & Reviews** - Collaborate with inline comments  
+- **Comments & Reviews** - Collaborate with inline comments
 - **Export Anywhere** - Markdown, Word DOCX, and more
 - **Autosave** - Never lose your work again
 
@@ -44,18 +57,16 @@ Unlike traditional editors, Korppi remembers **every change you make** and lets 
 
 ## System Requirements
 
-- **Operating System:** Windows 10+, macOS 10.14+, or Linux (Ubuntu 20.04+)
-- **Memory:** 4GB RAM minimum
-- **Storage:** 100MB for application
+- **Operating System:** Windows, macOS, or Linux distributions (tested on Ubuntu 24.04+ and NixOS)
 
 ---
 
 ## What's New?
 
-### Version 0.1.0 (December 2024)
+### Version 0.1.999 (December 2025)
 
 - 🎉 Initial public release
-- ✏️ Full markdown editing with Milkdown
+- ✏️ Full markdown editing
 - 📊 Timeline with patch history
 - 💬 Comments and review system
 - 🔍 Find & Replace with regex support

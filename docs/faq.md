@@ -8,21 +8,28 @@ Common questions about Korppi.
 
 ### What is Korppi?
 
-Korppi is a markdown editor with built-in version history and reconciliation features. It's designed for writers who need to track changes, collaborate, and maintain document history.
+Korppi is a markdown editor with integrated version history and conflict-free
+merging. It lets you write, track changes, and collaborate asynchronously, all
+locally, with no dependence on third-party servers.
 
 ### Why "Korppi"?
 
-Korppi means "raven" in Finnish. Ravens are known for their intelligence and memory—fitting for an editor that remembers everything!
+Korppi means "raven" in Finnish. Ravens are known for their intelligence and
+memory—fitting for an editor that remembers everything!
 
 ### Is Korppi free?
 
-Yes! Korppi is free and open source software, released under the MIT license.
+Yes! Korppi is free and open source software, released under the GPLv3 license.
 
 ### What platforms does Korppi support?
 
-- **Linux** (AppImage, Debian package)
+- **Linux** (AppImage)
 - **macOS** (DMG)
-- **Windows** (MSI installer)
+- **Windows** (EXE and MSI installer)
+
+### Did you write Korppi?
+
+No, I designed Korppi, but Korppi was written 100% by LLMs!
 
 ---
 
@@ -30,7 +37,9 @@ Yes! Korppi is free and open source software, released under the MIT license.
 
 ### What's a .kmd file?
 
-A `.kmd` (Korppi Markdown Document) file is Korppi's native format. It's a ZIP archive containing your markdown content, version history, comments, and metadata. See [File Format](file-format.html) for details.
+A `.kmd` (Korppi Markdown Document) file is Korppi's native format. It's a ZIP
+archive containing your markdown content, version history, comments, and
+metadata. See [File Format](file-format.html) for details.
 
 ### Can I open regular .md files?
 
@@ -48,9 +57,8 @@ Export your document:
 
 ### I accidentally closed without saving. Can I recover my work?
 
-If you had **Autosave** enabled, check the recent documents list—your last autosave should be there.
-
-If not, check for temporary files in your system's temp directory.
+If you didn't have autosave on, and if you ignored the prompt telling you that
+you had unsaved changes, too bad!
 
 ---
 
@@ -58,25 +66,28 @@ If not, check for temporary files in your system's temp directory.
 
 ### How is this different from Git?
 
-Git is designed for code with line-based tracking. Korppi is designed for prose:
-
-- **Semantic patches** - Understands document structure
-- **Visual timeline** - No command line needed
-- **Comments** - Built-in review system
-- **Rich formatting** - Full markdown support
+Git manages code. Korppi manages writing. It provides non-technical
+collaborators with intuitive version history and automatic reconciliation so
+parallel edits can be merged into a clean, unified document.
 
 ### Can multiple people edit at once?
 
-Real-time collaboration is planned but not yet implemented. Currently, use the **Reconciliation** feature to merge changes from different authors.
+No. Korppi is not a live collaborative editor. Instead, it’s designed for
+asynchronous collaboration: the workflow where people exchange revised versions
+of a document, add comments, and make tracked changes independently. Korppi
+streamlines this process by providing built-in reconciliation, making it easy to
+merge these parallel edits into a single, coherent document.
 
 ### Do comments appear in exported files?
 
-- **Markdown export:** Comments are stripped (pure content only)
-- **DOCX export:** Comments as Word comments (coming soon)
+No. Korppi keeps comments and discussion inside the editor. The goal is to use
+Korppi for drafting, review, and revision. Once the content is finalized, you
+can export to Word and focus on formatting and layout there.
 
 ### Can I customize keyboard shortcuts?
 
-Not yet, but it's on the roadmap!
+No. Korppi is designed for business users who generally prefer consistent,
+preset shortcuts rather than custom configurations.
 
 ---
 
@@ -84,19 +95,23 @@ Not yet, but it's on the roadmap!
 
 ### How far back does the history go?
 
-Korppi saves your complete edit history within each `.kmd` file. There's no limit—all patches are preserved.
+Korppi saves your complete edit history within each `.kmd` file. There's no
+limit, all patches are preserved.
 
 ### Can I delete history?
 
-Currently, no. History is considered valuable data. A future release may add the option to compact history.
+Currently, no. History is considered valuable data. A future release may add the
+option to compact history.
 
 ### What's a "pending" patch?
 
-Pending patches are changes imported via reconciliation that haven't been reviewed yet. You can approve or reject them.
+Pending patches are changes imported via reconciliation that haven't been
+reviewed yet. You can approve or reject them.
 
 ### I restored an old version. Can I undo that?
 
-Use `Ctrl+Z` (Undo) immediately after restore, or reconcile with a backup of your newer version.
+Use `Ctrl+Z` (Undo) immediately after restore, or reconcile with a backup of
+your newer version.
 
 ---
 
