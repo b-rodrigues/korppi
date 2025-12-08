@@ -31,10 +31,9 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          cache-on-failure: true
+      # sccache caches Rust compilation and works inside Nix builds
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
 
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
@@ -48,10 +47,13 @@ jobs:
             libfuse2 libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev patchelf \
             xdg-utils libglib2.0-bin desktop-file-utils \
-            mold
+            mold clang
 
       - name: Build binary
         env:
+          # Enable sccache for Rust
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
           # Limit parallel jobs to reduce memory pressure
           CARGO_BUILD_JOBS: "1"
           # Reduce codegen units to lower memory usage
