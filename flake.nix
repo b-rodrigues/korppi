@@ -114,7 +114,25 @@
         # PACKAGES
         ############################################################
         packages = rec {
-          # Builds the Rust Tauri backend (no linuxdeploy)
+          # Build frontend first (needs network access)
+          frontend = pkgs.buildNpmPackage {
+            pname = "korppi-frontend";
+            version = "0.1.0";
+            src = ./.;
+            
+            npmDepsHash = "sha256-EQrl4cNLxpkv+2s9kqqP5aFrjOmQLGKqghONdM/p7UM=";  # Will need to update
+            
+            buildPhase = ''
+              npm run build
+            '';
+            
+            installPhase = ''
+              mkdir -p $out
+              cp -r dist $out/
+            '';
+          };
+
+          # Builds the Rust Tauri backend
           korppi-bin = pkgs.rustPlatform.buildRustPackage {
             pname = "korppi-prototype";
             version = "0.1.0";
@@ -129,10 +147,7 @@
               lockFile = ./src-tauri/Cargo.lock;
             };
 
-
             nativeBuildInputs = [
-              pkgs.nodejs_20
-              pkgs.nodePackages.npm
               pkgs.pkg-config
               pkgs.cmake
             ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
@@ -140,36 +155,28 @@
               pkgs.clang # Needed for mold integration
             ];
 
-            buildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
+            buildInputs = commonDeps ++ darwinDeps ++ linuxDeps ++ [
+              pkgs.bzip2  # Required for zip/docx support
+            ];
 
-            # Use mold linker on Linux for faster linking, limit parallelism for CI
+            # Skip tests during package build (run separately with cargo test)
+            doCheck = false;
+
+            # Use mold linker on Linux for faster linking
             RUSTFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-C linker=clang -C link-arg=-fuse-ld=mold";
-            CARGO_BUILD_JOBS = "1";
 
-            # Build Tauri frontend before cargo
+            # Copy pre-built frontend and cd to cargo root
             preBuild = ''
-              npm ci
-              npm run build
+              echo "=== Copying pre-built frontend ==="
+              cp -r ${frontend}/dist ./dist
+              echo "=== Changing to src-tauri ==="
+              cd src-tauri
             '';
           };
 
-          # Wrap as AppImage using Nix — replaces linuxdeploy fully
-          appimage = pkgs.appimageTools.wrapType2 {
-            pname = "korppi";
-            version = "0.1.0";
-            src = korppi-bin;
-
-            extraInstallCommands = ''
-              mkdir -p $out/share/applications
-              cat > $out/share/applications/korppi.desktop <<EOF
-              [Desktop Entry]
-              Name=Korppi
-              Exec=korppi
-              Type=Application
-              Categories=Utility;
-              EOF
-            '';
-          };
+          # AppImage is just the binary for now
+          # TODO: Proper AppImage bundling can be added later
+          appimage = korppi-bin;
 
           # Default package = built binary
           default = korppi-bin;

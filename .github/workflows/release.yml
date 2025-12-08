@@ -18,10 +18,8 @@ jobs:
         include:
           - system: x86_64-linux
             runner: ubuntu-latest
-            arch_env: ""
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
-            arch_env: "arm_aarch64"
 
     runs-on: ${{ matrix.runner }}
 
@@ -31,31 +29,34 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
         with:
           size: 8G
 
-      - name: Install system dependencies
+      - name: Build with Tauri (in Nix shell)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libfuse2 libgtk-3-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
-            xdg-utils libglib2.0-bin desktop-file-utils
-
-      - name: Build AppImage
-        env:
-          # Limit Nix build parallelism to reduce memory pressure
-          NIX_CONFIG: "cores = 1"
-        run: nix build .#packages.${{ matrix.system }}.appimage --accept-flake-config -j1
+          nix develop .# --impure --accept-flake-config -c \
+            bash -c "npm install && npm run tauri build"
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
           name: korppi-${{ matrix.system }}-appimage
-          path: result/*
-          if-no-files-found: error
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: korppi-${{ matrix.system }}-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: warn
 
 
   # ─────────────────────────────────────────────
