@@ -135,9 +135,16 @@
               pkgs.nodePackages.npm
               pkgs.pkg-config
               pkgs.cmake
+            ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+              pkgs.mold  # Fast linker for Linux
+              pkgs.clang # Needed for mold integration
             ];
 
             buildInputs = commonDeps ++ darwinDeps ++ linuxDeps;
+
+            # Use mold linker on Linux for faster linking, limit parallelism for CI
+            RUSTFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-C linker=clang -C link-arg=-fuse-ld=mold";
+            CARGO_BUILD_JOBS = "1";
 
             # Build Tauri frontend before cargo
             preBuild = ''
