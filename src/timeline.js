@@ -15,6 +15,10 @@ let conflictState = {
     patchConflicts: new Map()
 };
 
+// Flag to control when conflict alert should be shown
+// Only set to true on document open or after reconciliation
+let showConflictAlertOnNextRefresh = false;
+
 export async function fetchPatchList() {
     const docId = getActiveDocumentId();
     if (docId) {
@@ -203,24 +207,27 @@ export function initTimeline() {
         });
     }
 
-    // Listen for patch status updates
+    // Listen for patch status updates (don't show conflict alert on accept/reject)
     window.addEventListener('patch-status-updated', async () => {
         await refreshTimeline();
     });
 
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
+        showConflictAlertOnNextRefresh = true;
         await refreshTimeline();
     });
 
     // Listen for document changes (open, switch, new)
     onDocumentChange(async (event, doc) => {
         if (event === "open" || event === "new" || event === "activeChange") {
+            showConflictAlertOnNextRefresh = true;
             await refreshTimeline();
         }
     });
 
     // Initial load
+    showConflictAlertOnNextRefresh = true;
     refreshTimeline();
 }
 
@@ -230,9 +237,10 @@ export function renderPatchList(patches) {
 
     // Detect conflicts in patches
     conflictState = detectPatchConflicts(patches);
-    
-    // Show alert if conflicts detected
-    if (conflictState.conflictGroups.length > 0) {
+
+    // Show alert if conflicts detected AND we should show it (only on document open or after reconciliation)
+    if (conflictState.conflictGroups.length > 0 && showConflictAlertOnNextRefresh) {
+        showConflictAlertOnNextRefresh = false;
         showConflictAlert(conflictState.conflictGroups, patches);
     }
 
@@ -355,7 +363,7 @@ export function renderPatchList(patches) {
         if (hasConflict) {
             div.classList.add("has-conflict");
         }
-        
+
         // Get conflict info
         let conflictInfo = '';
         if (hasConflict) {
@@ -762,13 +770,13 @@ function showConflictAlert(conflictGroups, patches) {
 
     const groupCount = conflictGroups.length;
     let message = `⚠️ ${groupCount} conflict group${groupCount > 1 ? 's' : ''} detected.\n\n`;
-    
+
     // Add details about each group
     conflictGroups.forEach((group, index) => {
         const patchIds = group.map(id => `#${id}`).join(', ');
         message += `Group ${index + 1}: Patches ${patchIds} modify the same text.\n`;
     });
-    
+
     alert(message);
 }
 
