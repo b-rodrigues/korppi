@@ -39,7 +39,7 @@ pub struct Comment {
 }
 
 /// Initialize comments table in a document's history database
-fn init_comments_table(conn: &Connection) -> Result<(), String> {
+pub fn init_comments_table(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS comments (

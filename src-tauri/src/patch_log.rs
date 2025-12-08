@@ -8,6 +8,8 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 use zip::ZipArchive;
 
+use crate::comments::{Comment, init_comments_table};
+
 fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
     let mut path = app.path().app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
@@ -294,10 +296,7 @@ pub fn import_patches_from_document(
         }
     }
     
-    drop(source_conn);
-    
-    // Clean up temp file
-    std::fs::remove_file(&temp_db_path).ok();
+
     
     // Get target document's history database path
     // The history is stored in the temp directory for the document
@@ -349,7 +348,93 @@ pub fn import_patches_from_document(
         });
     }
     
+    // Import comments
+    import_comments(&source_conn, &target_conn)?;
+
+    // Clean up
+    drop(source_conn);
+    std::fs::remove_file(&temp_db_path).ok();
+
     Ok(imported_patches)
+}
+
+fn import_comments(source_conn: &Connection, target_conn: &Connection) -> Result<(), String> {
+    // Ensure target table exists
+    init_comments_table(target_conn)?;
+
+    // Get all comments from source
+    let mut stmt = source_conn
+        .prepare("SELECT id, timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id FROM comments ORDER BY id ASC")
+        .map_err(|e| e.to_string())?;
+
+    let source_comments = stmt
+        .query_map([], |row| {
+            Ok(Comment {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                author: row.get(2)?,
+                author_color: row.get(3)?,
+                start_anchor: row.get(4)?,
+                end_anchor: row.get(5)?,
+                selected_text: row.get(6)?,
+                content: row.get(7)?,
+                status: row.get(8)?,
+                parent_id: row.get(9)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    // Map source ID -> Target ID
+    let mut id_map: HashMap<i64, i64> = HashMap::new();
+
+    for comment in source_comments {
+        // Check if equivalent comment exists in target
+        // We match on timestamp, author, and content to identify duplicates
+        let existing_id: Option<i64> = target_conn
+            .query_row(
+                "SELECT id FROM comments WHERE timestamp = ?1 AND author = ?2 AND content = ?3",
+                params![comment.timestamp, comment.author, comment.content],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+
+        if let Some(id) = existing_id {
+            // Found duplicate, map source ID to existing target ID
+            id_map.insert(comment.id, id);
+        } else {
+            // New comment, insert it
+            // Remap parent_id if it exists
+            let new_parent_id = comment.parent_id.and_then(|pid| id_map.get(&pid).copied());
+
+            target_conn
+                .execute(
+                    r#"
+                    INSERT INTO comments (timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                    "#,
+                    params![
+                        comment.timestamp,
+                        comment.author,
+                        comment.author_color,
+                        comment.start_anchor,
+                        comment.end_anchor,
+                        comment.selected_text,
+                        comment.content,
+                        comment.status,
+                        new_parent_id,
+                    ],
+                )
+                .map_err(|e| e.to_string())?;
+
+            let new_id = target_conn.last_insert_rowid();
+            id_map.insert(comment.id, new_id);
+        }
+    }
+
+    Ok(())
 }
 
 /// Result of a restore operation
