@@ -17,61 +17,43 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
 
     runs-on: ${{ matrix.runner }}
-    
-    container:
-      image: ubuntu:24.04@sha256:c35e29c9450151419d9448b0fd75374fec4fff364a27f176fb458d472dfc9e54
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.11.1"
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.90.0"
+
       - name: Install system dependencies
         run: |
-          apt-get update
-          apt-get install -y \
-            curl \
-            ca-certificates \
-            gnupg \
-            git \
-            build-essential \
-            pkg-config \
+          sudo apt-get update
+          sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libfuse2 \
-            xdg-utils \
-            file
-
-      - name: Install Node.js 24 via nvm
-        run: |
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-          . "$HOME/.nvm/nvm.sh"
-          nvm install 24
-          node -v
-          npm -v
-          echo "$HOME/.nvm/versions/node/$(node -v)/bin" >> $GITHUB_PATH
-
-      - name: Install Rust 1.90.0
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+            xdg-utils
 
       - name: Install npm dependencies
-        run: |
-          . "$HOME/.nvm/nvm.sh"
-          npm ci
+        run: npm ci
 
       - name: Build AppImage only
         env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"  # Allow AppImage tools to run without FUSE in container
-        run: |
-          . "$HOME/.nvm/nvm.sh"
-          . "$HOME/.cargo/env"
-          npm run tauri build -- --bundles appimage
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: npm run tauri build -- --bundles appimage
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
