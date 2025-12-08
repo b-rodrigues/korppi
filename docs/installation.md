@@ -1,5 +1,8 @@
 # Installation
 
+First, download the installer for your operating system. Then, follow the instructions
+below for your operating system.
+
 ## Download Korppi
 
 <a href="https://github.com/b-rodrigues/korppi/releases" class="download-btn">⬇️ Download Latest Release</a>
