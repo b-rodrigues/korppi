@@ -46,13 +46,14 @@ jobs:
             xdg-utils \
             file
 
-      - name: Install Node.js 20.19.6
+      - name: Install Node.js 24 via nvm
         run: |
-          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-          apt-get install -y nodejs
-          npm install -g npm@latest
-          node --version
-          npm --version
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+          . "$HOME/.nvm/nvm.sh"
+          nvm install 24
+          node -v
+          npm -v
+          echo "$HOME/.nvm/versions/node/$(node -v)/bin" >> $GITHUB_PATH
 
       - name: Install Rust 1.90.0
         run: |
@@ -97,7 +98,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.19.6"  # Match flake's nodejs_20
+          node-version: "24"  # Match flake's nodejs_24
           cache: npm
 
       - name: Install Rust
@@ -142,7 +143,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.19.6"  # Match flake's nodejs_20
+          node-version: "24"  # Match flake's nodejs_24
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

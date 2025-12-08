@@ -57,7 +57,7 @@
           cargo-outdated
           cargo-audit
           cargo-flamegraph
-          nodejs_20
+          nodejs_24
           nodePackages.npm
           openssl
           zlib
