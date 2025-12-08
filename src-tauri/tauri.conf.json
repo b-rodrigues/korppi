@@ -42,6 +42,11 @@
         "bundleMediaFramework": true
       }
     },
+    "windows": {
+      "nsis": {
+        "installMode": "both"
+      }
+    },
     "fileAssociations": [
       {
         "ext": [
