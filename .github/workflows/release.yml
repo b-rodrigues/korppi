@@ -22,54 +22,50 @@ jobs:
             runner: ubuntu-24.04-arm
 
     runs-on: ${{ matrix.runner }}
+    
+    container:
+      image: ubuntu:24.04@sha256:c35e29c9450151419d9448b0fd75374fec4fff364a27f176fb458d472dfc9e54
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            curl \
+            git \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libfuse2 \
+            xdg-utils \
+            file
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20.19.6"  # Match flake's nodejs_20
-          cache: npm
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.90.0"  # Pin to current stable for reproducibility
-
-      - name: Setup swap space
-        uses: actionhippie/swap-space@v1
-        with:
-          size: 8G
-
-      - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libfuse2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Build with Tauri
-        run: npm run tauri build
+      - name: Build AppImage only
+        run: |
+          . "$HOME/.cargo/env"
+          npm run tauri build -- --bundles appimage
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
           name: korppi-linux-${{ matrix.arch }}-appimage
           path: src-tauri/target/release/bundle/appimage/*.AppImage
-          if-no-files-found: warn
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: korppi-linux-${{ matrix.arch }}-bin
-          path: src-tauri/target/release/korppi-prototype
-          if-no-files-found: warn
+          if-no-files-found: error
 
 
   # ─────────────────────────────────────────────
