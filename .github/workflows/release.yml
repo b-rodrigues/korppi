@@ -16,9 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - system: x86_64-linux
+          - arch: x86_64
             runner: ubuntu-latest
-          - system: aarch64-linux
+          - arch: aarch64
             runner: ubuntu-24.04-arm
 
     runs-on: ${{ matrix.runner }}
@@ -26,36 +26,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
 
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
         with:
           size: 8G
 
-      - name: Build with Nix
-        run: nix build .#packages.${{ matrix.system }}.default --accept-flake-config
-
-      - name: Create portable bundle
+      - name: Install system dependencies
         run: |
-          # Create a self-contained bundle with all Nix dependencies
-          nix bundle .#packages.${{ matrix.system }}.default --accept-flake-config -o korppi-bundle
-          ls -la korppi-bundle* || true
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libfuse2
 
-      - name: Upload bundle
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build with Tauri
+        run: npm run tauri build
+
+      - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-bundle
-          path: korppi-bundle*
+          name: korppi-linux-${{ matrix.arch }}-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: warn
 
-      - name: Upload binary (for NixOS)
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-nix
-          path: result/bin/*
-          if-no-files-found: error
+          name: korppi-linux-${{ matrix.arch }}-bin
+          path: src-tauri/target/release/korppi-prototype
+          if-no-files-found: warn
 
 
   # ─────────────────────────────────────────────
