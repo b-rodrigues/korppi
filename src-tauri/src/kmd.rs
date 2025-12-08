@@ -651,8 +651,6 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                         }
                         if in_paragraph {
                             docx = docx.add_paragraph(current_paragraph);
-                            current_paragraph = Paragraph::new();
-                            in_paragraph = false;
                         }
                         
                         // Create heading with appropriate level

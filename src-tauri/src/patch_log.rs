@@ -359,6 +359,19 @@ pub fn import_patches_from_document(
 }
 
 fn import_comments(source_conn: &Connection, target_conn: &Connection) -> Result<(), String> {
+    // Check if comments table exists in source
+    let table_exists: bool = source_conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='comments'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if !table_exists {
+        return Ok(());
+    }
+
     // Ensure target table exists
     init_comments_table(target_conn)?;
 
