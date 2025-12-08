@@ -155,7 +155,8 @@
 
           # Wrap as AppImage using Nix — replaces linuxdeploy fully
           appimage = pkgs.appimageTools.wrapType2 {
-            name = "korppi";
+            pname = "korppi";
+            version = "0.1.0";
             src = korppi-bin;
 
             extraInstallCommands = ''

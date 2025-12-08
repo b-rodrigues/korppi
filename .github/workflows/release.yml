@@ -44,17 +44,17 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev patchelf \
             xdg-utils libglib2.0-bin desktop-file-utils
 
-      - name: Build binary
+      - name: Build AppImage
         env:
           # Limit Nix build parallelism to reduce memory pressure
           NIX_CONFIG: "cores = 1"
-        run: nix build .#packages.${{ matrix.system }}.korppi-bin --accept-flake-config -j1
+        run: nix build .#packages.${{ matrix.system }}.appimage --accept-flake-config -j1
 
-      - name: Upload binary
+      - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}
-          path: result/bin/*
+          name: korppi-${{ matrix.system }}-appimage
+          path: result/*
           if-no-files-found: error
 
 
