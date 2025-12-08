@@ -1,7 +1,7 @@
-use korppi_prototype::conflict_detector::ConflictDetector;
-use korppi_prototype::patch_log::Patch;
+use korppi::conflict_detector::ConflictDetector;
+use korppi::patch_log::Patch;
 use serde_json::json;
-use korppi_prototype::models::ConflictType;
+use korppi::models::ConflictType;
 
 #[test]
 fn test_overlapping_edit_detection() {

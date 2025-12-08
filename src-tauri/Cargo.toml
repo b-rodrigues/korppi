@@ -1,6 +1,6 @@
 [package]
-name = "korppi-prototype"
-version = "0.1.0"
+name = "korppi"
+version = "0.1.999"
 edition = "2021"
 
 [dependencies]

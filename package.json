@@ -1,7 +1,7 @@
 {
-  "name": "korppi-prototype",
-  "version": "0.1.0",
-  "description": "Korppi validation prototype",
+  "name": "korppi",
+  "version": "0.1.999",
+  "description": "Korppi - Local-first collaborative markdown editor",
   "scripts": {
     "tauri": "tauri",
     "dev": "vite",

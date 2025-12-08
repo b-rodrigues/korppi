@@ -8,5 +8,5 @@ fn main() {
         std::env::set_var("KORPPI_OPEN_FILE", &args[1]);
     }
     
-    korppi_prototype::run();
+    korppi::run();
 }
