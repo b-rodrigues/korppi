@@ -120,7 +120,7 @@
             version = "0.1.0";
             src = ./.;
             
-            npmDepsHash = "sha256-EQrl4cNLxpkv+2s9kqqP5aFrjOmQLGKqghONdM/p7UM=";  # Will need to update
+            npmDepsHash = "sha256-EQrl4cNLxpkv+2s9kqqP5aFrjOmQLGKqghONdM/p7UM=";
             
             buildPhase = ''
               npm run build
@@ -139,10 +139,8 @@
 
             src = ./.;
           
-            # Point to the subdirectory containing Cargo.toml
             cargoRoot = "src-tauri";
           
-            # cargoLock must be an attrset with lockFile
             cargoLock = {
               lockFile = ./src-tauri/Cargo.lock;
             };
@@ -151,34 +149,82 @@
               pkgs.pkg-config
               pkgs.cmake
             ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
-              pkgs.mold  # Fast linker for Linux
-              pkgs.clang # Needed for mold integration
+              pkgs.mold
+              pkgs.clang
             ];
 
             buildInputs = commonDeps ++ darwinDeps ++ linuxDeps ++ [
-              pkgs.bzip2  # Required for zip/docx support
+              pkgs.bzip2
             ];
 
-            # Skip tests during package build (run separately with cargo test)
             doCheck = false;
 
-            # Use mold linker on Linux for faster linking
             RUSTFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-C linker=clang -C link-arg=-fuse-ld=mold";
 
-            # Copy pre-built frontend and cd to cargo root
             preBuild = ''
-              echo "=== Copying pre-built frontend ==="
               cp -r ${frontend}/dist ./dist
-              echo "=== Changing to src-tauri ==="
               cd src-tauri
             '';
           };
 
-          # AppImage is just the binary for now
-          # TODO: Proper AppImage bundling can be added later
-          appimage = korppi-bin;
+          # Create AppImage using nix-bundle approach
+          appimage = pkgs.stdenv.mkDerivation {
+            pname = "korppi-appimage";
+            version = "0.1.0";
+            
+            nativeBuildInputs = [ pkgs.appimage-run pkgs.squashfsTools ];
+            
+            # No source needed, we're wrapping an existing derivation
+            dontUnpack = true;
+            
+            buildPhase = ''
+              # Create a wrapper script that sets up the Nix environment
+              mkdir -p AppDir/usr/bin
+              
+              # Copy the binary
+              cp ${korppi-bin}/bin/korppi-prototype AppDir/usr/bin/korppi
+              
+              # Create desktop file
+              cat > AppDir/korppi.desktop <<EOF
+              [Desktop Entry]
+              Name=Korppi
+              Exec=korppi
+              Type=Application
+              Categories=Utility;Office;
+              Icon=korppi
+              Terminal=false
+              EOF
+              
+              # Create minimal icon
+              mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+              echo '' > AppDir/usr/share/icons/hicolor/256x256/apps/korppi.png
+              
+              # Create AppRun that sets library paths
+              cat > AppDir/AppRun <<'APPRUN'
+              #!/bin/bash
+              SELF=$(readlink -f "$0")
+              HERE=$(dirname "$SELF")
+              export PATH="$HERE/usr/bin:$PATH"
+              export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+              exec "$HERE/usr/bin/korppi" "$@"
+              APPRUN
+              chmod +x AppDir/AppRun
+              
+              # Copy all required libraries from Nix store
+              mkdir -p AppDir/usr/lib
+              for lib in $(ldd ${korppi-bin}/bin/korppi-prototype | grep "=> /nix" | awk '{print $3}'); do
+                cp -L "$lib" AppDir/usr/lib/ 2>/dev/null || true
+              done
+            '';
+            
+            installPhase = ''
+              mkdir -p $out
+              cp -r AppDir $out/
+              # The actual AppImage creation would need appimagetool
+              # For now, output the AppDir which can be run directly
+            '';
+          };
 
-          # Default package = built binary
           default = korppi-bin;
         };
 

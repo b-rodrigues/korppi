@@ -29,34 +29,33 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          cache-on-failure: true
-
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
         with:
           size: 8G
 
-      - name: Build with Tauri (in Nix shell)
+      - name: Build with Nix
+        run: nix build .#packages.${{ matrix.system }}.default --accept-flake-config
+
+      - name: Create portable bundle
         run: |
-          nix develop .# --impure --accept-flake-config -c \
-            bash -c "npm install && npm run tauri build"
+          # Create a self-contained bundle with all Nix dependencies
+          nix bundle .#packages.${{ matrix.system }}.default --accept-flake-config -o korppi-bundle
+          ls -la korppi-bundle* || true
 
-      - name: Upload AppImage
+      - name: Upload bundle
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-appimage
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          name: korppi-${{ matrix.system }}-bundle
+          path: korppi-bundle*
           if-no-files-found: warn
 
-      - name: Upload deb
+      - name: Upload binary (for NixOS)
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
-          if-no-files-found: warn
+          name: korppi-${{ matrix.system }}-nix
+          path: result/bin/*
+          if-no-files-found: error
 
 
   # ─────────────────────────────────────────────
