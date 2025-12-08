@@ -909,6 +909,20 @@ textarea {
     text-decoration: line-through;
 }
 
+/* Inline diff spans (character-level) */
+.diff-addition {
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+.diff-deletion {
+    background: rgba(244, 67, 54, 0.3);
+    text-decoration: line-through;
+    color: var(--text-muted);
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
 /* ===== DIFF PREVIEW BANNER ===== */
 #diff-preview-banner {
     display: flex;

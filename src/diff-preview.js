@@ -324,6 +324,26 @@ export function isPreviewActive() {
 }
 
 /**
+ * Get pending patch IDs in the current conflict group
+ * @param {number|null} excludePatchId - Optional patch ID to exclude from results
+ * @returns {Promise<Array<number>>} - Array of pending patch IDs
+ */
+async function getPendingConflictPatchIds(excludePatchId = null) {
+    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
+        return [];
+    }
+
+    const { fetchPatchList } = await import('./timeline.js');
+    const allPatches = await fetchPatchList();
+
+    return previewState.conflictGroup.filter(patchId => {
+        if (excludePatchId !== null && patchId === excludePatchId) return false;
+        const patch = allPatches.find(p => p.id === patchId);
+        return patch && patch.review_status === 'pending';
+    });
+}
+
+/**
  * Advance to the next pending patch in the conflict group
  * If no more pending patches, exit preview
  * @param {number} justProcessedPatchId - The patch that was just accepted/rejected
@@ -335,16 +355,8 @@ async function advanceToNextPendingPatch(justProcessedPatchId) {
         return;
     }
 
-    // Get fresh patch list to find remaining pending patches
-    const { fetchPatchList } = await import('./timeline.js');
-    const allPatches = await fetchPatchList();
-
-    // Find remaining pending patches in the conflict group (excluding the just-processed one)
-    const remainingPending = previewState.conflictGroup.filter(patchId => {
-        if (patchId === justProcessedPatchId) return false;
-        const patch = allPatches.find(p => p.id === patchId);
-        return patch && patch.review_status === 'pending';
-    });
+    // Find remaining pending patches (excluding the just-processed one)
+    const remainingPending = await getPendingConflictPatchIds(justProcessedPatchId);
 
     // If no more pending patches, exit preview
     if (remainingPending.length === 0) {
@@ -370,20 +382,8 @@ async function updateConflictTabs() {
     // Clear existing tabs
     tabsContainer.innerHTML = '';
 
-    // Only show tabs if there's a conflict group
-    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
-        return;
-    }
-
-    // Import fetchPatchList to get patch statuses
-    const { fetchPatchList } = await import('./timeline.js');
-    const allPatches = await fetchPatchList();
-
-    // Filter to only pending patches in the conflict group
-    const pendingPatchIds = previewState.conflictGroup.filter(patchId => {
-        const patch = allPatches.find(p => p.id === patchId);
-        return patch && patch.review_status === 'pending';
-    });
+    // Get pending patches in the conflict group
+    const pendingPatchIds = await getPendingConflictPatchIds();
 
     // Only show tabs if there are multiple pending patches in conflict
     if (pendingPatchIds.length <= 1) {
