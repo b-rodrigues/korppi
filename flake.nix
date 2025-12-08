@@ -16,7 +16,7 @@
         };
 
         # Use stable Rust toolchain
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+        rustToolchain = pkgs.rust-bin.stable."1.90.0".default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"

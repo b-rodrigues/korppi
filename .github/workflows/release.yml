@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"  # Match flake's nodejs_20
+          node-version: "20.19.6"  # Match flake's nodejs_20
           cache: npm
 
       - name: Install Rust
@@ -92,7 +92,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"  # Match flake's nodejs_20
+          node-version: "20.19.6"  # Match flake's nodejs_20
           cache: npm
 
       - name: Install Rust
@@ -137,7 +137,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"  # Match flake's nodejs_20
+          node-version: "20.19.6"  # Match flake's nodejs_20
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
