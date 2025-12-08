@@ -61,12 +61,15 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          . "$HOME/.nvm/nvm.sh"
+          npm ci
 
       - name: Build AppImage only
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"  # Allow AppImage tools to run without FUSE in container
         run: |
+          . "$HOME/.nvm/nvm.sh"
           . "$HOME/.cargo/env"
           npm run tauri build -- --bundles appimage
 
