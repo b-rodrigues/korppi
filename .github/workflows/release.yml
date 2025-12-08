@@ -2,8 +2,6 @@ name: Release Build
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
 
@@ -17,7 +15,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-22.04
+            runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
 
