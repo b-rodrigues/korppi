@@ -16,7 +16,7 @@
     <div class="page-wrapper">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
-            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" class="current">FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="timeline.html" >Timeline and History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" class="current">FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
         </nav>
 
         <!-- Main Content -->
@@ -31,23 +31,26 @@
 <hr />
 <h2 id="general">General</h2>
 <h3 id="what-is-korppi">What is Korppi?</h3>
-<p>Korppi is a markdown editor with built-in version history and
-reconciliation features. It's designed for writers who need to track
-changes, collaborate, and maintain document history.</p>
+<p>Korppi is a markdown editor with integrated version history and
+conflict-free merging. It lets you write, track changes, and collaborate
+asynchronously, all locally, with no dependence on third-party
+servers.</p>
 <h3 id="why-korppi">Why "Korppi"?</h3>
 <p>Korppi means "raven" in Finnish. Ravens are known for their
 intelligence and memory—fitting for an editor that remembers
 everything!</p>
 <h3 id="is-korppi-free">Is Korppi free?</h3>
-<p>Yes! Korppi is free and open source software, released under the MIT
-license.</p>
+<p>Yes! Korppi is free and open source software, released under the
+GPLv3 license.</p>
 <h3 id="what-platforms-does-korppi-support">What platforms does Korppi
 support?</h3>
 <ul>
-<li><strong>Linux</strong> (AppImage, Debian package)</li>
+<li><strong>Linux</strong> (AppImage)</li>
 <li><strong>macOS</strong> (DMG)</li>
-<li><strong>Windows</strong> (MSI installer)</li>
+<li><strong>Windows</strong> (EXE and MSI installer)</li>
 </ul>
+<h3 id="did-you-write-korppi">Did you write Korppi?</h3>
+<p>No, I designed Korppi, but Korppi was written 100% by LLMs!</p>
 <hr />
 <h2 id="documents">Documents</h2>
 <h3 id="whats-a-kmd-file">What's a .kmd file?</h3>
@@ -71,45 +74,40 @@ documents with non-Korppi users?</h3>
 </ul>
 <h3 id="i-accidentally-closed-without-saving-can-i-recover-my-work">I
 accidentally closed without saving. Can I recover my work?</h3>
-<p>If you had <strong>Autosave</strong> enabled, check the recent
-documents list—your last autosave should be there.</p>
-<p>If not, check for temporary files in your system's temp
-directory.</p>
+<p>If you didn't have autosave on, and if you ignored the prompt telling
+you that you had unsaved changes, too bad!</p>
 <hr />
 <h2 id="features">Features</h2>
 <h3 id="how-is-this-different-from-git">How is this different from
 Git?</h3>
-<p>Git is designed for code with line-based tracking. Korppi is designed
-for prose:</p>
-<ul>
-<li><strong>Semantic patches</strong> - Understands document
-structure</li>
-<li><strong>Visual timeline</strong> - No command line needed</li>
-<li><strong>Comments</strong> - Built-in review system</li>
-<li><strong>Rich formatting</strong> - Full markdown support</li>
-</ul>
+<p>Git manages code. Korppi manages writing. It provides non-technical
+collaborators with intuitive version history and automatic
+reconciliation so parallel edits can be merged into a clean, unified
+document.</p>
 <h3 id="can-multiple-people-edit-at-once">Can multiple people edit at
 once?</h3>
-<p>Real-time collaboration is planned but not yet implemented.
-Currently, use the <strong>Reconciliation</strong> feature to merge
-changes from different authors.</p>
+<p>No. Korppi is not a live collaborative editor. Instead, it’s designed
+for asynchronous collaboration: the workflow where people exchange
+revised versions of a document, add comments, and make tracked changes
+independently. Korppi streamlines this process by providing built-in
+reconciliation, making it easy to merge these parallel edits into a
+single, coherent document.</p>
 <h3 id="do-comments-appear-in-exported-files">Do comments appear in
 exported files?</h3>
-<ul>
-<li><strong>Markdown export:</strong> Comments are stripped (pure
-content only)</li>
-<li><strong>DOCX export:</strong> Comments as Word comments (coming
-soon)</li>
-</ul>
+<p>No. Korppi keeps comments and discussion inside the editor. The goal
+is to use Korppi for drafting, review, and revision. Once the content is
+finalized, you can export to Word and focus on formatting and layout
+there.</p>
 <h3 id="can-i-customize-keyboard-shortcuts">Can I customize keyboard
 shortcuts?</h3>
-<p>Not yet, but it's on the roadmap!</p>
+<p>No. Korppi is designed for business users who generally prefer
+consistent, preset shortcuts rather than custom configurations.</p>
 <hr />
 <h2 id="timeline--history">Timeline &amp; History</h2>
 <h3 id="how-far-back-does-the-history-go">How far back does the history
 go?</h3>
 <p>Korppi saves your complete edit history within each <code>.kmd</code>
-file. There's no limit—all patches are preserved.</p>
+file. There's no limit, all patches are preserved.</p>
 <h3 id="can-i-delete-history">Can I delete history?</h3>
 <p>Currently, no. History is considered valuable data. A future release
 may add the option to compact history.</p>
@@ -172,7 +170,7 @@ Issue</a></li>
             </article>
 
             <footer class="footer">
-                <p>Last updated: 2025-12-07</p>
+                <p>Last updated: 2025-12-08</p>
                 <div class="badges">
                     <span>MADE WITH ♥</span>
                     <span>HTML 4.0</span>

@@ -16,7 +16,7 @@
     <div class="page-wrapper">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
-            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" class="current">Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments {{NAV}} Reviews</a></li><li><a href="timeline.html" >Timeline {{NAV}} History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" class="current">Quick Start</a></li><li><a href="first-document.html" >Your First Document</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Features</div><ul><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="timeline.html" >Timeline and History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
         </nav>
 
         <!-- Main Content -->
@@ -33,9 +33,13 @@
 Document</h2>
 <ol type="1">
 <li>Launch Korppi</li>
+<li>The welcome screen invites you to configure your user profile (which
+you should, so people can put a face on an edit when you'll send them
+the document)</li>
 <li>Click <strong>New</strong> in the left sidebar (or press
 <code>Ctrl+N</code>)</li>
 <li>Start typing in the editor!</li>
+<li>All your edits are automatically saves as <em>patches</em></li>
 </ol>
 <p>The editor uses <strong>Markdown</strong> formatting, so you can
 write naturally:</p>
@@ -56,10 +60,13 @@ class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb1-1"><
 <code>Ctrl+S</code>)</li>
 <li>Choose a location and filename</li>
 <li>Your document is saved as a <code>.kmd</code> file</li>
+<li>Send this <code>.kmd</code> file to colleagues: they will have
+access to the complete history of your file and can add their
+edits!</li>
 </ol>
 <blockquote>
-<p><strong>Tip:</strong> Enable <strong>Autosave</strong> in the
-Preferences section to automatically save every few minutes!</p>
+<p><strong>Tip:</strong> Enable <strong>Autosave</strong> to
+automatically save every few minutes!</p>
 </blockquote>
 <hr />
 <h2 id="step-3-format-your-text">Step 3: Format Your Text</h2>
@@ -130,6 +137,13 @@ document's history:</p>
 <li>Click a patch to preview that version</li>
 <li>Use Preview/Restore to go back in time</li>
 </ol>
+<p>As your colleagues send you their versions of the file, you will be
+able to <em>reconcile</em> versions into one main document!</p>
+<h2 id="step-6-reconcile-versions">Step 6: Reconcile versions</h2>
+<p>Clicking on "Reconcile" will prompt you to import all the different
+version of the document into your current session. Doing so imports all
+the history of your colleagues as patches into the timeline. You will
+then have the possibility to accept or reject their changes.</p>
 <hr />
 <h2 id="step-6-export-your-document">Step 6: Export Your Document</h2>
 <p>When you're ready to share:</p>
@@ -197,7 +211,7 @@ document's history:</p>
             </article>
 
             <footer class="footer">
-                <p>Last updated: 2025-12-07</p>
+                <p>Last updated: 2025-12-08</p>
                 <div class="badges">
                     <span>MADE WITH ♥</span>
                     <span>HTML 4.0</span>
