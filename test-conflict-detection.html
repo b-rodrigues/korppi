@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conflict Detection Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .test.pass {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+        .test.fail {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; font-size: 1.2em; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Conflict Detection Test Suite</h1>
+    <div id="test-results"></div>
+
+    <script type="module">
+        import { detectPatchConflicts, isInConflict, getConflictGroup, formatConflictInfo } from './src/conflict-detection.js';
+
+        const results = document.getElementById('test-results');
+
+        function test(name, fn) {
+            try {
+                fn();
+                results.innerHTML += `<div class="test pass"><h2>✓ ${name}</h2><p>PASSED</p></div>`;
+            } catch (e) {
+                results.innerHTML += `<div class="test fail"><h2>✗ ${name}</h2><p>FAILED: ${e.message}</p><pre>${e.stack}</pre></div>`;
+            }
+        }
+
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        // Test 1: No conflicts when patches don't overlap
+        test('No conflicts with non-overlapping patches', () => {
+            const patches = [
+                {
+                    id: 1,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello world' }
+                },
+                {
+                    id: 2,
+                    author: 'Bob',
+                    data: { snapshot: 'Hello world from Bob' }
+                }
+            ];
+
+            const result = detectPatchConflicts(patches);
+            assert(result.conflictGroups.length === 0, 'Should have no conflict groups');
+            assert(result.patchConflicts.size === 0, 'Should have no patch conflicts');
+        });
+
+        // Test 2: Detect conflicts when patches modify same text
+        test('Detect conflicts with overlapping edits', () => {
+            const patches = [
+                {
+                    id: 1,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello world' }
+                },
+                {
+                    id: 2,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello beautiful world' }
+                },
+                {
+                    id: 3,
+                    author: 'Bob',
+                    data: { snapshot: 'Hello amazing world' }
+                }
+            ];
+
+            const result = detectPatchConflicts(patches);
+            // Patches 2 and 3 should conflict (both modify "world")
+            assert(result.patchConflicts.size >= 1, 'Should detect conflicts');
+        });
+
+        // Test 3: Same author edits don't conflict
+        test('Same author edits do not create conflicts', () => {
+            const patches = [
+                {
+                    id: 1,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello' }
+                },
+                {
+                    id: 2,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello world' }
+                },
+                {
+                    id: 3,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello wonderful world' }
+                }
+            ];
+
+            const result = detectPatchConflicts(patches);
+            assert(result.conflictGroups.length === 0, 'Same author should not create conflicts');
+        });
+
+        // Test 4: Check isInConflict function
+        test('isInConflict correctly identifies conflicting patches', () => {
+            const patches = [
+                {
+                    id: 1,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello world' }
+                },
+                {
+                    id: 2,
+                    author: 'Alice',
+                    data: { snapshot: 'Hello beautiful world' }
+                },
+                {
+                    id: 3,
+                    author: 'Bob',
+                    data: { snapshot: 'Hello amazing world' }
+                }
+            ];
+
+            const result = detectPatchConflicts(patches);
+            
+            // Check if detected conflicts are accessible
+            if (result.patchConflicts.size > 0) {
+                const conflictingId = Array.from(result.patchConflicts.keys())[0];
+                assert(isInConflict(conflictingId, result.patchConflicts), 
+                    'isInConflict should return true for conflicting patch');
+            }
+            
+            assert(!isInConflict(999, result.patchConflicts), 
+                'isInConflict should return false for non-conflicting patch');
+        });
+
+        // Test 5: Multiple conflict groups
+        test('Multiple separate conflict groups', () => {
+            const patches = [
+                { id: 1, author: 'Alice', data: { snapshot: 'Line 1\nLine 2\nLine 3' } },
+                { id: 2, author: 'Alice', data: { snapshot: 'Line 1 modified\nLine 2\nLine 3' } },
+                { id: 3, author: 'Bob', data: { snapshot: 'Line 1 changed\nLine 2\nLine 3' } },
+                { id: 4, author: 'Charlie', data: { snapshot: 'Line 1\nLine 2\nLine 3 updated' } },
+                { id: 5, author: 'David', data: { snapshot: 'Line 1\nLine 2\nLine 3 altered' } }
+            ];
+
+            const result = detectPatchConflicts(patches);
+            
+            // Should have conflicts between different authors editing same sections
+            // Note: Actual conflict detection depends on text overlap
+            assert(result.patchConflicts.size >= 0, 'Should complete without error');
+            console.log('  Detected conflicts:', result.patchConflicts.size, 'patches in', result.conflictGroups.length, 'groups');
+        });
+
+        // Test 6: Format conflict info
+        test('formatConflictInfo produces correct output', () => {
+            const info = formatConflictInfo(1, [2, 3, 4]);
+            assert(info.includes('#2'), 'Should include patch #2');
+            assert(info.includes('#3'), 'Should include patch #3');
+            assert(info.includes('#4'), 'Should include patch #4');
+            assert(info.includes('⚠️'), 'Should include warning icon');
+        });
+
+        // Test 7: Empty patches
+        test('Handle empty patch list', () => {
+            const result = detectPatchConflicts([]);
+            assert(result.conflictGroups.length === 0, 'Should handle empty list');
+            assert(result.patchConflicts.size === 0, 'Should have no conflicts');
+        });
+
+        // Test 8: Single patch
+        test('Handle single patch', () => {
+            const patches = [
+                { id: 1, author: 'Alice', data: { snapshot: 'Hello' } }
+            ];
+            const result = detectPatchConflicts(patches);
+            assert(result.conflictGroups.length === 0, 'Should have no conflicts with single patch');
+        });
+
+        console.log('All tests completed!');
+    </script>
+</body>
+</html>

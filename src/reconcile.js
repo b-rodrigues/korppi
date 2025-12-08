@@ -42,10 +42,14 @@ export async function startReconciliation() {
         }
 
         const fileCount = selectedPaths.length;
-        alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);
-
-        // Refresh the timeline to show imported patches
+        
+        // Refresh the timeline to show imported patches (this will also trigger conflict detection)
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
+        
+        // Use setTimeout to allow timeline refresh and conflict detection to complete first
+        setTimeout(() => {
+            alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);
+        }, 100);
 
     } catch (err) {
         console.error("Reconciliation failed:", err);

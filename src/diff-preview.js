@@ -8,13 +8,16 @@ import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { hexToRgba, escapeHtml } from './utils.js';
 import { getEditorContent } from './editor.js';
+import { getConflictState } from './timeline.js';
+import { getConflictGroup } from './conflict-detection.js';
 
 let previewState = {
     active: false,
     mode: 'highlight', // 'highlight' or 'diff'
     patchId: null,
     oldText: '',
-    newText: ''
+    newText: '',
+    conflictGroup: null // Array of patch IDs in the same conflict group
 };
 
 /**
@@ -24,12 +27,17 @@ let previewState = {
  * @param {string} newText - Current version text
  */
 export function enterPreview(patchId, oldText, newText) {
+    // Get conflict group if this patch is in conflict
+    const conflictState = getConflictState();
+    const conflictGroup = getConflictGroup(patchId, conflictState.conflictGroups);
+
     previewState = {
         active: true,
         mode: 'highlight',
         patchId,
         oldText,
-        newText
+        newText,
+        conflictGroup
     };
 
     showPreviewBanner();
@@ -45,7 +53,8 @@ export function exitPreview() {
         mode: 'highlight',
         patchId: null,
         oldText: '',
-        newText: ''
+        newText: '',
+        conflictGroup: null
     };
 
     hidePreviewBanner();
@@ -83,6 +92,7 @@ function showPreviewBanner() {
         banner.innerHTML = `
             <div class="preview-info">
                 <span class="preview-label">📋 Preview Mode: Patch #<span id="preview-patch-id"></span></span>
+                <div id="conflict-tabs" class="conflict-tabs"></div>
             </div>
             <div class="preview-controls">
                 <button class="mode-btn active" data-mode="highlight">🎨 Highlight</button>
@@ -131,6 +141,9 @@ function showPreviewBanner() {
         patchIdEl.textContent = previewState.patchId;
     }
 
+    // Update conflict tabs if this patch is in a conflict group
+    updateConflictTabs();
+
     banner.style.display = 'flex';
 }
 
@@ -159,9 +172,11 @@ function renderPreview() {
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'diff-preview-overlay';
+        overlay.className = 'diff-preview-overlay';
         const editorContainer = document.getElementById('editor');
-        if (editorContainer) {
-            editorContainer.appendChild(overlay);
+        if (editorContainer && editorContainer.parentElement) {
+            // Insert before the editor so it appears at the top, below the banner
+            editorContainer.parentElement.insertBefore(overlay, editorContainer);
         }
     }
 
@@ -217,11 +232,13 @@ async function acceptCurrentPatch() {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
+    const currentPatchId = previewState.patchId;
+
     try {
         // Update review status in database
         await invoke("update_patch_review_status", {
             docId,
-            patchId: previewState.patchId,
+            patchId: currentPatchId,
             status: "accepted"
         });
 
@@ -255,11 +272,11 @@ async function acceptCurrentPatch() {
         const { restoreDocumentState } = await import('./yjs-setup.js');
         restoreDocumentState(mergedContent);
 
-        alert("Patch accepted and merged!");
-        exitPreview();
-
-        // Refresh timeline
+        // Refresh timeline first
         window.dispatchEvent(new CustomEvent('patch-status-updated'));
+
+        // Try to advance to the next pending patch in the conflict group
+        await advanceToNextPendingPatch(currentPatchId);
 
     } catch (err) {
         console.error("Failed to accept patch:", err);
@@ -276,19 +293,21 @@ async function rejectCurrentPatch() {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
+    const currentPatchId = previewState.patchId;
+
     try {
         // Update review status in database
         await invoke("update_patch_review_status", {
             docId,
-            patchId: previewState.patchId,
+            patchId: currentPatchId,
             status: "rejected"
         });
 
-        alert("Patch rejected!");
-        exitPreview();
-
-        // Refresh timeline
+        // Refresh timeline first
         window.dispatchEvent(new CustomEvent('patch-status-updated'));
+
+        // Try to advance to the next pending patch in the conflict group
+        await advanceToNextPendingPatch(currentPatchId);
 
     } catch (err) {
         console.error("Failed to reject patch:", err);
@@ -302,4 +321,151 @@ async function rejectCurrentPatch() {
  */
 export function isPreviewActive() {
     return previewState.active;
+}
+
+/**
+ * Get pending patch IDs in the current conflict group
+ * @param {number|null} excludePatchId - Optional patch ID to exclude from results
+ * @returns {Promise<Array<number>>} - Array of pending patch IDs
+ */
+async function getPendingConflictPatchIds(excludePatchId = null) {
+    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
+        return [];
+    }
+
+    const { fetchPatchList } = await import('./timeline.js');
+    const allPatches = await fetchPatchList();
+
+    return previewState.conflictGroup.filter(patchId => {
+        if (excludePatchId !== null && patchId === excludePatchId) return false;
+        const patch = allPatches.find(p => p.id === patchId);
+        return patch && patch.review_status === 'pending';
+    });
+}
+
+/**
+ * Advance to the next pending patch in the conflict group
+ * If no more pending patches, exit preview
+ * @param {number} justProcessedPatchId - The patch that was just accepted/rejected
+ */
+async function advanceToNextPendingPatch(justProcessedPatchId) {
+    // If no conflict group, just exit
+    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
+        exitPreview();
+        return;
+    }
+
+    // Find remaining pending patches (excluding the just-processed one)
+    const remainingPending = await getPendingConflictPatchIds(justProcessedPatchId);
+
+    // If no more pending patches, exit preview
+    if (remainingPending.length === 0) {
+        exitPreview();
+        return;
+    }
+
+    // Switch to the first remaining pending patch
+    const nextPatchId = remainingPending[0];
+    await switchToConflictPatch(nextPatchId);
+
+    // Update the conflict tabs to reflect the new state
+    await updateConflictTabs();
+}
+
+/**
+ * Update the conflict tabs in the preview banner
+ */
+async function updateConflictTabs() {
+    const tabsContainer = document.getElementById('conflict-tabs');
+    if (!tabsContainer) return;
+
+    // Clear existing tabs
+    tabsContainer.innerHTML = '';
+
+    // Get pending patches in the conflict group
+    const pendingPatchIds = await getPendingConflictPatchIds();
+
+    // Only show tabs if there are multiple pending patches in conflict
+    if (pendingPatchIds.length <= 1) {
+        return;
+    }
+
+    // Show warning indicator
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'conflict-warning-header';
+    warningDiv.innerHTML = '⚠️ Conflicting patches:';
+    warningDiv.style.cssText = 'color:#f44336;font-weight:bold;font-size:0.9rem;margin-right:8px;';
+    tabsContainer.appendChild(warningDiv);
+
+    // Create tabs for each pending patch in the conflict group
+    for (const patchId of pendingPatchIds) {
+        const tab = document.createElement('button');
+        tab.className = 'conflict-tab';
+        tab.dataset.patchId = patchId;
+        tab.textContent = `Patch #${patchId}`;
+
+        if (patchId === previewState.patchId) {
+            tab.classList.add('active');
+        }
+
+        tab.addEventListener('click', async () => {
+            await switchToConflictPatch(patchId);
+        });
+
+        tabsContainer.appendChild(tab);
+    }
+}
+
+/**
+ * Switch preview to a different patch in the conflict group
+ * @param {number} patchId - The patch ID to switch to
+ */
+async function switchToConflictPatch(patchId) {
+    if (patchId === previewState.patchId) return;
+
+    // Import fetchPatch from timeline
+    const { fetchPatch, fetchPatchList } = await import('./timeline.js');
+
+    const patch = await fetchPatch(patchId);
+    if (!patch) {
+        alert("Failed to load patch");
+        return;
+    }
+
+    // Get current editor content as the "old" state
+    const currentContent = getEditorContent();
+
+    // Calculate what the merged result would be (3-way merge simulation)
+    const allPatches = await fetchPatchList();
+    const savePatchesOnly = allPatches
+        .filter(p => p.kind === "Save" && p.data?.snapshot)
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    const baseSnapshot = savePatchesOnly.length > 0
+        ? savePatchesOnly[0].data.snapshot
+        : '';
+
+    const patchContent = patch.data?.snapshot || '';
+
+    // Simulate what the merge would produce
+    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+
+    // Update preview state
+    previewState.patchId = patchId;
+    previewState.oldText = currentContent;
+    previewState.newText = mergedResult;
+
+    // Update UI
+    const patchIdEl = document.querySelector('#preview-patch-id');
+    if (patchIdEl) {
+        patchIdEl.textContent = patchId;
+    }
+
+    // Update tab states
+    document.querySelectorAll('.conflict-tab').forEach(tab => {
+        tab.classList.toggle('active', parseInt(tab.dataset.patchId) === patchId);
+    });
+
+    // Re-render preview
+    renderPreview();
 }

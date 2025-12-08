@@ -4,9 +4,20 @@ import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
 import { detectLineRange, formatLineRange } from "./line-range-detector.js";
+import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGroup } from "./conflict-detection.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
+
+// Track conflict state
+let conflictState = {
+    conflictGroups: [],
+    patchConflicts: new Map()
+};
+
+// Flag to control when conflict alert should be shown
+// Only set to true on document open or after reconciliation
+let showConflictAlertOnNextRefresh = false;
 
 export async function fetchPatchList() {
     const docId = getActiveDocumentId();
@@ -196,30 +207,42 @@ export function initTimeline() {
         });
     }
 
-    // Listen for patch status updates
+    // Listen for patch status updates (don't show conflict alert on accept/reject)
     window.addEventListener('patch-status-updated', async () => {
         await refreshTimeline();
     });
 
     // Listen for reconciliation import event
     window.addEventListener('reconciliation-imported', async () => {
+        showConflictAlertOnNextRefresh = true;
         await refreshTimeline();
     });
 
     // Listen for document changes (open, switch, new)
     onDocumentChange(async (event, doc) => {
         if (event === "open" || event === "new" || event === "activeChange") {
+            showConflictAlertOnNextRefresh = true;
             await refreshTimeline();
         }
     });
 
     // Initial load
+    showConflictAlertOnNextRefresh = true;
     refreshTimeline();
 }
 
 export function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
+
+    // Detect conflicts in patches
+    conflictState = detectPatchConflicts(patches);
+
+    // Show alert if conflicts detected AND we should show it (only on document open or after reconciliation)
+    if (conflictState.conflictGroups.length > 0 && showConflictAlertOnNextRefresh) {
+        showConflictAlertOnNextRefresh = false;
+        showConflictAlert(conflictState.conflictGroups, patches);
+    }
 
     // Get filter values
     const authorFilter = document.getElementById("filter-author")?.value || "all";
@@ -335,6 +358,19 @@ export function renderPatchList(patches) {
             }
         }
 
+        // Check if this patch is in conflict
+        const hasConflict = isInConflict(patch.id, conflictState.patchConflicts);
+        if (hasConflict) {
+            div.classList.add("has-conflict");
+        }
+
+        // Get conflict info
+        let conflictInfo = '';
+        if (hasConflict) {
+            const conflictingIds = conflictState.patchConflicts.get(patch.id) || [];
+            conflictInfo = formatConflictInfo(patch.id, conflictingIds);
+        }
+
         // Apply line range filter if set
         if (lineStart !== null || lineEnd !== null) {
             if (!patch._lineRange) {
@@ -358,6 +394,7 @@ export function renderPatchList(patches) {
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
                     <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${patch.author}</span>
+                    ${conflictInfo ? `<div class="conflict-warning" style="color:#f44336;font-size:0.75rem;margin-top:2px;">${conflictInfo}</div>` : ''}
                 </div>
                 <div class="timeline-item-actions">
                     <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
@@ -713,4 +750,40 @@ async function resetToOriginal() {
         console.error("Reset failed:", err);
         alert(`Failed to reset: ${err}`);
     }
+}
+
+// Track last alert time to prevent spam
+let lastConflictAlertTime = 0;
+
+/**
+ * Show alert when conflicts are detected
+ * @param {Array<Array<number>>} conflictGroups - Groups of conflicting patch IDs
+ * @param {Array} patches - All patches
+ */
+function showConflictAlert(conflictGroups, patches) {
+    // Only show alert once per timeline load (avoid spam on filters)
+    const timeSinceLastAlert = Date.now() - lastConflictAlertTime;
+    if (timeSinceLastAlert < 5000) {
+        return; // Don't spam alerts
+    }
+    lastConflictAlertTime = Date.now();
+
+    const groupCount = conflictGroups.length;
+    let message = `⚠️ ${groupCount} conflict group${groupCount > 1 ? 's' : ''} detected.\n\n`;
+
+    // Add details about each group
+    conflictGroups.forEach((group, index) => {
+        const patchIds = group.map(id => `#${id}`).join(', ');
+        message += `Group ${index + 1}: Patches ${patchIds} modify the same text.\n`;
+    });
+
+    alert(message);
+}
+
+/**
+ * Get the current conflict state (for use by other modules)
+ * @returns {Object} - { conflictGroups, patchConflicts }
+ */
+export function getConflictState() {
+    return conflictState;
 }
