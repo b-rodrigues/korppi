@@ -33,7 +33,7 @@ jobs:
           cache: npm
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
