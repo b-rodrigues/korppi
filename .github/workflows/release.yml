@@ -29,11 +29,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"  # Match flake's nodejs_20
           cache: npm
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.90.0"  # Pin to current stable for reproducibility
 
       - name: Setup swap space
         uses: actionhippie/swap-space@v1
@@ -78,7 +80,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - system: aarch64-darwin
+          - arch: aarch64
+            target: aarch64-apple-darwin
             runner: macos-latest
 
     runs-on: ${{ matrix.runner }}
@@ -86,24 +89,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@v3
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          workspaces: src-tauri
-          cache-on-failure: true
+          node-version: "20"  # Match flake's nodejs_20
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.90.0"  # Pin to current stable for reproducibility
+          targets: ${{ matrix.target }}
+
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Build .dmg
-        run: |
-          nix develop .# --impure --accept-flake-config -c \
-            bash -c "npm install && npm run tauri build"
+        run: npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload dmg
         uses: actions/upload-artifact@v4
         with:
-          name: korppi-${{ matrix.system }}-dmg
-          path: src-tauri/target/**/release/bundle/dmg/*.dmg
+          name: korppi-macos-${{ matrix.arch }}-dmg
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   # ─────────────────────────────────────────────
@@ -129,11 +137,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"  # Match flake's nodejs_20
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: "1.90.0"  # Pin to current stable for reproducibility
           targets: ${{ matrix.target }}
 
       - name: Install dependencies
