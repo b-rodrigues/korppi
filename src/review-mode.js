@@ -316,7 +316,7 @@ function renderSingleAuthorOverlay() {
         .sort((a, b) => a.timestamp - b.timestamp);
 
     const baseContent = acceptedPatches.length > 0
-        ? acceptedPatches[acceptedPatches.length - 1].data.snapshot
+        ? acceptedPatches[acceptedPatches.length - 1].data?.snapshot || ''
         : reviewState.baseContent;
 
     // Get the current author's latest snapshot

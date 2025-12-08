@@ -1,6 +1,6 @@
 // src/patch-grouper.js
 
-import { getAuthorId } from "./profile-service.js";
+import { getAuthorId, getCachedProfile } from "./profile-service.js";
 
 const TIME_WINDOW_MS = 600; // grouping horizon in ms
 const MAX_GROUP_SIZE = 100; // prevent unbounded growth
@@ -8,12 +8,18 @@ const MAX_GROUP_SIZE = 100; // prevent unbounded growth
 let currentGroup = null;
 
 function buildRecord(group) {
+  const profile = getCachedProfile();
   return {
     timestamp: group.startTimestamp,
     author: group.author,
     kind: "semantic_group",
-    data: group.patches,
-    snapshot: group.snapshot || ""
+    review_status: "accepted",  // Auto-accept own edits
+    data: {
+      patches: group.patches,
+      snapshot: group.snapshot || "",
+      authorName: profile?.name || "Local User",
+      authorColor: profile?.color || "#3498db"
+    }
   };
 }
 

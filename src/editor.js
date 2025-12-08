@@ -11,7 +11,7 @@ import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin, undo, redo } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
 
-import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence, switchDocument, loadDocumentState } from "./yjs-setup.js";
+import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence, switchDocument, loadDocumentState, isApplyingUpdate } from "./yjs-setup.js";
 import { stepToSemanticPatch } from "./patch-extractor.js";
 import {
     addSemanticPatches,
@@ -139,6 +139,11 @@ export async function initEditor() {
         const patchLoggerPlugin = new Plugin({
             appendTransaction(transactions, oldState, newState) {
                 if (!transactions.length) return;
+
+                // Skip patch recording when we're applying updates (e.g., restoring from patch)
+                if (isApplyingUpdate()) {
+                    return;
+                }
 
                 const semanticPatches = [];
 

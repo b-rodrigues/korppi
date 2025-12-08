@@ -5,6 +5,8 @@ import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
 import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGroup } from "./conflict-detection.js";
+import { getEditorContent } from "./editor.js";
+import { getCachedProfile } from "./profile-service.js";
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -45,8 +47,7 @@ export async function fetchPatch(id) {
  */
 export function hasSnapshotContent(patch) {
     if (!patch || !patch.data) return false;
-    // The snapshot field contains the text content - use optional chaining for safety
-    const snapshot = patch.data?.snapshot;
+    const snapshot = patch.data.snapshot;
     return typeof snapshot === 'string' && snapshot.length > 0;
 }
 
@@ -254,34 +255,73 @@ export function renderPatchList(patches) {
     // Calculate line end from start + range
     const lineEnd = (lineStart !== null && lineRange !== null) ? lineStart + lineRange : null;
 
-    // Populate author dropdown with unique authors
+    // Populate author dropdown with unique authors (use ID for value, name for display)
     const filterAuthorSelect = document.getElementById("filter-author");
     if (filterAuthorSelect && patches.length > 0) {
-        const uniqueAuthors = [...new Set(patches.map(p => p.author))];
+        // Build a map of author ID to display name
+        const authorMap = new Map();
+        patches.forEach(p => {
+            if (!authorMap.has(p.author)) {
+                const displayName = p.data?.authorName || p.author;
+                authorMap.set(p.author, displayName);
+            }
+        });
+
         const currentValue = filterAuthorSelect.value;
 
         filterAuthorSelect.innerHTML = '<option value="all">All Authors</option>' +
-            uniqueAuthors.map(author =>
-                `<option value="${author}" ${currentValue === author ? 'selected' : ''}>${author}</option>`
+            Array.from(authorMap.entries()).map(([authorId, displayName]) =>
+                `<option value="${authorId}" ${currentValue === authorId ? 'selected' : ''}>${displayName}</option>`
             ).join('');
     }
 
+    // Get current user's author ID for filtering
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+
+    // Helper: determine effective status of a patch
+    const getEffectiveStatus = (p) => {
+        if (p.review_status) return p.review_status;
+        // Patches by current user are implicitly "accepted"
+        // Patches by others are implicitly "pending"
+        return p.author === currentUserId ? "accepted" : "pending";
+    };
+
     // Filter patches
     let filteredPatches = patches.filter(p => {
+        // Must have snapshot content
+        if (!hasSnapshotContent(p)) {
+            return false;
+        }
+
         // Filter by author
         if (authorFilter !== "all" && p.author !== authorFilter) {
             return false;
         }
 
         // Filter by status
-        if (statusFilter !== "all" && p.review_status !== statusFilter) {
-            return false;
+        if (statusFilter !== "all") {
+            const effectiveStatus = getEffectiveStatus(p);
+            if (effectiveStatus !== statusFilter) {
+                return false;
+            }
         }
 
         return true;
     });
 
-    // Sort patches
+    // For "pending" status filter ONLY: hide patches that match current editor content
+    // These are "base" patches that don't represent changes to review
+    // We do NOT apply this filter for "accepted" or "all" views
+    if (statusFilter === "pending") {
+        const currentEditorContent = getEditorContent() || '';
+        filteredPatches = filteredPatches.filter(patch => {
+            const snapshot = patch.data?.snapshot || '';
+            return snapshot !== currentEditorContent;
+        });
+    }
+
+    // Sort patches BEFORE rendering (determines display order)
     if (sortOrder === "time-asc") {
         filteredPatches.sort((a, b) => a.timestamp - b.timestamp);
     } else if (sortOrder === "time-desc") {
@@ -312,9 +352,6 @@ export function renderPatchList(patches) {
         });
     }
 
-    // Filter to only show patches with snapshots  
-    filteredPatches = filteredPatches.filter(patch => hasSnapshotContent(patch));
-
     // Store filtered patches for later use
     const patchesBeforeLineFilter = [...filteredPatches];
 
@@ -329,10 +366,12 @@ export function renderPatchList(patches) {
 
         const ts = new Date(patch.timestamp).toLocaleString();
         const authorColor = patch.data?.authorColor || "#808080";
+        // Use authorName from data if available, fallback to author ID for backward compatibility
+        const authorDisplayName = patch.data?.authorName || patch.author;
 
         // Calculate line range if this patch has snapshot data
         let lineRangeInfo = '';
-        if (patch.data?.snapshot) {
+        if (hasSnapshotContent(patch)) {
             // Get previous patch for comparison
             const currentIndex = filteredPatches.indexOf(patch);
             let previousSnapshot = '';
@@ -340,7 +379,7 @@ export function renderPatchList(patches) {
             if (currentIndex > 0) {
                 // Find previous patch with snapshot
                 for (let i = currentIndex - 1; i >= 0; i--) {
-                    if (filteredPatches[i].data?.snapshot) {
+                    if (hasSnapshotContent(filteredPatches[i])) {
                         previousSnapshot = filteredPatches[i].data.snapshot;
                         break;
                     }
@@ -393,7 +432,7 @@ export function renderPatchList(patches) {
             <div class="timeline-item-header">
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
-                    <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${patch.author}</span>
+                    <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${authorDisplayName}</span>
                     ${conflictInfo ? `<div class="conflict-warning" style="color:#f44336;font-size:0.75rem;margin-top:2px;">${conflictInfo}</div>` : ''}
                 </div>
                 <div class="timeline-item-actions">
@@ -479,7 +518,7 @@ async function previewPatch(patchId) {
 
     const allPatches = await fetchPatchList();
     const savePatchesOnly = allPatches
-        .filter(p => p.kind === "Save" && p.data?.snapshot)
+        .filter(p => p.kind === "Save" && hasSnapshotContent(p))
         .sort((a, b) => a.timestamp - b.timestamp);
 
     const baseSnapshot = savePatchesOnly.length > 0
@@ -517,7 +556,7 @@ async function viewPatchContent(patchId) {
 
     if (currentIndex > 0) {
         const previousPatch = savePatchesOnly[currentIndex - 1];
-        const previousContent = previousPatch.data?.snapshot || "";
+        const previousContent = previousPatch.data?.snapshot || '';
         diff = calculateDiff(previousContent, content);
     } else {
         diff = "No previous version to compare with";
@@ -686,10 +725,11 @@ function showContentModal(patchId, content, diff) {
 export function renderPatchDetails(patch) {
     const details = document.getElementById("timeline-details");
     const canRestore = hasSnapshotContent(patch);
+    const authorDisplayName = patch.data?.authorName || patch.author;
 
     details.innerHTML = `
         <h3>Patch #${patch.id}</h3>
-        <p><strong>Author:</strong> ${patch.author}</p>
+        <p><strong>Author:</strong> ${authorDisplayName}</p>
         <p><strong>Kind:</strong> ${patch.kind}</p>
         ${canRestore ? `<button class="restore-btn-detail" data-patch-id="${patch.id}">↩ Restore to this version</button>` : '<p class="no-restore-hint">No snapshot available for restoration</p>'}
         <pre>${JSON.stringify(patch.data, null, 2)}</pre>

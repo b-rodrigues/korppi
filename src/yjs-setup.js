@@ -113,6 +113,10 @@ export function endApplyingDiskUpdates() {
     applyingCounter--;
 }
 
+export function isApplyingUpdate() {
+    return applyingCounter > 0;
+}
+
 // Force immediate save (for beforeunload, etc.)
 export async function forceSave() {
     if (saveTimeout) clearTimeout(saveTimeout);
@@ -169,7 +173,7 @@ export function restoreDocumentState(textContent) {
     try {
         // Get the XML fragment and clear it
         const xmlFragment = ydoc.getXmlFragment("prosemirror");
-        
+
         // Use a transaction to make the change atomic
         ydoc.transact(() => {
             // Delete all existing content
@@ -180,7 +184,7 @@ export function restoreDocumentState(textContent) {
             // Create a paragraph node with the restored text
             // Split by newlines to create separate paragraphs
             const paragraphs = textContent.split('\n');
-            
+
             for (const para of paragraphs) {
                 const paragraph = new Y.XmlElement('paragraph');
                 const textNode = new Y.XmlText();

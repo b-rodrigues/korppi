@@ -69,14 +69,17 @@ export async function saveDocument(id = null, path = null) {
             if (!lastSavePatch || lastSavePatch.data.snapshot !== editorContent) {
                 const timestamp = Date.now();
                 const profile = getCachedProfile();
-                const author = profile?.name || "Local User";
+                const author = profile?.id || "local";
+                const authorName = profile?.name || "Local User";
                 const authorColor = profile?.color || "#3498db";
                 const patch = {
                     timestamp,
                     author,
                     kind: "Save",
+                    review_status: "accepted",  // Auto-accept own saves
                     data: {
                         snapshot: editorContent,
+                        authorName,  // Store author name for display
                         authorColor  // Store author color for multi-author highlighting
                     }
                 };

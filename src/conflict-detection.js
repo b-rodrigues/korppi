@@ -4,14 +4,14 @@
 import { calculateCharDiff } from './diff-highlighter.js';
 
 /**
- * Detect conflicts between patches by analyzing overlapping edits
- * @param {Array} patches - List of patches to analyze
+ * Detect conflicts between patches based on overlapping edit locations.
+ * @param {Array} patches - Array of patches with snapshot data
  * @returns {Object} - { conflictGroups: Array<Array<patchId>>, patchConflicts: Map<patchId, Array<patchId>> }
  */
 export function detectPatchConflicts(patches) {
     // Only analyze patches with snapshot content
     const patchesWithContent = patches.filter(p => p.data?.snapshot);
-    
+
     if (patchesWithContent.length < 2) {
         return { conflictGroups: [], patchConflicts: new Map() };
     }
@@ -23,7 +23,7 @@ export function detectPatchConflicts(patches) {
         const prevPatch = i > 0 ? patchesWithContent[i - 1] : null;
         const prevContent = prevPatch?.data?.snapshot || '';
         const currentContent = patch.data.snapshot;
-        
+
         const ranges = extractEditRanges(prevContent, currentContent);
         if (ranges.length > 0) {
             patchEditRanges.push({
@@ -36,17 +36,17 @@ export function detectPatchConflicts(patches) {
 
     // Find overlapping patches
     const conflicts = new Map(); // patchId -> Set of conflicting patchIds
-    
+
     for (let i = 0; i < patchEditRanges.length; i++) {
         for (let j = i + 1; j < patchEditRanges.length; j++) {
             const patchA = patchEditRanges[i];
             const patchB = patchEditRanges[j];
-            
+
             // Skip if same author (not a conflict)
             if (patchA.author === patchB.author) {
                 continue;
             }
-            
+
             // Check if any ranges overlap
             if (hasOverlappingRanges(patchA.ranges, patchB.ranges)) {
                 // Add conflict relationship
@@ -84,7 +84,7 @@ function extractEditRanges(oldText, newText) {
     const diff = calculateCharDiff(oldText, newText);
     const ranges = [];
     let newTextPos = 0;
-    
+
     for (const op of diff) {
         if (op.type === 'add') {
             // Addition in new text
@@ -116,15 +116,15 @@ function extractEditRanges(oldText, newText) {
  */
 function mergeRanges(ranges) {
     if (ranges.length === 0) return [];
-    
+
     // Sort by start position
     const sorted = [...ranges].sort((a, b) => a.start - b.start);
     const merged = [sorted[0]];
-    
+
     for (let i = 1; i < sorted.length; i++) {
         const current = sorted[i];
         const last = merged[merged.length - 1];
-        
+
         // If ranges overlap or are adjacent, merge them
         if (current.start <= last.end) {
             last.end = Math.max(last.end, current.end);
@@ -132,7 +132,7 @@ function mergeRanges(ranges) {
             merged.push(current);
         }
     }
-    
+
     return merged;
 }
 
@@ -163,21 +163,21 @@ function hasOverlappingRanges(rangesA, rangesB) {
 function groupConflicts(patchConflicts) {
     const visited = new Set();
     const groups = [];
-    
+
     for (const [patchId] of patchConflicts) {
         if (visited.has(patchId)) continue;
-        
+
         // BFS to find all connected patches
         const group = new Set();
         const queue = [patchId];
-        
+
         while (queue.length > 0) {
             const current = queue.shift();
             if (visited.has(current)) continue;
-            
+
             visited.add(current);
             group.add(current);
-            
+
             const conflicts = patchConflicts.get(current) || [];
             for (const conflictId of conflicts) {
                 if (!visited.has(conflictId)) {
@@ -185,12 +185,12 @@ function groupConflicts(patchConflicts) {
                 }
             }
         }
-        
+
         if (group.size > 1) {
             groups.push(Array.from(group).sort((a, b) => a - b));
         }
     }
-    
+
     return groups;
 }
 
@@ -227,10 +227,10 @@ export function getConflictGroup(patchId, conflictGroups) {
  */
 export function formatConflictInfo(patchId, conflictingPatchIds) {
     if (conflictingPatchIds.length === 0) return '';
-    
+
     const others = conflictingPatchIds.filter(id => id !== patchId);
     if (others.length === 0) return '';
-    
+
     const ids = others.map(id => `#${id}`).join(', ');
     return `⚠️ Conflicts with ${ids}`;
 }
