@@ -6,14 +6,20 @@ const TIME_WINDOW_MS = 600; // grouping horizon in ms
 const MAX_GROUP_SIZE = 100; // prevent unbounded growth
 
 let currentGroup = null;
+let lastPatchUuid = null; // Track parentage in memory
 
 function buildRecord(group) {
   const profile = getCachedProfile();
-  return {
+
+  // Generate a new UUID for this patch
+  const patchUuid = crypto.randomUUID();
+
+  const record = {
     timestamp: group.startTimestamp,
     author: group.author,
     kind: "semantic_group",
-    review_status: "accepted",  // Auto-accept own edits
+    uuid: patchUuid,
+    parent_uuid: lastPatchUuid,
     data: {
       patches: group.patches,
       snapshot: group.snapshot || "",
@@ -21,6 +27,11 @@ function buildRecord(group) {
       authorColor: profile?.color || "#3498db"
     }
   };
+
+  // Update parent pointer for next patch
+  lastPatchUuid = patchUuid;
+
+  return record;
 }
 
 // Add one or more semantic patches (from one transaction).
@@ -102,4 +113,9 @@ export function getGroupStats() {
     ageMs: Date.now() - currentGroup.startTimestamp,
     author: currentGroup.author,
   };
+}
+
+// Allow setting the last patch UUID explicitly (e.g. on document load)
+export function setLastPatchUuid(uuid) {
+  lastPatchUuid = uuid;
 }

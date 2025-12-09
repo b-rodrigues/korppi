@@ -1,6 +1,7 @@
 // src/yjs-setup.js
 import * as Y from "yjs";
 import { invoke } from "@tauri-apps/api/core";
+import { setLastPatchUuid } from "./patch-grouper.js";
 import {
     getActiveDocumentId,
     updateDocumentState,
@@ -37,8 +38,24 @@ export async function loadDocumentState(docId = null) {
         } else {
             // console.log("YJS: Loaded state is empty");
         }
+
+        // Load the last patch UUID to continue the history chain
+        const patches = await invoke("list_document_patches", { id });
+        if (patches && patches.length > 0) {
+            // Sort by ID descending to get the latest
+            patches.sort((a, b) => b.id - a.id);
+            const lastPatch = patches[0];
+            if (lastPatch.uuid) {
+                setLastPatchUuid(lastPatch.uuid);
+            }
+        } else {
+            // No patches yet, start fresh chain
+            setLastPatchUuid(null);
+        }
+
     } catch (err) {
         console.warn("Failed to load document state, starting fresh:", err);
+        setLastPatchUuid(null);
     } finally {
         applyingCounter--;
     }

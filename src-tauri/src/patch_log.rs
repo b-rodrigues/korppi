@@ -10,6 +10,7 @@ use uuid::Uuid;
 use zip::ZipArchive;
 
 use crate::comments::{Comment, init_comments_table};
+use crate::db_utils::ensure_schema;
 
 /// Generate a deterministic patch UID from content
 /// Uses SHA256 hash of author + timestamp + snapshot content
@@ -47,28 +48,10 @@ fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
 fn get_conn(app: &AppHandle) -> Result<Connection, String> {
     let path = db_path(app)?;
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
-    conn.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS patches (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            author      TEXT    NOT NULL,
-            kind        TEXT    NOT NULL,
-            data        TEXT    NOT NULL
-        );
 
-        CREATE TABLE IF NOT EXISTS snapshots (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            patch_id    INTEGER NOT NULL,
-            state       BLOB    NOT NULL,
-            FOREIGN KEY (patch_id) REFERENCES patches(id)
-        );
+    // Use shared schema definition
+    ensure_schema(&conn)?;
 
-        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
-        "#,
-    )
-    .map_err(|e| e.to_string())?;
     Ok(conn)
 }
 
@@ -78,6 +61,8 @@ pub struct PatchInput {
     pub author: String,
     pub kind: String,
     pub data: serde_json::Value,
+    pub uuid: Option<String>,
+    pub parent_uuid: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -87,30 +72,41 @@ pub struct Patch {
     pub author: String,
     pub kind: String,
     pub data: serde_json::Value,
-    #[serde(default = "default_review_status")]
-    pub review_status: String,
     #[serde(default)]
-    pub patch_uid: Option<String>,
+    pub uuid: Option<String>,
+    #[serde(default)]
+    pub parent_uuid: Option<String>,
 }
 
-fn default_review_status() -> String {
-    "pending".to_string()
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PatchReview {
+    pub patch_uuid: String,
+    pub reviewer_id: String,
+    pub decision: String, // "accepted" or "rejected"
+    pub reviewer_name: Option<String>,
+    pub reviewed_at: i64,
 }
 
 #[tauri::command]
-pub fn record_patch(app: AppHandle, patch: PatchInput) -> Result<(), String> {
+pub fn record_patch(app: AppHandle, patch: PatchInput, parent_uuid: Option<String>) -> Result<String, String> {
     let conn = get_conn(&app)?;
     let data_str =
         serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
 
+    // Use provided UUID or generate new one
+    let patch_uuid = patch.uuid.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // Use provided parent_uuid (from struct) or argument fallback
+    let actual_parent = patch.parent_uuid.or(parent_uuid);
+
     conn.execute(
-        "INSERT INTO patches (timestamp, author, kind, data)
-         VALUES (?1, ?2, ?3, ?4)",
-        params![patch.timestamp, patch.author, patch.kind, data_str],
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![patch.timestamp, patch.author, patch.kind, data_str, patch_uuid, actual_parent],
     )
     .map_err(|e| e.to_string())?;
 
-    Ok(())
+    Ok(patch_uuid)
 }
 
 #[tauri::command]
@@ -118,7 +114,7 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
     let conn = get_conn(&app)?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, timestamp, author, kind, data
+            "SELECT id, timestamp, author, kind, data, uuid, parent_uuid
              FROM patches
              ORDER BY id ASC",
         )
@@ -136,8 +132,8 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
-                review_status: "pending".to_string(),
-                patch_uid: None,
+                uuid: row.get(5).ok(),
+                parent_uuid: row.get(6).ok(),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -154,7 +150,7 @@ pub fn list_patches(app: AppHandle) -> Result<Vec<Patch>, String> {
 pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
     let conn = get_conn(&app)?;
     let mut stmt = conn
-        .prepare("SELECT id, timestamp, author, kind, data FROM patches WHERE id = ?1")
+        .prepare("SELECT id, timestamp, author, kind, data, uuid, parent_uuid FROM patches WHERE id = ?1")
         .map_err(|e| e.to_string())?;
 
     let patch = stmt
@@ -169,8 +165,8 @@ pub fn get_patch(app: AppHandle, id: i64) -> Result<Patch, String> {
                 author: row.get(2)?,
                 kind: row.get(3)?,
                 data,
-                review_status: "pending".to_string(),
-                patch_uid: None,
+                uuid: row.get(5).ok(),
+                parent_uuid: row.get(6).ok(),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -282,14 +278,14 @@ pub fn import_patches_from_document(
         .map_err(|e| format!("Failed to open source history: {}", e))?;
     
     // Get all Save patches from source (ignore intermediate edits)
-    let source_patches: Vec<(i64, i64, String, String, String)> = {
+    let source_patches: Vec<(i64, i64, String, String, String, Option<String>, Option<String>)> = {
+        // First try with uuid and parent_uuid columns
+        let query = "SELECT id, timestamp, author, kind, data, uuid, parent_uuid FROM patches WHERE kind = 'Save' ORDER BY timestamp ASC";
+        let query_fallback = "SELECT id, timestamp, author, kind, data, NULL as uuid, NULL as parent_uuid FROM patches WHERE kind = 'Save' ORDER BY timestamp ASC";
+
         let mut stmt = source_conn
-            .prepare(
-                "SELECT id, timestamp, author, kind, data
-                 FROM patches
-                 WHERE kind = 'Save'
-                 ORDER BY timestamp ASC"
-            )
+            .prepare(query)
+            .or_else(|_| source_conn.prepare(query_fallback))
             .map_err(|e| e.to_string())?;
         
         let rows = stmt
@@ -300,6 +296,8 @@ pub fn import_patches_from_document(
                     row.get(2)?,
                     row.get(3)?,
                     row.get(4)?,
+                    row.get(5).ok(),
+                    row.get(6).ok(),
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -311,7 +309,7 @@ pub fn import_patches_from_document(
     
     // Get snapshots for those patches
     let mut snapshot_map: HashMap<i64, Vec<u8>> = HashMap::new();
-    for (patch_id, _, _, _, _) in &source_patches {
+    for (patch_id, _, _, _, _, _, _) in &source_patches {
         let state: Option<Vec<u8>> = source_conn
             .query_row(
                 "SELECT state FROM snapshots WHERE patch_id = ?1",
@@ -326,10 +324,7 @@ pub fn import_patches_from_document(
         }
     }
     
-
-    
     // Get target document's history database path
-    // The history is stored in the temp directory for the document
     let temp_base = std::env::temp_dir().join("korppi-documents");
     let target_history_path = temp_base.join(&target_doc_id).join("history.sqlite");
     
@@ -340,26 +335,25 @@ pub fn import_patches_from_document(
     let target_conn = Connection::open(&target_history_path)
         .map_err(|e| e.to_string())?;
     
-    // Add patch_uid column to existing tables (migration for older databases)
-    target_conn.execute("ALTER TABLE patches ADD COLUMN patch_uid TEXT", []).ok();
-    target_conn.execute("CREATE INDEX IF NOT EXISTS idx_patches_patch_uid ON patches(patch_uid)", []).ok();
+    // Use shared schema definition
+    ensure_schema(&target_conn)?;
     
-    // Import patches into target, skipping duplicates by patch_uid
+    // Import patches into target, deduplicating by UUID
     let mut imported_patches = Vec::new();
     
-    for (source_patch_id, timestamp, author, kind, data_str) in source_patches {
-        // Parse data to generate patch_uid
+    for (source_patch_id, timestamp, author, kind, data_str, source_uuid, parent_uuid) in source_patches {
+        // Parse data
         let data: serde_json::Value = serde_json::from_str(&data_str)
             .unwrap_or(serde_json::Value::Null);
         
-        // Generate deterministic patch UID for this patch
-        let patch_uid = generate_patch_uid(&author, timestamp, &data);
+        // Use existing UUID or generate a new one
+        let patch_uuid = source_uuid.unwrap_or_else(|| Uuid::new_v4().to_string());
         
-        // Check if this patch already exists by patch_uid (fast hash comparison)
+        // Check if this patch already exists by UUID
         let exists: bool = target_conn
             .query_row(
-                "SELECT 1 FROM patches WHERE patch_uid = ?1",
-                params![&patch_uid],
+                "SELECT 1 FROM patches WHERE uuid = ?1",
+                params![&patch_uuid],
                 |_| Ok(true)
             )
             .optional()
@@ -367,15 +361,15 @@ pub fn import_patches_from_document(
             .unwrap_or(false);
         
         if exists {
-            // Skip this patch, it's already in the target
+            // Patch already exists, skip insert but import reviews below
             continue;
         }
         
-        // Insert patch with 'pending' review status (imported patches need review)
+        // Insert new patch
         target_conn
             .execute(
-                "INSERT INTO patches (timestamp, author, kind, data, review_status, patch_uid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![timestamp, &author, &kind, &data_str, "pending", &patch_uid],
+                "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![timestamp, &author, &kind, &data_str, &patch_uuid, parent_uuid],
             )
             .map_err(|e| e.to_string())?;
         
@@ -397,11 +391,14 @@ pub fn import_patches_from_document(
             author,
             kind,
             data,
-            review_status: "pending".to_string(),
-            patch_uid: Some(patch_uid),
+            uuid: Some(patch_uuid),
+            parent_uuid,
         });
     }
     
+    // Import reviews from source to target
+    import_reviews(&source_conn, &target_conn)?;
+
     // Import comments
     import_comments(&source_conn, &target_conn)?;
 
@@ -410,6 +407,52 @@ pub fn import_patches_from_document(
     std::fs::remove_file(&temp_db_path).ok();
 
     Ok(imported_patches)
+}
+
+fn import_reviews(source_conn: &Connection, target_conn: &Connection) -> Result<(), String> {
+    // Check if patch_reviews table exists in source
+    let table_exists: bool = source_conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='patch_reviews'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if !table_exists {
+        return Ok(());
+    }
+
+    // Get all reviews from source
+    let mut stmt = source_conn
+        .prepare("SELECT patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at FROM patch_reviews")
+        .map_err(|e| e.to_string())?;
+
+    let source_reviews = stmt
+        .query_map([], |row| {
+            Ok(PatchReview {
+                patch_uuid: row.get(0)?,
+                reviewer_id: row.get(1)?,
+                decision: row.get(2)?,
+                reviewer_name: row.get(3)?,
+                reviewed_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    // Import reviews (INSERT OR REPLACE to handle duplicates)
+    for review in source_reviews {
+        target_conn
+            .execute(
+                "INSERT OR REPLACE INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![review.patch_uuid, review.reviewer_id, review.decision, review.reviewer_name, review.reviewed_at],
+            )
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 fn import_comments(source_conn: &Connection, target_conn: &Connection) -> Result<(), String> {
@@ -502,6 +545,112 @@ fn import_comments(source_conn: &Connection, target_conn: &Connection) -> Result
     }
 
     Ok(())
+}
+
+/// Record a review for a patch
+#[tauri::command]
+pub fn record_patch_review(
+    app: AppHandle,
+    patch_uuid: String,
+    reviewer_id: String,
+    decision: String,
+    reviewer_name: Option<String>,
+) -> Result<(), String> {
+    let conn = get_conn(&app)?;
+
+    // Validate decision
+    if decision != "accepted" && decision != "rejected" {
+        return Err(format!("Invalid decision: {}. Must be 'accepted' or 'rejected'", decision));
+    }
+
+    let reviewed_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as i64;
+
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Get reviews for a specific patch
+#[tauri::command]
+pub fn get_patch_reviews(
+    app: AppHandle,
+    patch_uuid: String,
+) -> Result<Vec<PatchReview>, String> {
+    let conn = get_conn(&app)?;
+
+    let mut stmt = conn
+        .prepare("SELECT patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at FROM patch_reviews WHERE patch_uuid = ?1 ORDER BY reviewed_at DESC")
+        .map_err(|e| e.to_string())?;
+
+    let reviews = stmt
+        .query_map([patch_uuid], |row| {
+            Ok(PatchReview {
+                patch_uuid: row.get(0)?,
+                reviewer_id: row.get(1)?,
+                decision: row.get(2)?,
+                reviewer_name: row.get(3)?,
+                reviewed_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(reviews)
+}
+
+/// Get patches that need review by the current user
+#[tauri::command]
+pub fn get_patches_needing_review(
+    app: AppHandle,
+    reviewer_id: String,
+) -> Result<Vec<Patch>, String> {
+    let conn = get_conn(&app)?;
+
+    // Query patches where author != reviewer_id and no review exists from reviewer_id
+    let mut stmt = conn
+        .prepare(
+            "SELECT p.id, p.timestamp, p.author, p.kind, p.data, p.uuid, p.parent_uuid
+             FROM patches p
+             WHERE p.author != ?1
+             AND p.uuid IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM patch_reviews pr
+                 WHERE pr.patch_uuid = p.uuid
+                 AND pr.reviewer_id = ?1
+             )
+             ORDER BY p.timestamp ASC"
+        )
+        .map_err(|e| e.to_string())?;
+
+    let patches = stmt
+        .query_map([reviewer_id], |row| {
+            let data_str: String = row.get(4)?;
+            let data: serde_json::Value =
+                serde_json::from_str(&data_str).unwrap_or(serde_json::Value::Null);
+
+            Ok(Patch {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                author: row.get(2)?,
+                kind: row.get(3)?,
+                data,
+                uuid: row.get(5).ok(),
+                parent_uuid: row.get(6).ok(),
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(patches)
 }
 
 /// Result of a restore operation
