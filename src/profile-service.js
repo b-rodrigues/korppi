@@ -60,6 +60,18 @@ export function getAuthorId() {
 }
 
 /**
+ * Get the current user's ID and name for review attribution.
+ * Returns safe defaults if profile hasn't been loaded.
+ * @returns {{ id: string, name: string }} The current user info
+ */
+export function getCurrentUserInfo() {
+    return {
+        id: cachedProfile?.id || 'local',
+        name: cachedProfile?.name || 'Local User'
+    };
+}
+
+/**
  * Initialize the profile on app startup.
  * Loads and caches the profile.
  * @returns {Promise<Object>} The loaded profile
