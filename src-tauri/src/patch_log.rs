@@ -10,6 +10,7 @@ use uuid::Uuid;
 use zip::ZipArchive;
 
 use crate::comments::{Comment, init_comments_table};
+use crate::db_utils::ensure_schema;
 
 /// Generate a deterministic patch UID from content
 /// Uses SHA256 hash of author + timestamp + snapshot content
@@ -47,55 +48,10 @@ fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
 fn get_conn(app: &AppHandle) -> Result<Connection, String> {
     let path = db_path(app)?;
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
-    conn.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS patches (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            author      TEXT    NOT NULL,
-            kind        TEXT    NOT NULL,
-            data        TEXT    NOT NULL,
-            uuid        TEXT,
-            parent_uuid TEXT
-        );
 
-        CREATE TABLE IF NOT EXISTS snapshots (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            patch_id    INTEGER NOT NULL,
-            state       BLOB    NOT NULL,
-            FOREIGN KEY (patch_id) REFERENCES patches(id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS patch_reviews (
-            patch_uuid   TEXT NOT NULL,
-            reviewer_id  TEXT NOT NULL,
-            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
-            reviewer_name TEXT,
-            reviewed_at  INTEGER NOT NULL,
-            PRIMARY KEY (patch_uuid, reviewer_id)
-        );
+    // Use shared schema definition
+    ensure_schema(&conn)?;
 
-        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
-        CREATE INDEX IF NOT EXISTS idx_patch_reviews_reviewer_id ON patch_reviews(reviewer_id);
-        CREATE INDEX IF NOT EXISTS idx_patches_uuid ON patches(uuid);
-        "#,
-    )
-    .map_err(|e| e.to_string())?;
-    
-    // Migration: Add uuid and parent_uuid columns if they don't exist (without UNIQUE constraint initially)
-    conn.execute("ALTER TABLE patches ADD COLUMN uuid TEXT", []).ok();
-    conn.execute("ALTER TABLE patches ADD COLUMN parent_uuid TEXT", []).ok();
-    
-    // Generate UUIDs for existing rows that don't have one
-    conn.execute(
-        "UPDATE patches SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL",
-        [],
-    ).ok();
-    
-    // Now we can safely add the UNIQUE constraint by recreating the index
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_uuid_unique ON patches(uuid)", []).ok();
-    
     Ok(conn)
 }
 
@@ -105,6 +61,8 @@ pub struct PatchInput {
     pub author: String,
     pub kind: String,
     pub data: serde_json::Value,
+    pub uuid: Option<String>,
+    pub parent_uuid: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -135,13 +93,16 @@ pub fn record_patch(app: AppHandle, patch: PatchInput, parent_uuid: Option<Strin
     let data_str =
         serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
 
-    // Generate UUID for new patch
-    let patch_uuid = Uuid::new_v4().to_string();
+    // Use provided UUID or generate new one
+    let patch_uuid = patch.uuid.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // Use provided parent_uuid (from struct) or argument fallback
+    let actual_parent = patch.parent_uuid.or(parent_uuid);
 
     conn.execute(
         "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![patch.timestamp, patch.author, patch.kind, data_str, patch_uuid, parent_uuid],
+        params![patch.timestamp, patch.author, patch.kind, data_str, patch_uuid, actual_parent],
     )
     .map_err(|e| e.to_string())?;
 
@@ -321,7 +282,7 @@ pub fn import_patches_from_document(
         // First try with uuid and parent_uuid columns
         let query = "SELECT id, timestamp, author, kind, data, uuid, parent_uuid FROM patches WHERE kind = 'Save' ORDER BY timestamp ASC";
         let query_fallback = "SELECT id, timestamp, author, kind, data, NULL as uuid, NULL as parent_uuid FROM patches WHERE kind = 'Save' ORDER BY timestamp ASC";
-        
+
         let mut stmt = source_conn
             .prepare(query)
             .or_else(|_| source_conn.prepare(query_fallback))
@@ -374,22 +335,8 @@ pub fn import_patches_from_document(
     let target_conn = Connection::open(&target_history_path)
         .map_err(|e| e.to_string())?;
     
-    // Ensure new schema exists (migration for older databases)
-    target_conn.execute("ALTER TABLE patches ADD COLUMN uuid TEXT UNIQUE", []).ok();
-    target_conn.execute("ALTER TABLE patches ADD COLUMN parent_uuid TEXT", []).ok();
-    target_conn.execute(
-        r#"CREATE TABLE IF NOT EXISTS patch_reviews (
-            patch_uuid   TEXT NOT NULL,
-            reviewer_id  TEXT NOT NULL,
-            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
-            reviewer_name TEXT,
-            reviewed_at  INTEGER NOT NULL,
-            PRIMARY KEY (patch_uuid, reviewer_id)
-        )"#,
-        [],
-    ).ok();
-    target_conn.execute("CREATE INDEX IF NOT EXISTS idx_patches_uuid ON patches(uuid)", []).ok();
-    target_conn.execute("CREATE INDEX IF NOT EXISTS idx_patch_reviews_reviewer_id ON patch_reviews(reviewer_id)", []).ok();
+    // Use shared schema definition
+    ensure_schema(&target_conn)?;
     
     // Import patches into target, deduplicating by UUID
     let mut imported_patches = Vec::new();
@@ -451,7 +398,7 @@ pub fn import_patches_from_document(
     
     // Import reviews from source to target
     import_reviews(&source_conn, &target_conn)?;
-    
+
     // Import comments
     import_comments(&source_conn, &target_conn)?;
 
@@ -610,23 +557,23 @@ pub fn record_patch_review(
     reviewer_name: Option<String>,
 ) -> Result<(), String> {
     let conn = get_conn(&app)?;
-    
+
     // Validate decision
     if decision != "accepted" && decision != "rejected" {
         return Err(format!("Invalid decision: {}. Must be 'accepted' or 'rejected'", decision));
     }
-    
+
     let reviewed_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_millis() as i64;
-    
+
     conn.execute(
-        "INSERT OR REPLACE INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at],
     )
     .map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 
@@ -637,11 +584,11 @@ pub fn get_patch_reviews(
     patch_uuid: String,
 ) -> Result<Vec<PatchReview>, String> {
     let conn = get_conn(&app)?;
-    
+
     let mut stmt = conn
         .prepare("SELECT patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at FROM patch_reviews WHERE patch_uuid = ?1 ORDER BY reviewed_at DESC")
         .map_err(|e| e.to_string())?;
-    
+
     let reviews = stmt
         .query_map([patch_uuid], |row| {
             Ok(PatchReview {
@@ -655,7 +602,7 @@ pub fn get_patch_reviews(
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    
+
     Ok(reviews)
 }
 
@@ -666,7 +613,7 @@ pub fn get_patches_needing_review(
     reviewer_id: String,
 ) -> Result<Vec<Patch>, String> {
     let conn = get_conn(&app)?;
-    
+
     // Query patches where author != reviewer_id and no review exists from reviewer_id
     let mut stmt = conn
         .prepare(
@@ -682,7 +629,7 @@ pub fn get_patches_needing_review(
              ORDER BY p.timestamp ASC"
         )
         .map_err(|e| e.to_string())?;
-    
+
     let patches = stmt
         .query_map([reviewer_id], |row| {
             let data_str: String = row.get(4)?;
@@ -702,7 +649,7 @@ pub fn get_patches_needing_review(
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    
+
     Ok(patches)
 }
 

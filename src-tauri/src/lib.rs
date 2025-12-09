@@ -8,11 +8,12 @@ pub mod profile;
 pub mod kmd;
 pub mod document_manager;
 pub mod comments;
+pub mod db_utils;
 
 use std::sync::Mutex;
 use patch_log::{
-    list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch, 
-    restore_to_patch, import_patches_from_document, record_patch_review, 
+    list_patches, record_patch, get_patch, save_snapshot, get_snapshot_for_patch,
+    restore_to_patch, import_patches_from_document, record_patch_review,
     get_patch_reviews, get_patches_needing_review,
 };
 use yjs_store::{load_doc, store_update};

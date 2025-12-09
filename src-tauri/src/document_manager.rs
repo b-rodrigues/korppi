@@ -21,6 +21,7 @@ use zip::{ZipArchive, ZipWriter};
 use crate::kmd::{
     check_version_compatibility, DocumentMeta, FormatInfo, AuthorProfile,
 };
+use crate::db_utils::ensure_schema;
 
 /// Default author color for new profiles
 const DEFAULT_AUTHOR_COLOR: &str = "#3498db";
@@ -590,62 +591,18 @@ pub fn record_document_patch(
         .ok_or_else(|| format!("Document not found: {}", id))?;
     
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
-    conn.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS patches (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            author      TEXT    NOT NULL,
-            kind        TEXT    NOT NULL,
-            data        TEXT    NOT NULL,
-            uuid        TEXT,
-            parent_uuid TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS snapshots (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp   INTEGER NOT NULL,
-            patch_id    INTEGER NOT NULL,
-            state       BLOB    NOT NULL,
-            FOREIGN KEY (patch_id) REFERENCES patches(id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS patch_reviews (
-            patch_uuid   TEXT NOT NULL,
-            reviewer_id  TEXT NOT NULL,
-            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
-            reviewer_name TEXT,
-            reviewed_at  INTEGER NOT NULL,
-            PRIMARY KEY (patch_uuid, reviewer_id)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
-        CREATE INDEX IF NOT EXISTS idx_patch_reviews_reviewer_id ON patch_reviews(reviewer_id);
-        CREATE INDEX IF NOT EXISTS idx_patches_uuid ON patches(uuid);
-        "#,
-    ).map_err(|e| e.to_string())?;
     
-    // Migration: Add uuid and parent_uuid columns if they don't exist (without UNIQUE constraint initially)
-    conn.execute("ALTER TABLE patches ADD COLUMN uuid TEXT", []).ok();
-    conn.execute("ALTER TABLE patches ADD COLUMN parent_uuid TEXT", []).ok();
-    
-    // Generate UUIDs for existing rows that don't have one
-    conn.execute(
-        "UPDATE patches SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL",
-        [],
-    ).ok();
-    
-    // Now we can safely add the UNIQUE constraint by recreating the index
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_uuid_unique ON patches(uuid)", []).ok();
+    // Use shared schema definition
+    ensure_schema(&conn)?;
     
     let data_str = serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
     
-    // Generate UUID for new patch
-    let patch_uuid = uuid::Uuid::new_v4().to_string();
+    // Use provided UUID or generate new one
+    let patch_uuid = patch.uuid.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
     
     conn.execute(
         "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![patch.timestamp, patch.author, patch.kind, data_str, patch_uuid, None::<String>],
+        params![patch.timestamp, patch.author, patch.kind, data_str, patch_uuid, patch.parent_uuid],
     ).map_err(|e| e.to_string())?;
     
     let patch_id = conn.last_insert_rowid();
@@ -682,6 +639,9 @@ pub fn list_document_patches(
     }
     
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+
+    // Ensure schema exists and is migrated (especially on first open of legacy doc)
+    ensure_schema(&conn)?;
     
     let mut stmt = conn
         .prepare("SELECT id, timestamp, author, kind, data, uuid, parent_uuid FROM patches ORDER BY id ASC")
@@ -730,6 +690,9 @@ pub fn record_document_patch_review(
     
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
+    // Ensure schema exists (needed for patch_reviews table)
+    ensure_schema(&conn)?;
+
     // Validate decision
     if decision != "accepted" && decision != "rejected" {
         return Err(format!("Invalid decision: {}. Must be 'accepted' or 'rejected'", decision));
@@ -739,21 +702,9 @@ pub fn record_document_patch_review(
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_millis() as i64;
-    
-    // Ensure patch_reviews table exists
-    conn.execute_batch(
-        r#"CREATE TABLE IF NOT EXISTS patch_reviews (
-            patch_uuid   TEXT NOT NULL,
-            reviewer_id  TEXT NOT NULL,
-            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
-            reviewer_name TEXT,
-            reviewed_at  INTEGER NOT NULL,
-            PRIMARY KEY (patch_uuid, reviewer_id)
-        )"#,
-    ).ok();
-    
+
     conn.execute(
-        "INSERT OR REPLACE INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at],
     )
     .map_err(|e| e.to_string())?;
@@ -775,10 +726,13 @@ pub fn get_document_patch_reviews(
     
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     
+    // Ensure schema exists
+    ensure_schema(&conn)?;
+    
     let mut stmt = conn
         .prepare("SELECT patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at FROM patch_reviews WHERE patch_uuid = ?1 ORDER BY reviewed_at DESC")
         .map_err(|e| e.to_string())?;
-    
+
     let reviews = stmt
         .query_map([patch_uuid], |row| {
             Ok(crate::patch_log::PatchReview {
@@ -792,7 +746,7 @@ pub fn get_document_patch_reviews(
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    
+
     Ok(reviews)
 }
 
@@ -804,12 +758,15 @@ pub fn get_document_patches_needing_review(
     reviewer_id: String,
 ) -> Result<Vec<crate::patch_log::Patch>, String> {
     let manager = manager.lock().map_err(|e| e.to_string())?;
-    
+
     let doc = manager.documents.get(&doc_id)
         .ok_or_else(|| format!("Document not found: {}", doc_id))?;
-    
+
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
-    
+
+    // Ensure schema exists
+    ensure_schema(&conn)?;
+
     // Query patches where author != reviewer_id and no review exists from reviewer_id
     let mut stmt = conn
         .prepare(
@@ -825,7 +782,7 @@ pub fn get_document_patches_needing_review(
              ORDER BY p.timestamp ASC"
         )
         .map_err(|e| e.to_string())?;
-    
+
     let patches = stmt
         .query_map([reviewer_id], |row| {
             let data_str: String = row.get(4)?;
@@ -845,7 +802,7 @@ pub fn get_document_patches_needing_review(
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    
+
     Ok(patches)
 }
 
