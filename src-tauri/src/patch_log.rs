@@ -569,7 +569,7 @@ pub fn record_patch_review(
         .as_millis() as i64;
 
     conn.execute(
-        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT OR REPLACE INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at],
     )
     .map_err(|e| e.to_string())?;

@@ -465,12 +465,11 @@ export async function renderPatchList(patches) {
             }
             
             if (reviewerMap.size > 0) {
-                reviewBadges = '<div style="margin-top:4px;font-size:0.75rem;">';
+                reviewBadges = '<div style="margin-top:4px;">';
                 for (const review of reviewerMap.values()) {
                     const icon = review.decision === 'accepted' ? '✓' : '✗';
-                    const color = review.decision === 'accepted' ? '#4caf50' : '#f44336';
                     const name = review.reviewer_name || review.reviewer_id;
-                    reviewBadges += `<span style="color:${color};margin-right:8px;" title="${name} ${review.decision}">${icon} ${name}</span>`;
+                    reviewBadges += `<span class="review-badge ${review.decision}" title="${name} ${review.decision}">${icon} ${name}</span>`;
                 }
                 reviewBadges += '</div>';
             }
