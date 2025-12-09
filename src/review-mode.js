@@ -4,7 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getActiveDocumentId } from "./document-manager.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
-import { getCachedProfile } from "./profile-service.js";
+import { getCachedProfile, getCurrentUserInfo } from "./profile-service.js";
 import { hexToRgba, escapeHtml } from "./utils.js";
 
 let reviewState = {
@@ -69,13 +69,40 @@ export async function enterReviewMode(patches) {
     // Sort patches chronologically
     savePatchesOnly.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Get current user profile
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
+    // Get current user info
+    const { id: currentUserId } = getCurrentUserInfo();
+
+    // Clear and populate the patchReviews map with existing reviews
+    const docId = getActiveDocumentId();
+    const patchReviews = new Map();
+
+    if (docId) {
+        for (const patch of savePatchesOnly) {
+            if (patch.uuid) {
+                const reviews = await invoke("get_document_patch_reviews", {
+                    docId,
+                    patchUuid: patch.uuid
+                }).catch(() => []);
+                patchReviews.set(patch.uuid, reviews);
+            }
+        }
+    }
 
     // Get patches that need review (author != current user and no review from current user)
-    const patchesNeedingReview = await getPatchesNeedingReview(savePatchesOnly, currentUserId);
-    
+    const patchesNeedingReview = savePatchesOnly.filter(patch => {
+        // Skip patches by current user (implicitly accepted)
+        if (patch.author === currentUserId) return false;
+
+        // Check if current user has already reviewed this patch
+        if (patch.uuid) {
+            const reviews = patchReviews.get(patch.uuid) || [];
+            const hasReviewed = reviews.some(r => r.reviewer_id === currentUserId);
+            if (hasReviewed) return false;
+        }
+
+        return true;
+    });
+
     // Get unique authors from patches needing review
     const authors = [...new Set(patchesNeedingReview.map(p => p.author))];
 
@@ -89,6 +116,7 @@ export async function enterReviewMode(patches) {
     reviewState.authors = authors;
     reviewState.baseContent = savePatchesOnly[0].data.snapshot || '';
     reviewState.currentAuthor = null;
+    reviewState.patchReviews = patchReviews;
 
     showAuthorSelectionBanner();
 }
@@ -100,8 +128,11 @@ export function exitReviewMode() {
     reviewState = {
         active: false,
         patches: [],
-        authorFilter: [],
+        authors: [],
+        currentAuthor: null,
+        currentAuthorPatches: [],
         baseContent: '',
+        patchReviews: new Map(),
     };
 
     hideReviewBanner();
@@ -142,9 +173,7 @@ export async function acceptPatch(patchId) {
         return;
     }
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
-    const currentUserName = currentUserProfile?.name || 'Local User';
+    const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
         await invoke("record_document_patch_review", {
@@ -186,9 +215,7 @@ export async function rejectPatch(patchId) {
         return;
     }
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
-    const currentUserName = currentUserProfile?.name || 'Local User';
+    const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
         await invoke("record_document_patch_review", {
@@ -247,8 +274,7 @@ function showAuthorSelectionBanner() {
         }
     }
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
+    const { id: currentUserId } = getCurrentUserInfo();
 
     banner.innerHTML = `
         <div class="review-info">
@@ -259,7 +285,7 @@ function showAuthorSelectionBanner() {
         const patches = reviewState.patches.filter(p => p.author === author);
         const patch = patches[0];
         const color = patch?.data?.authorColor || '#3498db';
-        
+
         // Count patches needing review (those without current user's review)
         const pending = patches.filter(p => {
             if (!p.uuid) return true;
@@ -354,8 +380,7 @@ async function updateReviewProgress() {
     const progressEl = document.getElementById('review-progress');
     if (!progressEl) return;
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
+    const { id: currentUserId } = getCurrentUserInfo();
 
     let pending = 0;
     let accepted = 0;
@@ -418,10 +443,10 @@ function renderSingleAuthorOverlay() {
         }
     }
 
-    // Get all accepted patches chronologically as base
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
+    // Get current user info once
+    const { id: currentUserId } = getCurrentUserInfo();
 
+    // Get all accepted patches chronologically as base
     const acceptedPatches = reviewState.patches
         .filter(p => {
              // Implicitly accepted if authored by current user
@@ -456,8 +481,6 @@ function renderSingleAuthorOverlay() {
     let reviewStatus = 'pending';
     if (currentAuthorLatest.uuid) {
         const reviews = reviewState.patchReviews.get(currentAuthorLatest.uuid) || [];
-        const currentUserProfile = getCachedProfile();
-        const currentUserId = currentUserProfile?.id || 'local';
         const myReview = reviews.find(r => r.reviewer_id === currentUserId);
         if (myReview) {
             reviewStatus = myReview.decision;
@@ -500,9 +523,7 @@ async function acceptAllFromAuthor() {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
-    const currentUserName = currentUserProfile?.name || 'Local User';
+    const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
         for (const patch of reviewState.currentAuthorPatches) {
@@ -555,9 +576,7 @@ async function rejectAllFromAuthor() {
         return;
     }
 
-    const currentUserProfile = getCachedProfile();
-    const currentUserId = currentUserProfile?.id || 'local';
-    const currentUserName = currentUserProfile?.name || 'Local User';
+    const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
         for (const patch of reviewState.currentAuthorPatches) {

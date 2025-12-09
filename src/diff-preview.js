@@ -3,7 +3,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { calculateCharDiff } from './diff-highlighter.js';
-import { getCachedProfile } from './profile-service.js';
+import { getCachedProfile, getCurrentUserInfo } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { hexToRgba, escapeHtml } from './utils.js';
@@ -239,9 +239,7 @@ async function acceptCurrentPatch() {
         const { fetchPatch } = await import('./timeline.js');
         const patch = await fetchPatch(currentPatchId);
         if (patch && patch.uuid) {
-            const currentUserProfile = getCachedProfile();
-            const currentUserId = currentUserProfile?.id || 'local';
-            const currentUserName = currentUserProfile?.name || 'Local User';
+            const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
             await invoke("record_document_patch_review", {
                 docId,
@@ -310,9 +308,7 @@ async function rejectCurrentPatch() {
         const { fetchPatch } = await import('./timeline.js');
         const patch = await fetchPatch(currentPatchId);
         if (patch && patch.uuid) {
-            const currentUserProfile = getCachedProfile();
-            const currentUserId = currentUserProfile?.id || 'local';
-            const currentUserName = currentUserProfile?.name || 'Local User';
+            const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
             await invoke("record_document_patch_review", {
                 docId,
@@ -355,13 +351,39 @@ async function getPendingConflictPatchIds(excludePatchId = null) {
 
     const { fetchPatchList } = await import('./timeline.js');
     const allPatches = await fetchPatchList();
+    const docId = getActiveDocumentId();
+    const { id: currentUserId } = getCurrentUserInfo();
 
-    return previewState.conflictGroup.filter(patchId => {
-        if (excludePatchId !== null && patchId === excludePatchId) return false;
-        // Note: With the new review system, we'd need to async check reviews here
-        // For now, we rely on the timeline filtering to pass valid patch IDs
-        return true;
-    });
+    // Build a map of patch ID to patch for quick lookup
+    const patchMap = new Map(allPatches.map(p => [p.id, p]));
+
+    // Filter conflict group to only include pending patches
+    const pendingIds = [];
+
+    for (const patchId of previewState.conflictGroup) {
+        if (excludePatchId !== null && patchId === excludePatchId) continue;
+
+        const patch = patchMap.get(patchId);
+        if (!patch) continue;
+
+        // Patches by current user are implicitly accepted (not pending)
+        if (patch.author === currentUserId) continue;
+
+        // Check if current user has already reviewed this patch
+        if (patch.uuid && docId) {
+            const reviews = await invoke("get_document_patch_reviews", {
+                docId,
+                patchUuid: patch.uuid
+            }).catch(() => []);
+
+            const hasReviewed = reviews.some(r => r.reviewer_id === currentUserId);
+            if (hasReviewed) continue;
+        }
+
+        pendingIds.push(patchId);
+    }
+
+    return pendingIds;
 }
 
 /**
