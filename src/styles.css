@@ -1754,3 +1754,22 @@ textarea {
         padding: 16px;
     }
 }
+/* Review Badges */
+.review-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 4px;
+    margin-right: 8px;
+}
+
+.review-badge.accepted {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: var(--success);
+}
+
+.review-badge.rejected {
+    background-color: rgba(244, 67, 54, 0.2);
+    color: var(--danger);
+}

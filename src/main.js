@@ -48,10 +48,47 @@ async function confirmExportWithWarnings() {
 
     // Check for pending patches
     try {
-        const patches = await fetchPatchList();
-        const pendingPatches = patches.filter(p => p.review_status === "pending");
-        if (pendingPatches.length > 0) {
-            warnings.push(`${pendingPatches.length} pending patch${pendingPatches.length > 1 ? 'es' : ''}`);
+        // We'll rely on the backend to tell us which patches need review
+        // Note: This logic assumes current user context.
+        // For a generic export warning, we might want "patches not accepted by anyone"
+        // but for now, "patches needing MY review" is a decent proxy or we can just fetch all patches
+        // and check if any are not authored by me and not accepted.
+
+        // Simpler approach: Fetch all patches, check if any non-local patches lack acceptance.
+        // However, without a robust "global acceptance" concept, this is tricky.
+        // Let's stick to: "Are there patches I haven't reviewed?"
+
+        // Actually, for export, the warning is usually about "unmerged changes".
+        // In this system, "accepted" patches are merged into the document view (if we implement that view).
+        // If we export the *current view*, we export what we see.
+        // If we see patches that are pending, we might be exporting a state that includes them (if applying all)
+        // or excludes them. KMD export includes history, so it's safe.
+        // MD/DOCX export is the snapshot.
+
+        // Let's warn if there are patches that the current user hasn't reviewed yet.
+        // This prompts them to maybe review before finalizing the doc.
+
+        // Ideally we'd call `get_patches_needing_review` but we need the current user ID.
+        // Let's use fetchPatchList and filter client-side for now as we don't have easy access to user ID here without importing profile service.
+
+        // Importing profile service dynamically to avoid circular deps if any
+        const { getCachedProfile } = await import("./profile-service.js");
+        const { invoke } = await import("@tauri-apps/api/core");
+        const { getActiveDocumentId } = await import("./document-manager.js");
+
+        const profile = getCachedProfile();
+        const currentUserId = profile?.id || 'local';
+        const docId = getActiveDocumentId();
+
+        if (docId) {
+             const patches = await invoke("get_document_patches_needing_review", {
+                 docId,
+                 reviewerId: currentUserId
+             });
+
+             if (patches.length > 0) {
+                 warnings.push(`${patches.length} pending patch${patches.length > 1 ? 'es' : ''}`);
+             }
         }
     } catch (err) {
         console.warn("Could not check patch status:", err);

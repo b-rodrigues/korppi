@@ -76,7 +76,6 @@ export async function saveDocument(id = null, path = null) {
                     timestamp,
                     author,
                     kind: "Save",
-                    review_status: "accepted",  // Auto-accept own saves
                     data: {
                         snapshot: editorContent,
                         authorName,  // Store author name for display

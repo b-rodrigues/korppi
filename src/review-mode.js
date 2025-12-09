@@ -419,8 +419,20 @@ function renderSingleAuthorOverlay() {
     }
 
     // Get all accepted patches chronologically as base
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+
     const acceptedPatches = reviewState.patches
-        .filter(p => p.review_status === 'accepted')
+        .filter(p => {
+             // Implicitly accepted if authored by current user
+             if (p.author === currentUserId) return true;
+
+             if (!p.uuid) return false;
+
+             const reviews = reviewState.patchReviews.get(p.uuid) || [];
+             const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+             return myReview && myReview.decision === 'accepted';
+        })
         .sort((a, b) => a.timestamp - b.timestamp);
 
     const baseContent = acceptedPatches.length > 0
@@ -439,7 +451,18 @@ function renderSingleAuthorOverlay() {
 
     const newContent = currentAuthorLatest.data?.snapshot || '';
     const authorColor = currentAuthorLatest.data?.authorColor || '#3498db';
-    const reviewStatus = currentAuthorLatest.review_status || 'pending';
+
+    // Determine status from review map
+    let reviewStatus = 'pending';
+    if (currentAuthorLatest.uuid) {
+        const reviews = reviewState.patchReviews.get(currentAuthorLatest.uuid) || [];
+        const currentUserProfile = getCachedProfile();
+        const currentUserId = currentUserProfile?.id || 'local';
+        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+        if (myReview) {
+            reviewStatus = myReview.decision;
+        }
+    }
 
     // Calculate diff
     const diffOps = calculateCharDiff(baseContent, newContent);
