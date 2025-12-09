@@ -1063,7 +1063,7 @@ fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
 
     // Parse the XML and extract text
     let mut reader = Reader::from_str(&xml_content);
-    reader.config_mut().trim_text(true);
+    reader.trim_text(true);
 
     let mut text_parts: Vec<String> = Vec::new();
     let mut current_paragraph: Vec<String> = Vec::new();
@@ -1137,7 +1137,7 @@ fn extract_odt_text(file_path: &PathBuf) -> Result<String, String> {
 
     // Parse the XML and extract text
     let mut reader = Reader::from_str(&xml_content);
-    reader.config_mut().trim_text(true);
+    reader.trim_text(true);
 
     let mut text_parts: Vec<String> = Vec::new();
     let mut current_paragraph: Vec<String> = Vec::new();
