@@ -9,6 +9,12 @@ import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
 let updateTimeout = null;
 let pendingUpdateTimeout = null;
 
+// Content cache to avoid redundant calculations
+let cachedContent = null;
+let cachedWordCount = 0;
+let cachedCharCount = 0;
+let cachedCharCountNoSpaces = 0;
+
 /**
  * Initialize word count and status bar functionality
  */
@@ -59,29 +65,57 @@ function debouncedPendingUpdate() {
 
 /**
  * Update the word count display
+ * Uses caching to avoid redundant string operations
  */
 function updateWordCount() {
     const content = getEditorContent() || "";
 
-    // Count words (split by whitespace, filter empty)
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0);
-    const wordCount = content.trim() === "" ? 0 : words.length;
+    // Only recalculate if content changed
+    if (content !== cachedContent) {
+        cachedContent = content;
 
-    // Count characters (with and without spaces)
-    const charCount = content.length;
-    const charCountNoSpaces = content.replace(/\s/g, "").length;
+        // Count words (split by whitespace, filter empty)
+        const trimmed = content.trim();
+        if (trimmed === "") {
+            cachedWordCount = 0;
+        } else {
+            // Faster word counting without creating an array
+            cachedWordCount = 1;
+            let inWord = true;
+            for (let i = 0; i < trimmed.length; i++) {
+                const isWs = trimmed.charCodeAt(i) <= 32;
+                if (isWs && inWord) {
+                    inWord = false;
+                } else if (!isWs && !inWord) {
+                    cachedWordCount++;
+                    inWord = true;
+                }
+            }
+        }
+
+        // Count characters
+        cachedCharCount = content.length;
+
+        // Count non-whitespace characters without creating a new string
+        cachedCharCountNoSpaces = 0;
+        for (let i = 0; i < content.length; i++) {
+            if (content.charCodeAt(i) > 32) {
+                cachedCharCountNoSpaces++;
+            }
+        }
+    }
 
     // Update display
     const wordEl = document.getElementById("word-count");
     const charEl = document.getElementById("char-count");
 
     if (wordEl) {
-        wordEl.textContent = `${wordCount.toLocaleString()} word${wordCount !== 1 ? 's' : ''}`;
+        wordEl.textContent = `${cachedWordCount.toLocaleString()} word${cachedWordCount !== 1 ? 's' : ''}`;
     }
 
     if (charEl) {
-        charEl.textContent = `${charCount.toLocaleString()} char${charCount !== 1 ? 's' : ''}`;
-        charEl.title = `${charCountNoSpaces.toLocaleString()} without spaces`;
+        charEl.textContent = `${cachedCharCount.toLocaleString()} char${cachedCharCount !== 1 ? 's' : ''}`;
+        charEl.title = `${cachedCharCountNoSpaces.toLocaleString()} without spaces`;
     }
 }
 
@@ -169,17 +203,28 @@ async function updatePendingCounts() {
 
 /**
  * Get current word count (for external use)
+ * Uses cached value if available, otherwise calculates
  */
 export function getWordCount() {
     const content = getEditorContent() || "";
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0);
-    return content.trim() === "" ? 0 : words.length;
+    if (content === cachedContent) {
+        return cachedWordCount;
+    }
+    // Update cache and return
+    updateWordCount();
+    return cachedWordCount;
 }
 
 /**
  * Get current character count (for external use)
+ * Uses cached value if available, otherwise calculates
  */
 export function getCharCount() {
     const content = getEditorContent() || "";
-    return content.length;
+    if (content === cachedContent) {
+        return cachedCharCount;
+    }
+    // Update cache and return
+    updateWordCount();
+    return cachedCharCount;
 }

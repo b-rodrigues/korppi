@@ -72,19 +72,21 @@ export async function enterReviewMode(patches) {
     // Get current user info
     const { id: currentUserId } = getCurrentUserInfo();
 
-    // Clear and populate the patchReviews map with existing reviews
+    // Clear and populate the patchReviews map with existing reviews in parallel
     const docId = getActiveDocumentId();
     const patchReviews = new Map();
 
     if (docId) {
-        for (const patch of savePatchesOnly) {
-            if (patch.uuid) {
-                const reviews = await invoke("get_document_patch_reviews", {
-                    docId,
-                    patchUuid: patch.uuid
-                }).catch(() => []);
-                patchReviews.set(patch.uuid, reviews);
-            }
+        const patchesWithUuid = savePatchesOnly.filter(p => p.uuid);
+        const reviewPromises = patchesWithUuid.map(patch =>
+            invoke("get_document_patch_reviews", {
+                docId,
+                patchUuid: patch.uuid
+            }).catch(() => []).then(reviews => ({ uuid: patch.uuid, reviews }))
+        );
+        const reviewResults = await Promise.all(reviewPromises);
+        for (const { uuid, reviews } of reviewResults) {
+            patchReviews.set(uuid, reviews);
         }
     }
 
@@ -550,18 +552,21 @@ async function acceptAllFromAuthor() {
     const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
-        for (const patch of reviewState.currentAuthorPatches) {
-            if (!patch.uuid) continue;
-
-            await invoke("record_document_patch_review", {
+        // Process all reviews in parallel
+        const patchesToReview = reviewState.currentAuthorPatches.filter(p => p.uuid);
+        await Promise.all(patchesToReview.map(patch =>
+            invoke("record_document_patch_review", {
                 docId,
                 patchUuid: patch.uuid,
                 reviewerId: currentUserId,
                 decision: "accepted",
                 reviewerName: currentUserName
-            });
+            })
+        ));
 
-            // Update local state
+        // Update local state after all remote calls succeed
+        const reviewedAt = Date.now();
+        for (const patch of patchesToReview) {
             if (!reviewState.patchReviews.has(patch.uuid)) {
                 reviewState.patchReviews.set(patch.uuid, []);
             }
@@ -569,7 +574,7 @@ async function acceptAllFromAuthor() {
                 reviewer_id: currentUserId,
                 decision: "accepted",
                 reviewer_name: currentUserName,
-                reviewed_at: Date.now()
+                reviewed_at: reviewedAt
             });
         }
 
@@ -603,18 +608,21 @@ async function rejectAllFromAuthor() {
     const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
     try {
-        for (const patch of reviewState.currentAuthorPatches) {
-            if (!patch.uuid) continue;
-
-            await invoke("record_document_patch_review", {
+        // Process all reviews in parallel
+        const patchesToReview = reviewState.currentAuthorPatches.filter(p => p.uuid);
+        await Promise.all(patchesToReview.map(patch =>
+            invoke("record_document_patch_review", {
                 docId,
                 patchUuid: patch.uuid,
                 reviewerId: currentUserId,
                 decision: "rejected",
                 reviewerName: currentUserName
-            });
+            })
+        ));
 
-            // Update local state
+        // Update local state after all remote calls succeed
+        const reviewedAt = Date.now();
+        for (const patch of patchesToReview) {
             if (!reviewState.patchReviews.has(patch.uuid)) {
                 reviewState.patchReviews.set(patch.uuid, []);
             }
@@ -622,7 +630,7 @@ async function rejectAllFromAuthor() {
                 reviewer_id: currentUserId,
                 decision: "rejected",
                 reviewer_name: currentUserName,
-                reviewed_at: Date.now()
+                reviewed_at: reviewedAt
             });
         }
 

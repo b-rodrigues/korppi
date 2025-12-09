@@ -3,6 +3,7 @@
 
 /**
  * Tokenize text into words and whitespace tokens
+ * Optimized to avoid regex per character
  * @param {string} text - Text to tokenize
  * @returns {string[]} Array of tokens
  */
@@ -10,33 +11,33 @@ function tokenize(text) {
     if (!text) return [];
 
     const tokens = [];
-    let current = '';
-    let inWhitespace = null;
+    const len = text.length;
+    let start = 0;
+    let inWhitespace = isWhitespace(text.charCodeAt(0));
 
-    for (const char of text) {
-        const isWs = /\s/.test(char);
+    for (let i = 1; i <= len; i++) {
+        const isWs = i < len ? isWhitespace(text.charCodeAt(i)) : !inWhitespace;
 
-        if (inWhitespace === null) {
-            inWhitespace = isWs;
-            current += char;
-        } else if (inWhitespace === isWs) {
-            current += char;
-        } else {
-            tokens.push(current);
-            current = char;
+        if (isWs !== inWhitespace) {
+            tokens.push(text.slice(start, i));
+            start = i;
             inWhitespace = isWs;
         }
-    }
-
-    if (current) {
-        tokens.push(current);
     }
 
     return tokens;
 }
 
 /**
+ * Fast whitespace check using charCode
+ */
+function isWhitespace(code) {
+    return code === 32 || code === 9 || code === 10 || code === 13 || code === 12;
+}
+
+/**
  * Compute LCS (Longest Common Subsequence) pairs
+ * Optimized with typed arrays and O(n) space for DP values
  * @param {string[]} base - Base tokens
  * @param {string[]} other - Other tokens
  * @returns {Array<[number, number]>} Array of [base_idx, other_idx] pairs
@@ -47,8 +48,24 @@ function lcsPairs(base, other) {
 
     if (m === 0 || n === 0) return [];
 
-    // Build DP table
-    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+    // For small inputs, use simple O(mn) space
+    if (m * n <= 10000) {
+        return lcsPairsSmall(base, other, m, n);
+    }
+
+    // For larger inputs, use O(n) space with direction tracking
+    return lcsPairsLarge(base, other, m, n);
+}
+
+/**
+ * LCS pairs for small inputs - O(mn) space
+ */
+function lcsPairsSmall(base, other, m, n) {
+    // Use typed arrays for better performance
+    const dp = new Array(m + 1);
+    for (let i = 0; i <= m; i++) {
+        dp[i] = new Uint16Array(n + 1);
+    }
 
     for (let i = 1; i <= m; i++) {
         for (let j = 1; j <= n; j++) {
@@ -71,6 +88,59 @@ function lcsPairs(base, other) {
             i--;
             j--;
         } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+            i--;
+        } else {
+            j--;
+        }
+    }
+
+    pairs.reverse();
+    return pairs;
+}
+
+/**
+ * LCS pairs for large inputs - O(n) space for DP values
+ * Direction tracking still requires O(mn) but uses compact Uint8Array
+ */
+function lcsPairsLarge(base, other, m, n) {
+    // Two rows for DP values
+    let prev = new Uint16Array(n + 1);
+    let curr = new Uint16Array(n + 1);
+
+    // Direction matrix: 0=diagonal(match), 1=up, 2=left
+    const dirs = new Uint8Array((m + 1) * (n + 1));
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            const idx = i * (n + 1) + j;
+            if (base[i - 1] === other[j - 1]) {
+                curr[j] = prev[j - 1] + 1;
+                dirs[idx] = 0; // diagonal/match
+            } else if (prev[j] >= curr[j - 1]) {
+                curr[j] = prev[j];
+                dirs[idx] = 1; // up
+            } else {
+                curr[j] = curr[j - 1];
+                dirs[idx] = 2; // left
+            }
+        }
+        // Swap rows
+        [prev, curr] = [curr, prev];
+        curr.fill(0);
+    }
+
+    // Backtrack to get pairs
+    const pairs = [];
+    let i = m;
+    let j = n;
+
+    while (i > 0 && j > 0) {
+        const idx = i * (n + 1) + j;
+        if (dirs[idx] === 0) {
+            pairs.push([i - 1, j - 1]);
+            i--;
+            j--;
+        } else if (dirs[idx] === 1) {
             i--;
         } else {
             j--;
