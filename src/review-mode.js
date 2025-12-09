@@ -14,7 +14,40 @@ let reviewState = {
     currentAuthor: null,   // Currently reviewing this author
     currentAuthorPatches: [], // Patches from current author
     baseContent: '',       // Original document content
+    patchReviews: new Map(), // Map of patch UUID to reviews
 };
+
+/**
+ * Helper function to get patches needing review by current user
+ */
+async function getPatchesNeedingReview(patches, currentUserId) {
+    const docId = getActiveDocumentId();
+    if (!docId) return [];
+    
+    const needsReview = [];
+    
+    for (const patch of patches) {
+        // Skip patches by current user (implicitly accepted)
+        if (patch.author === currentUserId) {
+            continue;
+        }
+        
+        // Check if current user has already reviewed this patch
+        if (patch.uuid) {
+            const reviews = await invoke("get_document_patch_reviews", {
+                docId,
+                patchUuid: patch.uuid
+            }).catch(() => []);
+            
+            const hasReviewed = reviews.some(r => r.reviewer_id === currentUserId);
+            if (!hasReviewed) {
+                needsReview.push(patch);
+            }
+        }
+    }
+    
+    return needsReview;
+}
 
 /**
  * Enter review mode with imported patches
@@ -36,13 +69,18 @@ export async function enterReviewMode(patches) {
     // Sort patches chronologically
     savePatchesOnly.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Get unique authors (excluding current user's auto-accepted patches)
-    const authors = [...new Set(savePatchesOnly
-        .filter(p => !p.review_status || p.review_status === 'pending')
-        .map(p => p.author))];
+    // Get current user profile
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+
+    // Get patches that need review (author != current user and no review from current user)
+    const patchesNeedingReview = await getPatchesNeedingReview(savePatchesOnly, currentUserId);
+    
+    // Get unique authors from patches needing review
+    const authors = [...new Set(patchesNeedingReview.map(p => p.author))];
 
     if (authors.length === 0) {
-        alert("No patches to review - all are already accepted");
+        alert("No patches to review - all patches are from you or you've already reviewed them");
         return;
     }
 
@@ -98,18 +136,35 @@ export async function acceptPatch(patchId) {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
+    const patch = reviewState.patches.find(p => p.id === patchId);
+    if (!patch || !patch.uuid) {
+        console.error("Patch UUID not found");
+        return;
+    }
+
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+    const currentUserName = currentUserProfile?.name || 'Local User';
+
     try {
-        await invoke("update_patch_review_status", {
+        await invoke("record_document_patch_review", {
             docId,
-            patchId,
-            status: "accepted"
+            patchUuid: patch.uuid,
+            reviewerId: currentUserId,
+            decision: "accepted",
+            reviewerName: currentUserName
         });
 
         // Update local state
-        const patch = reviewState.patches.find(p => p.id === patchId);
-        if (patch && patch.data) {
-            patch.data.review_status = "accepted";
+        if (!reviewState.patchReviews.has(patch.uuid)) {
+            reviewState.patchReviews.set(patch.uuid, []);
         }
+        reviewState.patchReviews.get(patch.uuid).push({
+            reviewer_id: currentUserId,
+            decision: "accepted",
+            reviewer_name: currentUserName,
+            reviewed_at: Date.now()
+        });
 
         renderMultiAuthorOverlay();
         updateReviewProgress();
@@ -125,18 +180,35 @@ export async function rejectPatch(patchId) {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
+    const patch = reviewState.patches.find(p => p.id === patchId);
+    if (!patch || !patch.uuid) {
+        console.error("Patch UUID not found");
+        return;
+    }
+
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+    const currentUserName = currentUserProfile?.name || 'Local User';
+
     try {
-        await invoke("update_patch_review_status", {
+        await invoke("record_document_patch_review", {
             docId,
-            patchId,
-            status: "rejected"
+            patchUuid: patch.uuid,
+            reviewerId: currentUserId,
+            decision: "rejected",
+            reviewerName: currentUserName
         });
 
         // Update local state
-        const patch = reviewState.patches.find(p => p.id === patchId);
-        if (patch && patch.data) {
-            patch.data.review_status = "rejected";
+        if (!reviewState.patchReviews.has(patch.uuid)) {
+            reviewState.patchReviews.set(patch.uuid, []);
         }
+        reviewState.patchReviews.get(patch.uuid).push({
+            reviewer_id: currentUserId,
+            decision: "rejected",
+            reviewer_name: currentUserName,
+            reviewed_at: Date.now()
+        });
 
         renderMultiAuthorOverlay();
         updateReviewProgress();
@@ -175,6 +247,9 @@ function showAuthorSelectionBanner() {
         }
     }
 
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+
     banner.innerHTML = `
         <div class="review-info">
             <span class="review-label">🔍 Review Mode - Select Author</span>
@@ -184,7 +259,13 @@ function showAuthorSelectionBanner() {
         const patches = reviewState.patches.filter(p => p.author === author);
         const patch = patches[0];
         const color = patch?.data?.authorColor || '#3498db';
-        const pending = patches.filter(p => !p.data?.review_status || p.data.review_status === 'pending').length;
+        
+        // Count patches needing review (those without current user's review)
+        const pending = patches.filter(p => {
+            if (!p.uuid) return true;
+            const reviews = reviewState.patchReviews.get(p.uuid) || [];
+            return !reviews.some(r => r.reviewer_id === currentUserId);
+        }).length;
 
         return `
                     <button class="author-select-btn" data-author="${author}" 
@@ -269,13 +350,40 @@ function showReviewBanner() {
 /**
  * Update review progress display
  */
-function updateReviewProgress() {
+async function updateReviewProgress() {
     const progressEl = document.getElementById('review-progress');
     if (!progressEl) return;
 
-    const pending = reviewState.patches.filter(p => !p.data?.review_status || p.data.review_status === 'pending').length;
-    const accepted = reviewState.patches.filter(p => p.data?.review_status === 'accepted').length;
-    const rejected = reviewState.patches.filter(p => p.data?.review_status === 'rejected').length;
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+
+    let pending = 0;
+    let accepted = 0;
+    let rejected = 0;
+
+    for (const patch of reviewState.patches) {
+        // Skip patches by current user
+        if (patch.author === currentUserId) {
+            continue;
+        }
+
+        if (!patch.uuid) {
+            pending++;
+            continue;
+        }
+
+        // Check if reviewed
+        const reviews = reviewState.patchReviews.get(patch.uuid) || [];
+        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+        
+        if (!myReview) {
+            pending++;
+        } else if (myReview.decision === 'accepted') {
+            accepted++;
+        } else if (myReview.decision === 'rejected') {
+            rejected++;
+        }
+    }
 
     progressEl.textContent = `${pending} pending, ${accepted} accepted, ${rejected} rejected`;
 }
@@ -369,17 +477,32 @@ async function acceptAllFromAuthor() {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+    const currentUserName = currentUserProfile?.name || 'Local User';
+
     try {
         for (const patch of reviewState.currentAuthorPatches) {
-            await invoke("update_patch_review_status", {
+            if (!patch.uuid) continue;
+
+            await invoke("record_document_patch_review", {
                 docId,
-                patchId: patch.id,
-                status: "accepted"
+                patchUuid: patch.uuid,
+                reviewerId: currentUserId,
+                decision: "accepted",
+                reviewerName: currentUserName
             });
 
-            if (patch.data) {
-                patch.data.review_status = "accepted";
+            // Update local state
+            if (!reviewState.patchReviews.has(patch.uuid)) {
+                reviewState.patchReviews.set(patch.uuid, []);
             }
+            reviewState.patchReviews.get(patch.uuid).push({
+                reviewer_id: currentUserId,
+                decision: "accepted",
+                reviewer_name: currentUserName,
+                reviewed_at: Date.now()
+            });
         }
 
         alert(`All patches from ${reviewState.currentAuthor} have been accepted`);
@@ -409,17 +532,32 @@ async function rejectAllFromAuthor() {
         return;
     }
 
+    const currentUserProfile = getCachedProfile();
+    const currentUserId = currentUserProfile?.id || 'local';
+    const currentUserName = currentUserProfile?.name || 'Local User';
+
     try {
         for (const patch of reviewState.currentAuthorPatches) {
-            await invoke("update_patch_review_status", {
+            if (!patch.uuid) continue;
+
+            await invoke("record_document_patch_review", {
                 docId,
-                patchId: patch.id,
-                status: "rejected"
+                patchUuid: patch.uuid,
+                reviewerId: currentUserId,
+                decision: "rejected",
+                reviewerName: currentUserName
             });
 
-            if (patch.data) {
-                patch.data.review_status = "rejected";
+            // Update local state
+            if (!reviewState.patchReviews.has(patch.uuid)) {
+                reviewState.patchReviews.set(patch.uuid, []);
             }
+            reviewState.patchReviews.get(patch.uuid).push({
+                reviewer_id: currentUserId,
+                decision: "rejected",
+                reviewer_name: currentUserName,
+                reviewed_at: Date.now()
+            });
         }
 
         alert(`All patches from ${reviewState.currentAuthor} have been rejected`);

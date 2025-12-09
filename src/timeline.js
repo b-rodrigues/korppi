@@ -232,7 +232,7 @@ export function initTimeline() {
     refreshTimeline();
 }
 
-export function renderPatchList(patches) {
+export async function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
@@ -279,12 +279,33 @@ export function renderPatchList(patches) {
     const currentUserProfile = getCachedProfile();
     const currentUserId = currentUserProfile?.id || 'local';
 
-    // Helper: determine effective status of a patch
+    // Preload reviews for all patches
+    const docId = getActiveDocumentId();
+    const patchReviews = new Map(); // Map of patch UUID to reviews
+    if (docId) {
+        for (const patch of patches) {
+            if (patch.uuid) {
+                const reviews = await invoke("get_document_patch_reviews", {
+                    docId,
+                    patchUuid: patch.uuid
+                }).catch(() => []);
+                patchReviews.set(patch.uuid, reviews);
+            }
+        }
+    }
+
+    // Helper: Get reviews for a patch and determine effective status
     const getEffectiveStatus = (p) => {
-        if (p.review_status) return p.review_status;
-        // Patches by current user are implicitly "accepted"
-        // Patches by others are implicitly "pending"
-        return p.author === currentUserId ? "accepted" : "pending";
+        // Patches by current user are implicitly "accepted" (no review needed)
+        if (p.author === currentUserId) return "accepted";
+        
+        // Check if we have a review from current user
+        if (!p.uuid) return "pending";
+        
+        const reviews = patchReviews.get(p.uuid) || [];
+        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+        
+        return myReview ? myReview.decision : "pending";
     };
 
     // Filter patches
@@ -428,12 +449,40 @@ export function renderPatchList(patches) {
             }
         }
 
+        // Get review badges for this patch (excluding current user's self-review)
+        let reviewBadges = '';
+        if (patch.uuid && patch.author !== currentUserId) {
+            const reviews = patchReviews.get(patch.uuid) || [];
+            // Show latest review per reviewer (excluding current user)
+            const reviewerMap = new Map();
+            for (const review of reviews) {
+                if (review.reviewer_id !== currentUserId) {
+                    const existing = reviewerMap.get(review.reviewer_id);
+                    if (!existing || review.reviewed_at > existing.reviewed_at) {
+                        reviewerMap.set(review.reviewer_id, review);
+                    }
+                }
+            }
+            
+            if (reviewerMap.size > 0) {
+                reviewBadges = '<div style="margin-top:4px;font-size:0.75rem;">';
+                for (const review of reviewerMap.values()) {
+                    const icon = review.decision === 'accepted' ? '✓' : '✗';
+                    const color = review.decision === 'accepted' ? '#4caf50' : '#f44336';
+                    const name = review.reviewer_name || review.reviewer_id;
+                    reviewBadges += `<span style="color:${color};margin-right:8px;" title="${name} ${review.decision}">${icon} ${name}</span>`;
+                }
+                reviewBadges += '</div>';
+            }
+        }
+
         div.innerHTML = `
             <div class="timeline-item-header">
                 <div class="timeline-item-info">
                     <strong>#${patch.id}</strong> - ${patch.kind}
                     <span class="author-badge" style="background-color:${authorColor};color:white;padding:2px 6px;border-radius:3px;font-size:0.75rem;margin-left:6px;">${authorDisplayName}</span>
                     ${conflictInfo ? `<div class="conflict-warning" style="color:#f44336;font-size:0.75rem;margin-top:2px;">${conflictInfo}</div>` : ''}
+                    ${reviewBadges}
                 </div>
                 <div class="timeline-item-actions">
                     <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
