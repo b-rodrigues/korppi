@@ -44,6 +44,11 @@ pub fn ensure_schema(conn: &Connection) -> Result<(), String> {
         CREATE INDEX IF NOT EXISTS idx_patch_reviews_reviewer_id ON patch_reviews(reviewer_id);
         -- Use unique index to enforce uniqueness on the uuid column (covers both new and migrated tables)
         CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_uuid ON patches(uuid);
+        -- Performance indexes for common query patterns
+        CREATE INDEX IF NOT EXISTS idx_patches_timestamp ON patches(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_patches_author ON patches(author);
+        CREATE INDEX IF NOT EXISTS idx_patches_kind ON patches(kind);
+        CREATE INDEX IF NOT EXISTS idx_patch_reviews_patch_uuid ON patch_reviews(patch_uuid);
         "#,
     )
     .map_err(|e| e.to_string())?;

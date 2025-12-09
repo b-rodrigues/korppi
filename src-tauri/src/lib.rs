@@ -28,7 +28,7 @@ use document_manager::{
     record_document_patch, list_document_patches, get_initial_file,
     save_document_snapshot, restore_document_to_patch,
     record_document_patch_review, get_document_patch_reviews,
-    get_document_patches_needing_review,
+    get_document_patches_needing_review, check_parent_patch_status,
     DocumentManager,
 };
 use comments::{

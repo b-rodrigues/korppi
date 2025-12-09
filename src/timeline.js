@@ -279,18 +279,20 @@ export async function renderPatchList(patches) {
     const currentUserProfile = getCachedProfile();
     const currentUserId = currentUserProfile?.id || 'local';
 
-    // Preload reviews for all patches
+    // Preload reviews for all patches in parallel
     const docId = getActiveDocumentId();
     const patchReviews = new Map(); // Map of patch UUID to reviews
     if (docId) {
-        for (const patch of patches) {
-            if (patch.uuid) {
-                const reviews = await invoke("get_document_patch_reviews", {
-                    docId,
-                    patchUuid: patch.uuid
-                }).catch(() => []);
-                patchReviews.set(patch.uuid, reviews);
-            }
+        const patchesWithUuid = patches.filter(p => p.uuid);
+        const reviewPromises = patchesWithUuid.map(patch =>
+            invoke("get_document_patch_reviews", {
+                docId,
+                patchUuid: patch.uuid
+            }).catch(() => []).then(reviews => ({ uuid: patch.uuid, reviews }))
+        );
+        const reviewResults = await Promise.all(reviewPromises);
+        for (const { uuid, reviews } of reviewResults) {
+            patchReviews.set(uuid, reviews);
         }
     }
 
