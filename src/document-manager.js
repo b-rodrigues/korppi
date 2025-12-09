@@ -34,6 +34,20 @@ export async function openDocument(path = null) {
 }
 
 /**
+ * Import a document from various formats (markdown, docx, odt)
+ * Shows file picker if path is null
+ * @param {string|null} path - Optional file path
+ * @returns {Promise<Object>} Import result with handle and content
+ */
+export async function importDocument(path = null) {
+    const result = await invoke("import_document", { path });
+    openDocuments.set(result.handle.id, result.handle);
+    setActiveDocument(result.handle.id);
+    notifyListeners("import", result.handle);
+    return result;
+}
+
+/**
  * Save the active or specified document
  * @param {string|null} id - Document ID (uses active if null)
  * @param {string|null} path - Optional path for Save As

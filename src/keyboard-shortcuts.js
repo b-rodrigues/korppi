@@ -4,11 +4,13 @@
 import {
     newDocument,
     openDocument,
+    importDocument,
     saveDocument,
     closeDocument,
     getActiveDocumentId,
     getOpenDocuments
 } from "./document-manager.js";
+import { restoreDocumentState } from "./yjs-setup.js";
 import { switchToNextTab, switchToPreviousTab } from "./document-tabs.js";
 import { doUndo, doRedo } from "./editor.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
@@ -49,6 +51,21 @@ async function handleKeyDown(e) {
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
                     console.error("Failed to open document:", err);
+                }
+            }
+            break;
+
+        case "i":
+            // Ctrl/Cmd + I: Import document
+            e.preventDefault();
+            try {
+                const result = await importDocument();
+                if (result.content) {
+                    restoreDocumentState(result.content);
+                }
+            } catch (err) {
+                if (!err.toString().includes("No file selected")) {
+                    console.error("Failed to import document:", err);
                 }
             }
             break;

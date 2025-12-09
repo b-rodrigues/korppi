@@ -2,7 +2,7 @@ import { initEditor, getMarkdown, doUndo, doRedo } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 import { exportAsMarkdown, exportAsDocx } from "./kmd-service.js";
-import { forceSave } from "./yjs-setup.js";
+import { forceSave, restoreDocumentState } from "./yjs-setup.js";
 import { startReconciliation } from "./reconcile.js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showSaveConfirmModal } from "./components/save-confirm-modal.js";
@@ -10,6 +10,7 @@ import {
     initDocumentManager,
     newDocument,
     openDocument,
+    importDocument,
     saveDocument,
     getRecentDocuments,
     clearRecentDocuments,
@@ -258,6 +259,25 @@ window.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
+    // Import button handler
+    const importDocBtn = document.getElementById("import-doc-btn");
+    if (importDocBtn) {
+        importDocBtn.addEventListener("click", async () => {
+            try {
+                const result = await importDocument();
+                // Set the imported content in the editor
+                if (result.content) {
+                    restoreDocumentState(result.content);
+                }
+            } catch (err) {
+                if (!err.toString().includes("No file selected")) {
+                    console.error("Failed to import document:", err);
+                    alert("Failed to import document: " + err);
+                }
+            }
+        });
+    }
+
     if (saveDocBtn) {
         saveDocBtn.addEventListener("click", async () => {
             try {
@@ -347,6 +367,24 @@ window.addEventListener("DOMContentLoaded", async () => {
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
                     console.error("Failed to open document:", err);
+                }
+            }
+        });
+    }
+
+    // Import button in recent documents panel
+    const importDocumentBtn = document.getElementById("import-document-btn");
+    if (importDocumentBtn) {
+        importDocumentBtn.addEventListener("click", async () => {
+            try {
+                const result = await importDocument();
+                if (result.content) {
+                    restoreDocumentState(result.content);
+                }
+            } catch (err) {
+                if (!err.toString().includes("No file selected")) {
+                    console.error("Failed to import document:", err);
+                    alert("Failed to import document: " + err);
                 }
             }
         });
