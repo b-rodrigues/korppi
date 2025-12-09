@@ -318,9 +318,9 @@ fn test_needs_my_review_query() {
 fn test_import_deduplication_by_uuid() {
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path().join("test.db");
-    
+
     let conn = Connection::open(&db_path).unwrap();
-    
+
     // Create tables
     conn.execute_batch(
         r#"
@@ -336,18 +336,18 @@ fn test_import_deduplication_by_uuid() {
         "#,
     )
     .unwrap();
-    
+
     let patch_uuid = Uuid::new_v4().to_string();
     let data = json!({"snapshot": "content"});
     let data_str = serde_json::to_string(&data).unwrap();
-    
+
     // Insert first patch
     conn.execute(
         "INSERT INTO patches (timestamp, author, kind, data, uuid) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![1000, "bob", "Save", &data_str, &patch_uuid],
     )
     .unwrap();
-    
+
     // Try to import same patch (should be skipped due to UUID constraint)
     let exists: bool = conn
         .query_row(
@@ -358,13 +358,114 @@ fn test_import_deduplication_by_uuid() {
         .optional()
         .unwrap()
         .unwrap_or(false);
-    
+
     assert!(exists, "Patch with UUID should exist");
-    
+
     // Verify only one patch exists
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM patches WHERE uuid = ?1", [&patch_uuid], |row| row.get(0))
         .unwrap();
-    
+
     assert_eq!(count, 1, "Should only have one patch with this UUID");
+}
+
+#[test]
+fn test_parent_patch_rejection_detection() {
+    let temp_dir = TempDir::new().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+
+    let conn = Connection::open(&db_path).unwrap();
+
+    // Create tables
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS patches (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            author      TEXT    NOT NULL,
+            kind        TEXT    NOT NULL,
+            data        TEXT    NOT NULL,
+            uuid        TEXT UNIQUE,
+            parent_uuid TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS patch_reviews (
+            patch_uuid   TEXT NOT NULL,
+            reviewer_id  TEXT NOT NULL,
+            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
+            reviewer_name TEXT,
+            reviewed_at  INTEGER NOT NULL,
+            PRIMARY KEY (patch_uuid, reviewer_id)
+        );
+        "#,
+    )
+    .unwrap();
+
+    let reviewer_id = "alice";
+
+    // Create parent patch (A1) and child patch (G1)
+    let parent_uuid = Uuid::new_v4().to_string();
+    let child_uuid = Uuid::new_v4().to_string();
+    let data = json!({"snapshot": "content"});
+    let data_str = serde_json::to_string(&data).unwrap();
+
+    // Insert parent patch A1
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![1000, "bob", "Save", &data_str, &parent_uuid, None::<String>],
+    )
+    .unwrap();
+
+    // Insert child patch G1 with parent_uuid pointing to A1
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![2000, "gunther", "Save", &data_str, &child_uuid, &parent_uuid],
+    )
+    .unwrap();
+
+    // Alice rejects the parent patch A1
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&parent_uuid, reviewer_id, "rejected", "Alice", 1500],
+    )
+    .unwrap();
+
+    // Query to check if child's parent was rejected by reviewer
+    // This simulates what check_parent_patch_status does
+    let child_parent_uuid: Option<String> = conn
+        .query_row(
+            "SELECT parent_uuid FROM patches WHERE uuid = ?1",
+            params![&child_uuid],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap()
+        .flatten();
+
+    assert_eq!(child_parent_uuid, Some(parent_uuid.clone()), "Child should have parent_uuid");
+
+    // Check if parent was rejected by alice
+    let parent_decision: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&parent_uuid, reviewer_id],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+
+    assert_eq!(parent_decision, Some("rejected".to_string()), "Parent should be rejected by alice");
+
+    // Verify that if Bob tries to accept G1, we can detect the rejected parent
+    // (Bob hasn't reviewed the parent, so he won't see a warning - only Alice would)
+    let bob_parent_decision: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&parent_uuid, "bob"],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+
+    assert_eq!(bob_parent_decision, None, "Bob hasn't reviewed the parent patch");
 }
