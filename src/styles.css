@@ -1765,11 +1765,11 @@ textarea {
 }
 
 .review-badge.accepted {
-    background-color: #d4edda;
-    color: #155724;
+    background-color: rgba(76, 175, 80, 0.2);
+    color: var(--success);
 }
 
 .review-badge.rejected {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: rgba(244, 67, 54, 0.2);
+    color: var(--danger);
 }

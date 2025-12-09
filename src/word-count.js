@@ -112,12 +112,30 @@ async function updatePendingCounts() {
 
     // Update pending patches
     try {
-        const patches = await fetchPatchList();
+        // Importing modules dynamically to avoid circular dependencies
+        const { invoke } = await import("@tauri-apps/api/core");
+        const { getCachedProfile } = await import("./profile-service.js");
 
-        // Filter to only patches with snapshots (same as timeline)
-        const validPatches = patches.filter(p => hasSnapshotContent(p));
-        const pendingPatches = validPatches.filter(p => p.review_status === "pending");
-        const count = pendingPatches.length;
+        const profile = getCachedProfile();
+        const currentUserId = profile?.id || 'local';
+
+        // Use backend to count patches needing MY review
+        const patches = await invoke("get_document_patches_needing_review", {
+            docId,
+            reviewerId: currentUserId
+        });
+
+        // Filter out patches without snapshots (metadata-only updates shouldn't be reviewed here)
+        // Though get_document_patches_needing_review returns all types,
+        // usually we care about content changes (kind=Save/Edit)
+        // Let's assume the backend already filtered or we accept all types.
+        // But for UI consistency with timeline, check for snapshot if possible.
+        // The Patch struct has `data` field.
+
+        const count = patches.filter(p => {
+             // Basic check if it has data.snapshot
+             return p.data && typeof p.data.snapshot === 'string';
+        }).length;
 
         if (patchesEl) {
             patchesEl.textContent = `📋 ${count} patch${count !== 1 ? 'es' : ''}`;
@@ -127,6 +145,7 @@ async function updatePendingCounts() {
                 : "No pending patches";
         }
     } catch (err) {
+        console.warn("Failed to update pending patch count:", err);
         // Ignore errors, keep previous value
     }
 

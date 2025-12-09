@@ -43,7 +43,6 @@ commands.allow = [
     "get_initial_file",
     "save_document_snapshot",
     "restore_document_to_patch",
-    "update_patch_review_status",
     "import_patches_from_document",
     "reset_imported_patches_status",
     "save_snapshot",
