@@ -22,6 +22,8 @@ use crate::kmd::{
     check_version_compatibility, DocumentMeta, FormatInfo, AuthorProfile,
 };
 use crate::db_utils::ensure_schema;
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 
 /// Default author color for new profiles
 const DEFAULT_AUTHOR_COLOR: &str = "#3498db";
@@ -1002,10 +1004,324 @@ pub fn check_parent_patch_status(
     }
 }
 
+/// Supported import file formats
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ImportFormat {
+    Markdown,
+    RMarkdown,
+    Quarto,
+    Docx,
+    Odt,
+}
+
+impl ImportFormat {
+    fn from_extension(ext: &str) -> Option<Self> {
+        match ext.to_lowercase().as_str() {
+            "md" | "markdown" | "txt" => Some(ImportFormat::Markdown),
+            "rmd" => Some(ImportFormat::RMarkdown),
+            "qmd" => Some(ImportFormat::Quarto),
+            "docx" => Some(ImportFormat::Docx),
+            "odt" => Some(ImportFormat::Odt),
+            _ => None,
+        }
+    }
+}
+
+/// Strip YAML frontmatter from markdown content (for .rmd, .qmd files)
+fn strip_yaml_frontmatter(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Check if the document starts with YAML frontmatter delimiter
+    if lines.is_empty() || lines[0].trim() != "---" {
+        return content.to_string();
+    }
+
+    // Find the closing delimiter
+    for (i, line) in lines.iter().enumerate().skip(1) {
+        if line.trim() == "---" || line.trim() == "..." {
+            // Return everything after the frontmatter
+            return lines[(i + 1)..].join("\n");
+        }
+    }
+
+    // No closing delimiter found, return original content
+    content.to_string()
+}
+
+/// Extract text content from a DOCX file
+fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
+    let file = File::open(file_path).map_err(|e| format!("Failed to open DOCX file: {}", e))?;
+    let mut archive = ZipArchive::new(file).map_err(|e| format!("Invalid DOCX file: {}", e))?;
+
+    // DOCX stores the main content in word/document.xml
+    let mut document_xml = archive
+        .by_name("word/document.xml")
+        .map_err(|_| "Missing word/document.xml in DOCX file")?;
+
+    let mut xml_content = String::new();
+    document_xml.read_to_string(&mut xml_content).map_err(|e| e.to_string())?;
+
+    // Parse the XML and extract text
+    let mut reader = Reader::from_str(&xml_content);
+    reader.trim_text(true);
+
+    let mut text_parts: Vec<String> = Vec::new();
+    let mut current_paragraph: Vec<String> = Vec::new();
+    let mut in_text = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                let name = e.local_name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+
+                // Check for text elements (w:t)
+                if name_str == "t" {
+                    in_text = true;
+                }
+                // Check for paragraph breaks (w:p)
+                else if name_str == "p" {
+                    if !current_paragraph.is_empty() {
+                        text_parts.push(current_paragraph.join(""));
+                        current_paragraph.clear();
+                    }
+                }
+                // Check for line breaks (w:br)
+                else if name_str == "br" {
+                    current_paragraph.push("\n".to_string());
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if in_text {
+                    if let Ok(text) = e.unescape() {
+                        current_paragraph.push(text.to_string());
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let name = e.local_name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+
+                if name_str == "t" {
+                    in_text = false;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(format!("Error parsing DOCX XML: {}", e)),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    // Don't forget the last paragraph
+    if !current_paragraph.is_empty() {
+        text_parts.push(current_paragraph.join(""));
+    }
+
+    Ok(text_parts.join("\n\n"))
+}
+
+/// Extract text content from an ODT file
+fn extract_odt_text(file_path: &PathBuf) -> Result<String, String> {
+    let file = File::open(file_path).map_err(|e| format!("Failed to open ODT file: {}", e))?;
+    let mut archive = ZipArchive::new(file).map_err(|e| format!("Invalid ODT file: {}", e))?;
+
+    // ODT stores the main content in content.xml
+    let mut content_xml = archive
+        .by_name("content.xml")
+        .map_err(|_| "Missing content.xml in ODT file")?;
+
+    let mut xml_content = String::new();
+    content_xml.read_to_string(&mut xml_content).map_err(|e| e.to_string())?;
+
+    // Parse the XML and extract text
+    let mut reader = Reader::from_str(&xml_content);
+    reader.trim_text(true);
+
+    let mut text_parts: Vec<String> = Vec::new();
+    let mut current_paragraph: Vec<String> = Vec::new();
+    let mut in_paragraph = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                let name = e.local_name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+
+                // Check for paragraph elements (text:p, text:h for headings)
+                if name_str == "p" || name_str == "h" {
+                    if !current_paragraph.is_empty() {
+                        text_parts.push(current_paragraph.join(""));
+                        current_paragraph.clear();
+                    }
+                    in_paragraph = true;
+                }
+                // Check for line breaks (text:line-break)
+                else if name_str == "line-break" {
+                    current_paragraph.push("\n".to_string());
+                }
+                // Check for tabs (text:tab)
+                else if name_str == "tab" {
+                    current_paragraph.push("\t".to_string());
+                }
+                // Check for spaces (text:s)
+                else if name_str == "s" {
+                    current_paragraph.push(" ".to_string());
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if in_paragraph {
+                    if let Ok(text) = e.unescape() {
+                        current_paragraph.push(text.to_string());
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let name = e.local_name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+
+                if name_str == "p" || name_str == "h" {
+                    in_paragraph = false;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(format!("Error parsing ODT XML: {}", e)),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    // Don't forget the last paragraph
+    if !current_paragraph.is_empty() {
+        text_parts.push(current_paragraph.join(""));
+    }
+
+    Ok(text_parts.join("\n\n"))
+}
+
+/// Result of an import operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportResult {
+    pub handle: DocumentHandle,
+    pub content: String,
+    pub source_format: String,
+}
+
+/// Import a document from various formats (markdown, docx, odt)
+/// Shows file picker if path is None
+#[tauri::command]
+pub async fn import_document(
+    app: AppHandle,
+    manager: State<'_, Mutex<DocumentManager>>,
+    path: Option<String>,
+) -> Result<ImportResult, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file_path: PathBuf = if let Some(p) = path {
+        PathBuf::from(p)
+    } else {
+        // Show file picker with filters for all supported formats
+        let file = app.dialog()
+            .file()
+            .add_filter("All Supported", &["md", "markdown", "txt", "rmd", "qmd", "docx", "odt"])
+            .add_filter("Markdown", &["md", "markdown", "txt"])
+            .add_filter("R Markdown", &["rmd"])
+            .add_filter("Quarto", &["qmd"])
+            .add_filter("Word Document", &["docx"])
+            .add_filter("OpenDocument Text", &["odt"])
+            .blocking_pick_file();
+
+        match file {
+            Some(f) => f.into_path().map_err(|_| "Failed to convert file path".to_string())?,
+            None => return Err("No file selected".to_string()),
+        }
+    };
+
+    if !file_path.exists() {
+        return Err(format!("File not found: {:?}", file_path));
+    }
+
+    // Determine format from extension
+    let extension = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    let format = ImportFormat::from_extension(extension)
+        .ok_or_else(|| format!("Unsupported file format: {}", extension))?;
+
+    // Extract content based on format
+    let content = match format {
+        ImportFormat::Markdown => {
+            fs::read_to_string(&file_path)
+                .map_err(|e| format!("Failed to read markdown file: {}", e))?
+        }
+        ImportFormat::RMarkdown | ImportFormat::Quarto => {
+            let raw_content = fs::read_to_string(&file_path)
+                .map_err(|e| format!("Failed to read file: {}", e))?;
+            strip_yaml_frontmatter(&raw_content)
+        }
+        ImportFormat::Docx => {
+            extract_docx_text(&file_path)?
+        }
+        ImportFormat::Odt => {
+            extract_odt_text(&file_path)?
+        }
+    };
+
+    // Create a new document
+    let doc_id = Uuid::new_v4().to_string();
+    let temp_dir = create_document_temp_dir(&doc_id)?;
+
+    // Get title from filename
+    let title = file_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Imported Document".to_string());
+
+    let handle = DocumentHandle {
+        id: doc_id.clone(),
+        path: None, // Imported documents don't have a .kmd path yet
+        title: title.clone(),
+        is_modified: true, // Mark as modified since it's not saved as KMD yet
+        opened_at: Utc::now(),
+    };
+
+    let mut meta = DocumentMeta::default();
+    meta.title = title;
+
+    let state = DocumentState {
+        handle: handle.clone(),
+        yjs_state: Vec::new(), // Will be populated when editor loads
+        history_path: temp_dir.join("history.sqlite"),
+        meta,
+    };
+
+    let mut manager = manager.lock().map_err(|e| e.to_string())?;
+    manager.documents.insert(doc_id.clone(), state);
+    manager.active_document_id = Some(doc_id);
+
+    let format_name = match format {
+        ImportFormat::Markdown => "markdown",
+        ImportFormat::RMarkdown => "rmarkdown",
+        ImportFormat::Quarto => "quarto",
+        ImportFormat::Docx => "docx",
+        ImportFormat::Odt => "odt",
+    };
+
+    Ok(ImportResult {
+        handle,
+        content,
+        source_format: format_name.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_document_handle_serialization() {
         let handle = DocumentHandle {
