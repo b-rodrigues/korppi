@@ -1,6 +1,6 @@
 // Test patch review functionality
 use korppi::patch_log::{Patch, PatchReview};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::json;
 use tempfile::TempDir;
 use uuid::Uuid;
