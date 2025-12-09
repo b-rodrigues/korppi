@@ -923,6 +923,85 @@ pub fn restore_document_to_patch(
     })
 }
 
+/// Result of checking parent patch status
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ParentPatchStatus {
+    pub has_parent: bool,
+    pub parent_uuid: Option<String>,
+    pub parent_rejected: bool,
+    pub rejected_by_name: Option<String>,
+}
+
+/// Check if a patch's parent has been rejected by the current user
+/// This is used to warn users about accepting orphaned patches
+#[tauri::command]
+pub fn check_parent_patch_status(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    patch_uuid: String,
+    reviewer_id: String,
+) -> Result<ParentPatchStatus, String> {
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+
+    // Ensure schema exists
+    ensure_schema(&conn)?;
+
+    // Get the patch's parent_uuid
+    let parent_uuid: Option<String> = conn
+        .query_row(
+            "SELECT parent_uuid FROM patches WHERE uuid = ?1",
+            params![&patch_uuid],
+            |row| row.get(0)
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .flatten();
+
+    // If no parent, nothing to check
+    let Some(parent_uuid) = parent_uuid else {
+        return Ok(ParentPatchStatus {
+            has_parent: false,
+            parent_uuid: None,
+            parent_rejected: false,
+            rejected_by_name: None,
+        });
+    };
+
+    // Check if the parent was rejected by this reviewer
+    let rejection: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT decision, reviewer_name FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&parent_uuid, &reviewer_id],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    match rejection {
+        Some((decision, reviewer_name)) if decision == "rejected" => {
+            Ok(ParentPatchStatus {
+                has_parent: true,
+                parent_uuid: Some(parent_uuid),
+                parent_rejected: true,
+                rejected_by_name: reviewer_name,
+            })
+        }
+        _ => {
+            Ok(ParentPatchStatus {
+                has_parent: true,
+                parent_uuid: Some(parent_uuid),
+                parent_rejected: false,
+                rejected_by_name: None,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

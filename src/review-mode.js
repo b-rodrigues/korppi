@@ -175,6 +175,30 @@ export async function acceptPatch(patchId) {
 
     const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
 
+    // Check if parent patch was rejected (dependency tracking)
+    try {
+        const parentStatus = await invoke("check_parent_patch_status", {
+            docId,
+            patchUuid: patch.uuid,
+            reviewerId: currentUserId
+        });
+
+        if (parentStatus.parent_rejected) {
+            const proceed = confirm(
+                `⚠️ Warning: This patch depends on a parent patch that you rejected.\n\n` +
+                `Accepting this patch may result in inconsistent changes since the parent ` +
+                `patch (${parentStatus.parent_uuid?.slice(0, 8)}...) was rejected.\n\n` +
+                `Do you want to accept this patch anyway?`
+            );
+            if (!proceed) {
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn("Could not check parent patch status:", err);
+        // Continue anyway if the check fails
+    }
+
     try {
         await invoke("record_document_patch_review", {
             docId,

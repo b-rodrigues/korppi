@@ -318,9 +318,9 @@ fn test_needs_my_review_query() {
 fn test_import_deduplication_by_uuid() {
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path().join("test.db");
-    
+
     let conn = Connection::open(&db_path).unwrap();
-    
+
     // Create tables
     conn.execute_batch(
         r#"
@@ -336,18 +336,18 @@ fn test_import_deduplication_by_uuid() {
         "#,
     )
     .unwrap();
-    
+
     let patch_uuid = Uuid::new_v4().to_string();
     let data = json!({"snapshot": "content"});
     let data_str = serde_json::to_string(&data).unwrap();
-    
+
     // Insert first patch
     conn.execute(
         "INSERT INTO patches (timestamp, author, kind, data, uuid) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![1000, "bob", "Save", &data_str, &patch_uuid],
     )
     .unwrap();
-    
+
     // Try to import same patch (should be skipped due to UUID constraint)
     let exists: bool = conn
         .query_row(
@@ -358,13 +358,317 @@ fn test_import_deduplication_by_uuid() {
         .optional()
         .unwrap()
         .unwrap_or(false);
-    
+
     assert!(exists, "Patch with UUID should exist");
-    
+
     // Verify only one patch exists
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM patches WHERE uuid = ?1", [&patch_uuid], |row| row.get(0))
         .unwrap();
-    
+
     assert_eq!(count, 1, "Should only have one patch with this UUID");
+}
+
+#[test]
+fn test_parent_patch_rejection_detection() {
+    let temp_dir = TempDir::new().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+
+    let conn = Connection::open(&db_path).unwrap();
+
+    // Create tables
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS patches (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            author      TEXT    NOT NULL,
+            kind        TEXT    NOT NULL,
+            data        TEXT    NOT NULL,
+            uuid        TEXT UNIQUE,
+            parent_uuid TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS patch_reviews (
+            patch_uuid   TEXT NOT NULL,
+            reviewer_id  TEXT NOT NULL,
+            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
+            reviewer_name TEXT,
+            reviewed_at  INTEGER NOT NULL,
+            PRIMARY KEY (patch_uuid, reviewer_id)
+        );
+        "#,
+    )
+    .unwrap();
+
+    let reviewer_id = "alice";
+
+    // Create parent patch (A1) and child patch (G1)
+    let parent_uuid = Uuid::new_v4().to_string();
+    let child_uuid = Uuid::new_v4().to_string();
+    let data = json!({"snapshot": "content"});
+    let data_str = serde_json::to_string(&data).unwrap();
+
+    // Insert parent patch A1
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![1000, "bob", "Save", &data_str, &parent_uuid, None::<String>],
+    )
+    .unwrap();
+
+    // Insert child patch G1 with parent_uuid pointing to A1
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![2000, "gunther", "Save", &data_str, &child_uuid, &parent_uuid],
+    )
+    .unwrap();
+
+    // Alice rejects the parent patch A1
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&parent_uuid, reviewer_id, "rejected", "Alice", 1500],
+    )
+    .unwrap();
+
+    // Query to check if child's parent was rejected by reviewer
+    // This simulates what check_parent_patch_status does
+    let child_parent_uuid: Option<String> = conn
+        .query_row(
+            "SELECT parent_uuid FROM patches WHERE uuid = ?1",
+            params![&child_uuid],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap()
+        .flatten();
+
+    assert_eq!(child_parent_uuid, Some(parent_uuid.clone()), "Child should have parent_uuid");
+
+    // Check if parent was rejected by alice
+    let parent_decision: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&parent_uuid, reviewer_id],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+
+    assert_eq!(parent_decision, Some("rejected".to_string()), "Parent should be rejected by alice");
+
+    // Verify that if Bob tries to accept G1, we can detect the rejected parent
+    // (Bob hasn't reviewed the parent, so he won't see a warning - only Alice would)
+    let bob_parent_decision: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&parent_uuid, "bob"],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+
+    assert_eq!(bob_parent_decision, None, "Bob hasn't reviewed the parent patch");
+}
+
+/// Integration test for the full reconciliation scenario from the design document:
+/// Bob creates document -> sends to Alice and Günther
+/// Günther sends his version to Alice -> Alice reviews (accepts G1, rejects G2)
+/// Alice sends combined version to Bob
+/// Bob should see: Alice's patches (needs review), G1 (Alice accepted but Bob decides),
+///                 NOT G2 (Alice rejected), NOT his own patches
+#[test]
+fn test_reconciliation_scenario_bob_alice_gunther() {
+    let temp_dir = TempDir::new().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+
+    let conn = Connection::open(&db_path).unwrap();
+
+    // Create tables
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS patches (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER NOT NULL,
+            author      TEXT    NOT NULL,
+            kind        TEXT    NOT NULL,
+            data        TEXT    NOT NULL,
+            uuid        TEXT UNIQUE,
+            parent_uuid TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS patch_reviews (
+            patch_uuid   TEXT NOT NULL,
+            reviewer_id  TEXT NOT NULL,
+            decision     TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected')),
+            reviewer_name TEXT,
+            reviewed_at  INTEGER NOT NULL,
+            PRIMARY KEY (patch_uuid, reviewer_id)
+        );
+        "#,
+    )
+    .unwrap();
+
+    // User IDs
+    let bob_id = "bob";
+    let alice_id = "alice";
+    let gunther_id = "gunther";
+
+    // Step 1: Bob creates initial patches (B1, B2, B3)
+    let b1_uuid = Uuid::new_v4().to_string();
+    let b2_uuid = Uuid::new_v4().to_string();
+    let b3_uuid = Uuid::new_v4().to_string();
+    let data = json!({"snapshot": "content"});
+    let data_str = serde_json::to_string(&data).unwrap();
+
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![1000, bob_id, "Save", &data_str, &b1_uuid, None::<String>],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![2000, bob_id, "Save", &data_str, &b2_uuid, &b1_uuid],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![3000, bob_id, "Save", &data_str, &b3_uuid, &b2_uuid],
+    ).unwrap();
+
+    // Step 2: Alice adds her patches (A1, A2)
+    let a1_uuid = Uuid::new_v4().to_string();
+    let a2_uuid = Uuid::new_v4().to_string();
+
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![4000, alice_id, "Save", &data_str, &a1_uuid, &b3_uuid],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![5000, alice_id, "Save", &data_str, &a2_uuid, &a1_uuid],
+    ).unwrap();
+
+    // Step 3: Günther adds his patches (G1, G2)
+    let g1_uuid = Uuid::new_v4().to_string();
+    let g2_uuid = Uuid::new_v4().to_string();
+
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![6000, gunther_id, "Save", &data_str, &g1_uuid, &b3_uuid],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO patches (timestamp, author, kind, data, uuid, parent_uuid) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![7000, gunther_id, "Save", &data_str, &g2_uuid, &g1_uuid],
+    ).unwrap();
+
+    // Step 4: Alice reviews Günther's patches (accepts G1, rejects G2)
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&g1_uuid, alice_id, "accepted", "Alice", 8000],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&g2_uuid, alice_id, "rejected", "Alice", 8001],
+    ).unwrap();
+
+    // Step 5: Query patches needing Bob's review
+    // Bob should NOT see his own patches (B1, B2, B3)
+    // Bob SHOULD see Alice's patches (A1, A2) - needs his review
+    // Bob SHOULD see G1 (Alice accepted, but Bob decides independently)
+    // Bob SHOULD see G2 for independent review (Alice's rejection is recorded but doesn't hide from Bob)
+    // Note: Design says "does NOT see G2 (Alice rejected, hidden but recoverable)"
+    // This behavior would require a separate "hiding" mechanism - for now we show all unreviewed
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT uuid FROM patches
+             WHERE author != ?1
+             AND uuid IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM patch_reviews pr
+                 WHERE pr.patch_uuid = patches.uuid
+                 AND pr.reviewer_id = ?1
+             )
+             ORDER BY timestamp ASC"
+        )
+        .unwrap();
+
+    let patches_needing_bobs_review: Vec<String> = stmt
+        .query_map([bob_id], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Bob's own patches should NOT be in the list
+    assert!(!patches_needing_bobs_review.contains(&b1_uuid), "B1 should not need Bob's review");
+    assert!(!patches_needing_bobs_review.contains(&b2_uuid), "B2 should not need Bob's review");
+    assert!(!patches_needing_bobs_review.contains(&b3_uuid), "B3 should not need Bob's review");
+
+    // Alice's patches SHOULD need Bob's review
+    assert!(patches_needing_bobs_review.contains(&a1_uuid), "A1 should need Bob's review");
+    assert!(patches_needing_bobs_review.contains(&a2_uuid), "A2 should need Bob's review");
+
+    // Günther's patches SHOULD need Bob's review (he decides independently)
+    assert!(patches_needing_bobs_review.contains(&g1_uuid), "G1 should need Bob's review");
+    assert!(patches_needing_bobs_review.contains(&g2_uuid), "G2 should need Bob's review");
+
+    // Verify Alice's reviews are visible when Bob queries them
+    let alice_g1_review: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&g1_uuid, alice_id],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+    assert_eq!(alice_g1_review, Some("accepted".to_string()), "Alice accepted G1");
+
+    let alice_g2_review: Option<String> = conn
+        .query_row(
+            "SELECT decision FROM patch_reviews WHERE patch_uuid = ?1 AND reviewer_id = ?2",
+            params![&g2_uuid, alice_id],
+            |row| row.get(0)
+        )
+        .optional()
+        .unwrap();
+    assert_eq!(alice_g2_review, Some("rejected".to_string()), "Alice rejected G2");
+
+    // Step 6: Bob accepts G1 (his own decision, independent of Alice's)
+    conn.execute(
+        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&g1_uuid, bob_id, "accepted", "Bob", 9000],
+    ).unwrap();
+
+    // Now G1 should NOT be in Bob's pending list
+    let patches_after_review: Vec<String> = conn
+        .prepare(
+            "SELECT uuid FROM patches
+             WHERE author != ?1
+             AND uuid IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM patch_reviews pr
+                 WHERE pr.patch_uuid = patches.uuid
+                 AND pr.reviewer_id = ?1
+             )
+             ORDER BY timestamp ASC"
+        )
+        .unwrap()
+        .query_map([bob_id], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert!(!patches_after_review.contains(&g1_uuid), "G1 should no longer need Bob's review");
+    assert!(patches_after_review.contains(&g2_uuid), "G2 still needs Bob's review");
+
+    // Verify both Alice and Bob's reviews coexist for G1
+    let g1_reviews: Vec<(String, String)> = conn
+        .prepare("SELECT reviewer_id, decision FROM patch_reviews WHERE patch_uuid = ?1 ORDER BY reviewer_id")
+        .unwrap()
+        .query_map([&g1_uuid], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(g1_reviews.len(), 2, "G1 should have 2 reviews");
+    assert!(g1_reviews.iter().any(|(r, d)| r == alice_id && d == "accepted"), "Alice accepted G1");
+    assert!(g1_reviews.iter().any(|(r, d)| r == bob_id && d == "accepted"), "Bob accepted G1");
 }

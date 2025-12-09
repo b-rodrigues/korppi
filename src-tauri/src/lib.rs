@@ -88,6 +88,7 @@ pub fn run() {
             record_document_patch_review,
             get_document_patch_reviews,
             get_document_patches_needing_review,
+            check_parent_patch_status,
             import_patches_from_document,
             record_patch_review,
             get_patch_reviews,
