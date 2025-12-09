@@ -598,7 +598,7 @@ pub fn record_document_patch(
             author      TEXT    NOT NULL,
             kind        TEXT    NOT NULL,
             data        TEXT    NOT NULL,
-            uuid        TEXT UNIQUE,
+            uuid        TEXT,
             parent_uuid TEXT
         );
 
@@ -625,9 +625,18 @@ pub fn record_document_patch(
         "#,
     ).map_err(|e| e.to_string())?;
     
-    // Migration: Add uuid and parent_uuid columns if they don't exist
-    conn.execute("ALTER TABLE patches ADD COLUMN uuid TEXT UNIQUE", []).ok();
+    // Migration: Add uuid and parent_uuid columns if they don't exist (without UNIQUE constraint initially)
+    conn.execute("ALTER TABLE patches ADD COLUMN uuid TEXT", []).ok();
     conn.execute("ALTER TABLE patches ADD COLUMN parent_uuid TEXT", []).ok();
+    
+    // Generate UUIDs for existing rows that don't have one
+    conn.execute(
+        "UPDATE patches SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL",
+        [],
+    ).ok();
+    
+    // Now we can safely add the UNIQUE constraint by recreating the index
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_uuid_unique ON patches(uuid)", []).ok();
     
     let data_str = serde_json::to_string(&patch.data).map_err(|e| e.to_string())?;
     
@@ -744,7 +753,7 @@ pub fn record_document_patch_review(
     ).ok();
     
     conn.execute(
-        "INSERT INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT OR REPLACE INTO patch_reviews (patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![patch_uuid, reviewer_id, decision, reviewer_name, reviewed_at],
     )
     .map_err(|e| e.to_string())?;

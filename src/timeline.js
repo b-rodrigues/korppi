@@ -826,13 +826,13 @@ async function resetToOriginal() {
             return;
         }
 
-        // Reset all patch statuses back to pending
-        await invoke("reset_imported_patches_status", { docId });
+        // Note: In the new review system, reviews are permanent records and not reset
+        // Users can re-review patches if needed by recording new reviews
 
         // DON'T clear the snapshot - keep it for future resets
         // localStorage.removeItem('reconciliation-snapshot');
 
-        alert("Document restored to state before reconciliation. All patches reset to pending.");
+        alert("Document restored to state before reconciliation.");
         await refreshTimeline();
 
     } catch (err) {
