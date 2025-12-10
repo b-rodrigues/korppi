@@ -277,7 +277,7 @@ pub fn import_patches_from_document(
     let source_conn = Connection::open(&temp_db_path)
         .map_err(|e| format!("Failed to open source history: {}", e))?;
     
-    // Get all Save patches from source (ignore intermediate edits)
+    // Get all Save patches from source (only explicit saves, not intermediate edits)
     let source_patches: Vec<(i64, i64, String, String, String, Option<String>, Option<String>)> = {
         // First try with uuid and parent_uuid columns
         let query = "SELECT id, timestamp, author, kind, data, uuid, parent_uuid FROM patches WHERE kind = 'Save' ORDER BY timestamp ASC";

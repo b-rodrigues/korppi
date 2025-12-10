@@ -143,6 +143,42 @@ export async function saveDocument(id = null, path = null) {
  * @returns {Promise<boolean>} True if closed, false if cancelled
  */
 export async function closeDocument(id, force = false) {
+    // Auto-create a Save patch before closing to preserve changes for reconciliation
+    try {
+        const { getMarkdown } = await import("./editor.js");
+        const editorContent = getMarkdown();
+
+        if (editorContent) {
+            // Check if content has changed from last save
+            const patches = await invoke("list_document_patches", { id }).catch(() => []);
+            const lastSavePatch = patches
+                .filter(p => p.kind === "Save" && p.data?.snapshot)
+                .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+            // Create a Save patch if content changed
+            if (!lastSavePatch || lastSavePatch.data.snapshot !== editorContent) {
+                const timestamp = Date.now();
+                const profile = getCachedProfile();
+                const author = profile?.id || "local";
+                const authorName = profile?.name || "Local User";
+                const authorColor = profile?.color || "#3498db";
+                const patch = {
+                    timestamp,
+                    author,
+                    kind: "Save",
+                    data: {
+                        snapshot: editorContent,
+                        authorName,
+                        authorColor
+                    }
+                };
+                await invoke("record_document_patch", { id, patch });
+            }
+        }
+    } catch (err) {
+        console.warn("Could not create auto-save patch on close:", err);
+    }
+
     const result = await invoke("close_document", { id, force });
     if (result) {
         const handle = openDocuments.get(id);

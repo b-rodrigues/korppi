@@ -312,6 +312,11 @@ export async function renderPatchList(patches) {
 
     // Filter patches
     let filteredPatches = patches.filter(p => {
+        // Only show Save patches (hide semantic_group which is too granular for reconciliation)
+        if (p.kind !== "Save") {
+            return false;
+        }
+
         // Must have snapshot content
         if (!hasSnapshotContent(p)) {
             return false;
