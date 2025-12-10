@@ -10,13 +10,13 @@
  * @property {number} opened_at - Timestamp when document was opened
  */
 
-import { 
-    getOpenDocuments, 
-    getActiveDocumentId, 
-    setActiveDocument, 
-    closeDocument, 
+import {
+    getOpenDocuments,
+    getActiveDocumentId,
+    setActiveDocument,
+    closeDocument,
     newDocument,
-    onDocumentChange 
+    onDocumentChange
 } from "./document-manager.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
 
@@ -31,12 +31,13 @@ export function initDocumentTabs() {
         console.error("Document tabs container not found");
         return;
     }
-    
+
     // Listen for document changes
     onDocumentChange((event, document) => {
         switch (event) {
             case "new":
             case "open":
+            case "import":
                 addTab(document);
                 break;
             case "close":
@@ -56,7 +57,7 @@ export function initDocumentTabs() {
                 break;
         }
     });
-    
+
     // Add new tab button
     const newTabBtn = document.createElement("button");
     newTabBtn.id = "new-tab-btn";
@@ -79,16 +80,16 @@ export function initDocumentTabs() {
  */
 export function addTab(docHandle) {
     if (!tabsContainer) return;
-    
+
     // Check if tab already exists
     const existingTab = document.getElementById(`tab-${docHandle.id}`);
     if (existingTab) {
         setActiveTab(docHandle.id);
         return;
     }
-    
+
     const tab = createTabElement(docHandle);
-    
+
     // Insert before the new tab button
     const newTabBtn = document.getElementById("new-tab-btn");
     if (newTabBtn) {
@@ -96,7 +97,7 @@ export function addTab(docHandle) {
     } else {
         tabsContainer.appendChild(tab);
     }
-    
+
     setActiveTab(docHandle.id);
 }
 
@@ -110,34 +111,34 @@ function createTabElement(doc) {
     tab.id = `tab-${doc.id}`;
     tab.className = "document-tab";
     tab.dataset.documentId = doc.id;
-    
+
     const title = document.createElement("span");
     title.className = "tab-title";
     title.textContent = doc.title;
-    
+
     const modified = document.createElement("span");
     modified.className = "tab-modified";
     modified.textContent = "•";
     modified.style.display = doc.is_modified ? "inline" : "none";
-    
+
     const closeBtn = document.createElement("span");
     closeBtn.className = "tab-close";
     closeBtn.textContent = "×";
     closeBtn.title = "Close";
-    
+
     closeBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         await handleCloseTab(doc.id);
     });
-    
+
     tab.addEventListener("click", () => {
         setActiveDocument(doc.id);
     });
-    
+
     tab.appendChild(title);
     tab.appendChild(modified);
     tab.appendChild(closeBtn);
-    
+
     return tab;
 }
 
@@ -148,7 +149,7 @@ function createTabElement(doc) {
 async function handleCloseTab(documentId) {
     const docs = getOpenDocuments();
     const doc = docs.get(documentId);
-    
+
     if (doc && doc.is_modified) {
         const result = await confirm(
             `Save changes to "${doc.title}" before closing?`,
@@ -157,7 +158,7 @@ async function handleCloseTab(documentId) {
                 kind: "warning",
             }
         );
-        
+
         if (result) {
             // User wants to save
             const { saveDocument } = await import("./document-manager.js");
@@ -169,7 +170,7 @@ async function handleCloseTab(documentId) {
             }
         }
     }
-    
+
     await closeDocument(documentId, true);
 }
 
@@ -179,7 +180,7 @@ async function handleCloseTab(documentId) {
  */
 export function removeTab(documentId) {
     if (!tabsContainer || !documentId) return;
-    
+
     const tab = document.getElementById(`tab-${documentId}`);
     if (tab) {
         tab.remove();
@@ -192,11 +193,11 @@ export function removeTab(documentId) {
  */
 export function setActiveTab(documentId) {
     if (!tabsContainer) return;
-    
+
     // Remove active class from all tabs
     const tabs = tabsContainer.querySelectorAll(".document-tab");
     tabs.forEach(tab => tab.classList.remove("active"));
-    
+
     // Add active class to the selected tab
     const activeTab = document.getElementById(`tab-${documentId}`);
     if (activeTab) {
@@ -212,17 +213,17 @@ export function setActiveTab(documentId) {
  */
 export function updateTabTitle(documentId, title, isModified) {
     if (!tabsContainer) return;
-    
+
     const tab = document.getElementById(`tab-${documentId}`);
     if (!tab) return;
-    
+
     const titleEl = tab.querySelector(".tab-title");
     const modifiedEl = tab.querySelector(".tab-modified");
-    
+
     if (titleEl) {
         titleEl.textContent = title;
     }
-    
+
     if (modifiedEl) {
         modifiedEl.style.display = isModified ? "inline" : "none";
     }
@@ -235,20 +236,20 @@ export function updateTabTitle(documentId, title, isModified) {
  */
 export function getNextTabId(currentId) {
     if (!tabsContainer) return null;
-    
+
     const tabs = tabsContainer.querySelectorAll(".document-tab");
     const tabArray = Array.from(tabs);
     const currentIndex = tabArray.findIndex(t => t.dataset.documentId === currentId);
-    
+
     if (currentIndex === -1) return null;
-    
+
     // Try next tab, then previous
     if (currentIndex < tabArray.length - 1) {
         return tabArray[currentIndex + 1].dataset.documentId;
     } else if (currentIndex > 0) {
         return tabArray[currentIndex - 1].dataset.documentId;
     }
-    
+
     return null;
 }
 
@@ -258,13 +259,13 @@ export function getNextTabId(currentId) {
 export function switchToNextTab() {
     const activeId = getActiveDocumentId();
     if (!activeId || !tabsContainer) return;
-    
+
     const tabs = tabsContainer.querySelectorAll(".document-tab");
     const tabArray = Array.from(tabs);
     const currentIndex = tabArray.findIndex(t => t.dataset.documentId === activeId);
-    
+
     if (currentIndex === -1) return;
-    
+
     const nextIndex = (currentIndex + 1) % tabArray.length;
     const nextId = tabArray[nextIndex].dataset.documentId;
     setActiveDocument(nextId);
@@ -276,13 +277,13 @@ export function switchToNextTab() {
 export function switchToPreviousTab() {
     const activeId = getActiveDocumentId();
     if (!activeId || !tabsContainer) return;
-    
+
     const tabs = tabsContainer.querySelectorAll(".document-tab");
     const tabArray = Array.from(tabs);
     const currentIndex = tabArray.findIndex(t => t.dataset.documentId === activeId);
-    
+
     if (currentIndex === -1) return;
-    
+
     const prevIndex = (currentIndex - 1 + tabArray.length) % tabArray.length;
     const prevId = tabArray[prevIndex].dataset.documentId;
     setActiveDocument(prevId);
