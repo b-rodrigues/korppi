@@ -31,6 +31,7 @@ import { initWelcomeModal } from "./components/welcome-modal.js";
 import { initSearch } from "./search.js";
 import { initAutosave } from "./autosave.js";
 import { initWordCount } from "./word-count.js";
+import { initSidebarController } from "./components/sidebar-controller.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -202,6 +203,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // 1. Initialize UI Layout Components (sidebars, theme)
     initResizableSidebars();
+    initSidebarController(); // Hide right sidebar by default
     initThemeToggle();
     await initProfileButton();
 

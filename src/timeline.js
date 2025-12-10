@@ -123,12 +123,40 @@ export async function restoreToPatch(patchId) {
     }
 }
 
+// Debounce for refreshTimeline to prevent double renders
+let refreshTimelineTimeout = null;
+let refreshTimelinePromise = null;
+
 /**
- * Refresh the timeline list
+ * Refresh the timeline list (debounced to prevent duplicates)
  */
 export async function refreshTimeline() {
-    const patches = await fetchPatchList();
-    renderPatchList(patches);
+    // If a refresh is already pending, just extend the timeout
+    if (refreshTimelineTimeout) {
+        clearTimeout(refreshTimelineTimeout);
+    }
+
+    // Return existing promise if a refresh is in progress
+    if (refreshTimelinePromise) {
+        return refreshTimelinePromise;
+    }
+
+    // Debounce by 50ms to coalesce rapid calls
+    return new Promise((resolve) => {
+        refreshTimelineTimeout = setTimeout(async () => {
+            refreshTimelineTimeout = null;
+            refreshTimelinePromise = (async () => {
+                try {
+                    const patches = await fetchPatchList();
+                    renderPatchList(patches);
+                } finally {
+                    refreshTimelinePromise = null;
+                }
+            })();
+            await refreshTimelinePromise;
+            resolve();
+        }, 50);
+    });
 }
 
 /**
@@ -213,28 +241,31 @@ export function initTimeline() {
         await refreshTimeline();
     });
 
-    // Listen for reconciliation import event
+    // Listen for reconciliation import event - ONLY show conflict alert during reconciliation
     window.addEventListener('reconciliation-imported', async () => {
         showConflictAlertOnNextRefresh = true;
         await refreshTimeline();
     });
 
-    // Listen for document changes (open, switch, new)
+    // Listen for document changes (open, switch, new) - refresh timeline but don't alert
     onDocumentChange(async (event, doc) => {
         if (event === "open" || event === "new" || event === "activeChange") {
-            showConflictAlertOnNextRefresh = true;
+            // Don't set showConflictAlertOnNextRefresh - we only alert during reconciliation
             await refreshTimeline();
         }
     });
 
-    // Initial load
-    showConflictAlertOnNextRefresh = true;
+    // Initial load - no conflict alert
     refreshTimeline();
 }
 
 export async function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
+
+    // DEBUG: Log incoming patches
+    console.log("[DEBUG] renderPatchList called with", patches.length, "patches");
+    console.log("[DEBUG] Save patches:", patches.filter(p => p.kind === "Save").map(p => "#" + p.id).join(", "));
 
     // Detect conflicts in patches
     conflictState = detectPatchConflicts(patches);

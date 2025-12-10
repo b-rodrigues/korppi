@@ -17,6 +17,7 @@ import {
 import { getEditorContent, editor, editorViewCtx } from "./editor.js";
 import { escapeHtml } from "./utils.js";
 import { getProfile } from "./profile-service.js";
+import { showRightSidebar } from "./components/sidebar-controller.js";
 
 // ============================================================================
 // State
@@ -364,8 +365,8 @@ function showAddCommentModal(selection) {
             hideCommentModal();
             await refreshComments();
 
-            // Switch to comments tab
-            switchToTab("comments");
+            // Show sidebar and switch to comments tab
+            showRightSidebar('comments');
         } catch (err) {
             console.error("Failed to add comment:", err);
             alert("Failed to add comment: " + err);

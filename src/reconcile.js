@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getActiveDocumentId } from "./document-manager.js";
 import { getMarkdown } from "./editor.js";
+import { showRightSidebar } from "./components/sidebar-controller.js";
 
 /**
  * Start reconciliation process
@@ -45,6 +46,9 @@ export async function startReconciliation() {
 
         // Refresh the timeline to show imported patches (this will also trigger conflict detection)
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
+
+        // Auto-show the right sidebar with timeline tab for patch review
+        showRightSidebar('timeline');
 
         // Use setTimeout to allow timeline refresh and conflict detection to complete first
         setTimeout(() => {

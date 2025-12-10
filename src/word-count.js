@@ -5,6 +5,7 @@ import { getEditorContent } from "./editor.js";
 import { fetchPatchList, hasSnapshotContent } from "./timeline.js";
 import { listComments } from "./comments-service.js";
 import { getActiveDocumentId } from "./document-manager.js";
+import { showRightSidebar } from "./components/sidebar-controller.js";
 
 let updateTimeout = null;
 let pendingUpdateTimeout = null;
@@ -16,6 +17,20 @@ export function initWordCount() {
     // Initial update (may be 0 if no document open yet)
     updateWordCount();
     updatePendingCounts();
+
+    // Setup click handlers for pending badges to open sidebar
+    const patchesEl = document.getElementById("pending-patches");
+    const commentsEl = document.getElementById("pending-comments");
+
+    if (patchesEl) {
+        patchesEl.style.cursor = "pointer";
+        patchesEl.addEventListener("click", () => showRightSidebar("timeline"));
+    }
+
+    if (commentsEl) {
+        commentsEl.style.cursor = "pointer";
+        commentsEl.addEventListener("click", () => showRightSidebar("comments"));
+    }
 
     // Listen for content changes (typing)
     window.addEventListener("markdown-updated", () => {
@@ -159,8 +174,9 @@ async function updatePendingCounts() {
         // The Patch struct has `data` field.
 
         const count = patches.filter(p => {
-            // Basic check if it has data.snapshot
-            return p.data && typeof p.data.snapshot === 'string';
+            // Only count Save patches (exclude semantic_group which is too granular)
+            // Must also have a snapshot to be reviewable
+            return p.kind === "Save" && p.data && typeof p.data.snapshot === 'string';
         }).length;
 
         if (patchesEl) {

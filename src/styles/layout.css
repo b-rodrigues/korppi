@@ -218,6 +218,16 @@
     border-left: 1px solid var(--border-color);
     overflow: hidden;
     flex-shrink: 0;
+    transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease, border 0.2s ease;
+}
+
+/* Hidden state for right sidebar */
+.right-sidebar.hidden {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border-left: none;
+    overflow: hidden;
 }
 
 .timeline-header {
