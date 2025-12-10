@@ -1,6 +1,7 @@
 // editor.js — Clean unified version
 
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx } from "@milkdown/core";
+import { replaceAll } from "@milkdown/utils";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
@@ -87,6 +88,31 @@ export function doRedo() {
     }
 }
 
+/**
+ * Set the editor content from a markdown string.
+ * This properly parses the markdown and renders it in WYSIWYG mode.
+ * @param {string} markdown - The markdown content to set
+ * @returns {boolean} True if successful
+ */
+export function setMarkdownContent(markdown) {
+    if (!editor) {
+        console.error("setMarkdownContent: Editor not initialized");
+        return false;
+    }
+
+    if (!markdown || typeof markdown !== 'string') {
+        console.warn("setMarkdownContent: No valid markdown provided");
+        return false;
+    }
+
+    try {
+        editor.action(replaceAll(markdown));
+        return true;
+    } catch (err) {
+        console.error("setMarkdownContent error:", err);
+        return false;
+    }
+}
 
 export async function initEditor() {
     try {

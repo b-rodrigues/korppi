@@ -1,8 +1,8 @@
-import { initEditor, getMarkdown, doUndo, doRedo } from "./editor.js";
+import { initEditor, getMarkdown, doUndo, doRedo, setMarkdownContent } from "./editor.js";
 import { fetchPatchList, fetchPatch, renderPatchList, renderPatchDetails, initTimeline } from "./timeline.js";
 import { initConflictUI } from "./conflict-ui.js";
 import { exportAsMarkdown, exportAsDocx } from "./kmd-service.js";
-import { forceSave, restoreDocumentState } from "./yjs-setup.js";
+import { forceSave } from "./yjs-setup.js";
 import { startReconciliation } from "./reconcile.js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showSaveConfirmModal } from "./components/save-confirm-modal.js";
@@ -82,14 +82,14 @@ async function confirmExportWithWarnings() {
         const docId = getActiveDocumentId();
 
         if (docId) {
-             const patches = await invoke("get_document_patches_needing_review", {
-                 docId,
-                 reviewerId: currentUserId
-             });
+            const patches = await invoke("get_document_patches_needing_review", {
+                docId,
+                reviewerId: currentUserId
+            });
 
-             if (patches.length > 0) {
-                 warnings.push(`${patches.length} pending patch${patches.length > 1 ? 'es' : ''}`);
-             }
+            if (patches.length > 0) {
+                warnings.push(`${patches.length} pending patch${patches.length > 1 ? 'es' : ''}`);
+            }
         }
     } catch (err) {
         console.warn("Could not check patch status:", err);
@@ -265,9 +265,20 @@ window.addEventListener("DOMContentLoaded", async () => {
         importDocBtn.addEventListener("click", async () => {
             try {
                 const result = await importDocument();
-                // Set the imported content in the editor
+                // Wait for Yjs document switch to complete before restoring content
                 if (result.content) {
-                    restoreDocumentState(result.content);
+                    // The document switch is triggered by setActiveDocument inside importDocument.
+                    // We need to wait for the yjs-doc-replaced event to fire before restoring.
+                    await new Promise(resolve => {
+                        const handler = () => {
+                            window.removeEventListener("yjs-doc-replaced", handler);
+                            resolve();
+                        };
+                        window.addEventListener("yjs-doc-replaced", handler);
+                        // Timeout fallback in case the event already fired
+                        setTimeout(resolve, 100);
+                    });
+                    setMarkdownContent(result.content);
                 }
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
@@ -378,8 +389,18 @@ window.addEventListener("DOMContentLoaded", async () => {
         importDocumentBtn.addEventListener("click", async () => {
             try {
                 const result = await importDocument();
+                // Wait for Yjs document switch to complete before restoring content
                 if (result.content) {
-                    restoreDocumentState(result.content);
+                    await new Promise(resolve => {
+                        const handler = () => {
+                            window.removeEventListener("yjs-doc-replaced", handler);
+                            resolve();
+                        };
+                        window.addEventListener("yjs-doc-replaced", handler);
+                        // Timeout fallback in case the event already fired
+                        setTimeout(resolve, 100);
+                    });
+                    setMarkdownContent(result.content);
                 }
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
