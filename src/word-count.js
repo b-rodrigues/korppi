@@ -4,16 +4,10 @@
 import { getEditorContent } from "./editor.js";
 import { fetchPatchList, hasSnapshotContent } from "./timeline.js";
 import { listComments } from "./comments-service.js";
-import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
+import { getActiveDocumentId } from "./document-manager.js";
 
 let updateTimeout = null;
 let pendingUpdateTimeout = null;
-
-// Content cache to avoid redundant calculations
-let cachedContent = null;
-let cachedWordCount = 0;
-let cachedCharCount = 0;
-let cachedCharCountNoSpaces = 0;
 
 /**
  * Initialize word count and status bar functionality
@@ -30,16 +24,21 @@ export function initWordCount() {
         updateTimeout = setTimeout(updateWordCount, 300);
     });
 
-    // Listen for document changes via document-manager (most reliable)
-    onDocumentChange((event, doc) => {
-        // Update immediately when a document is opened or switched
-        if (event === "open" || event === "activeChange" || event === "new") {
+    // Listen for document switches AFTER content is loaded (yjs-doc-replaced fires after switchDocument)
+    window.addEventListener("yjs-doc-replaced", () => {
+        // Small delay to ensure editor state is updated
+        setTimeout(() => {
             updateWordCount();
             updatePendingCounts();
-        }
+        }, 50);
     });
 
-    // Also listen for window event as backup
+    // Listen for content restored (after patch restore)
+    window.addEventListener("yjs-content-restored", () => {
+        updateWordCount();
+    });
+
+    // Listen for document-changed event (fired after import content is set)
     window.addEventListener("document-changed", () => {
         updateWordCount();
         updatePendingCounts();
@@ -65,43 +64,36 @@ function debouncedPendingUpdate() {
 
 /**
  * Update the word count display
- * Uses caching to avoid redundant string operations
+ * Recalculates every time for accuracy (fast enough without caching)
  */
 function updateWordCount() {
     const content = getEditorContent() || "";
 
-    // Only recalculate if content changed
-    if (content !== cachedContent) {
-        cachedContent = content;
-
-        // Count words (split by whitespace, filter empty)
-        const trimmed = content.trim();
-        if (trimmed === "") {
-            cachedWordCount = 0;
-        } else {
-            // Faster word counting without creating an array
-            cachedWordCount = 1;
-            let inWord = true;
-            for (let i = 0; i < trimmed.length; i++) {
-                const isWs = trimmed.charCodeAt(i) <= 32;
-                if (isWs && inWord) {
-                    inWord = false;
-                } else if (!isWs && !inWord) {
-                    cachedWordCount++;
-                    inWord = true;
-                }
+    // Count words
+    const trimmed = content.trim();
+    let wordCount = 0;
+    if (trimmed !== "") {
+        wordCount = 1;
+        let inWord = true;
+        for (let i = 0; i < trimmed.length; i++) {
+            const isWs = trimmed.charCodeAt(i) <= 32;
+            if (isWs && inWord) {
+                inWord = false;
+            } else if (!isWs && !inWord) {
+                wordCount++;
+                inWord = true;
             }
         }
+    }
 
-        // Count characters
-        cachedCharCount = content.length;
+    // Count characters
+    const charCount = content.length;
 
-        // Count non-whitespace characters without creating a new string
-        cachedCharCountNoSpaces = 0;
-        for (let i = 0; i < content.length; i++) {
-            if (content.charCodeAt(i) > 32) {
-                cachedCharCountNoSpaces++;
-            }
+    // Count non-whitespace characters
+    let charCountNoSpaces = 0;
+    for (let i = 0; i < content.length; i++) {
+        if (content.charCodeAt(i) > 32) {
+            charCountNoSpaces++;
         }
     }
 
@@ -110,12 +102,12 @@ function updateWordCount() {
     const charEl = document.getElementById("char-count");
 
     if (wordEl) {
-        wordEl.textContent = `${cachedWordCount.toLocaleString()} word${cachedWordCount !== 1 ? 's' : ''}`;
+        wordEl.textContent = `${wordCount.toLocaleString()} word${wordCount !== 1 ? 's' : ''}`;
     }
 
     if (charEl) {
-        charEl.textContent = `${cachedCharCount.toLocaleString()} char${cachedCharCount !== 1 ? 's' : ''}`;
-        charEl.title = `${cachedCharCountNoSpaces.toLocaleString()} without spaces`;
+        charEl.textContent = `${charCount.toLocaleString()} char${charCount !== 1 ? 's' : ''}`;
+        charEl.title = `${charCountNoSpaces.toLocaleString()} without spaces`;
     }
 }
 
@@ -167,8 +159,8 @@ async function updatePendingCounts() {
         // The Patch struct has `data` field.
 
         const count = patches.filter(p => {
-             // Basic check if it has data.snapshot
-             return p.data && typeof p.data.snapshot === 'string';
+            // Basic check if it has data.snapshot
+            return p.data && typeof p.data.snapshot === 'string';
         }).length;
 
         if (patchesEl) {
@@ -203,28 +195,30 @@ async function updatePendingCounts() {
 
 /**
  * Get current word count (for external use)
- * Uses cached value if available, otherwise calculates
  */
 export function getWordCount() {
     const content = getEditorContent() || "";
-    if (content === cachedContent) {
-        return cachedWordCount;
+    const trimmed = content.trim();
+    if (trimmed === "") return 0;
+
+    let wordCount = 1;
+    let inWord = true;
+    for (let i = 0; i < trimmed.length; i++) {
+        const isWs = trimmed.charCodeAt(i) <= 32;
+        if (isWs && inWord) {
+            inWord = false;
+        } else if (!isWs && !inWord) {
+            wordCount++;
+            inWord = true;
+        }
     }
-    // Update cache and return
-    updateWordCount();
-    return cachedWordCount;
+    return wordCount;
 }
 
 /**
  * Get current character count (for external use)
- * Uses cached value if available, otherwise calculates
  */
 export function getCharCount() {
     const content = getEditorContent() || "";
-    if (content === cachedContent) {
-        return cachedCharCount;
-    }
-    // Update cache and return
-    updateWordCount();
-    return cachedCharCount;
+    return content.length;
 }

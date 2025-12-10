@@ -279,6 +279,8 @@ window.addEventListener("DOMContentLoaded", async () => {
                         setTimeout(resolve, 100);
                     });
                     setMarkdownContent(result.content);
+                    // Trigger word count update after content is loaded
+                    window.dispatchEvent(new CustomEvent("document-changed"));
                 }
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
@@ -401,6 +403,8 @@ window.addEventListener("DOMContentLoaded", async () => {
                         setTimeout(resolve, 100);
                     });
                     setMarkdownContent(result.content);
+                    // Trigger word count update after content is loaded
+                    window.dispatchEvent(new CustomEvent("document-changed"));
                 }
             } catch (err) {
                 if (!err.toString().includes("No file selected")) {
