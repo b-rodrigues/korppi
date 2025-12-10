@@ -39,5 +39,8 @@ pulldown-cmark = "0.13.0"
 # XML parsing for DOCX/ODT import
 quick-xml = "0.31"
 
+# Opening URLs in system browser
+open = "5"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

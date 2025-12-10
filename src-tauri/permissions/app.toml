@@ -62,5 +62,7 @@ commands.allow = [
     "check_parent_patch_status",
     "record_patch_review",
     "get_patch_reviews",
-    "get_patches_needing_review"
+    "get_patches_needing_review",
+    "check_pandoc_available",
+    "open_url"
 ]

@@ -36,11 +36,36 @@ export async function openDocument(path = null) {
 /**
  * Import a document from various formats (markdown, docx, odt)
  * Shows file picker if path is null
+ * For DOCX/ODT, checks if pandoc is available and prompts if not
  * @param {string|null} path - Optional file path
  * @returns {Promise<Object>} Import result with handle and content
  */
 export async function importDocument(path = null) {
     const result = await invoke("import_document", { path });
+
+    // Check if this was a DOCX or ODT file and if pandoc was used
+    const format = result.source_format?.toLowerCase() || "";
+    const needsPandoc = format === "docx" || format === "odt";
+
+    if (needsPandoc) {
+        // Check if pandoc is available
+        const hasPandoc = await invoke("check_pandoc_available");
+
+        if (!hasPandoc) {
+            // Show a warning that pandoc isn't installed
+            const message = `⚠️ Pandoc not found\n\n` +
+                `For better formatting (bold, italic, headings, lists, tables), install Pandoc.\n\n` +
+                `The document was imported with basic text extraction only.\n` +
+                `Restart the app after installing Pandoc for full formatting support.\n\n` +
+                `Click OK to open the Pandoc installation page.`;
+
+            if (confirm(message)) {
+                // Open the pandoc installation page in the default browser
+                await invoke("open_url", { url: "https://pandoc.org/installing.html" });
+            }
+        }
+    }
+
     openDocuments.set(result.handle.id, result.handle);
     setActiveDocument(result.handle.id);
     notifyListeners("import", result.handle);

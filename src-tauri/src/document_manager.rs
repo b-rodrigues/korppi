@@ -1048,8 +1048,75 @@ fn strip_yaml_frontmatter(content: &str) -> String {
     content.to_string()
 }
 
-/// Extract text content from a DOCX file
+/// Check if pandoc is available on the system
+fn is_pandoc_available() -> bool {
+    use std::process::Command;
+    Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Tauri command to check if pandoc is available
+#[tauri::command]
+pub fn check_pandoc_available() -> bool {
+    is_pandoc_available()
+}
+
+/// Tauri command to open a URL in the system's default browser
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))
+}
+
+/// Extract content from a DOCX file and convert to Markdown
+/// If use_pandoc is true and pandoc is available, uses pandoc for conversion
+/// Otherwise falls back to basic text extraction
+fn extract_docx_text_with_option(file_path: &PathBuf, use_pandoc: bool) -> Result<String, String> {
+    if use_pandoc {
+        if let Ok(markdown) = convert_with_pandoc(file_path, "docx") {
+            return Ok(markdown);
+        }
+    }
+    
+    // Fallback: basic text extraction without formatting
+    extract_docx_text_basic(file_path)
+}
+
+/// Extract content from a DOCX file (convenience wrapper)
 fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
+    // Try pandoc first by default
+    extract_docx_text_with_option(file_path, true)
+}
+
+/// Convert a document to markdown using pandoc
+fn convert_with_pandoc(file_path: &PathBuf, from_format: &str) -> Result<String, String> {
+    use std::process::Command;
+    
+    let output = Command::new("pandoc")
+        .arg("-f")
+        .arg(from_format)
+        .arg("-t")
+        .arg("markdown")
+        .arg("--wrap=none")  // Don't wrap lines
+        .arg(file_path)
+        .output()
+        .map_err(|e| format!("Failed to run pandoc: {}", e))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Pandoc conversion failed: {}", stderr));
+    }
+    
+    let markdown = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Invalid UTF-8 in pandoc output: {}", e))?;
+    
+    Ok(markdown)
+}
+
+/// Basic DOCX text extraction without formatting (fallback when pandoc unavailable)
+fn extract_docx_text_basic(file_path: &PathBuf) -> Result<String, String> {
     let file = File::open(file_path).map_err(|e| format!("Failed to open DOCX file: {}", e))?;
     let mut archive = ZipArchive::new(file).map_err(|e| format!("Invalid DOCX file: {}", e))?;
 
@@ -1076,19 +1143,14 @@ fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
                 let name = e.local_name();
                 let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
-                // Check for text elements (w:t)
                 if name_str == "t" {
                     in_text = true;
-                }
-                // Check for paragraph breaks (w:p)
-                else if name_str == "p" {
+                } else if name_str == "p" {
                     if !current_paragraph.is_empty() {
                         text_parts.push(current_paragraph.join(""));
                         current_paragraph.clear();
                     }
-                }
-                // Check for line breaks (w:br)
-                else if name_str == "br" {
+                } else if name_str == "br" {
                     current_paragraph.push("\n".to_string());
                 }
             }
@@ -1102,7 +1164,6 @@ fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
             Ok(Event::End(ref e)) => {
                 let name = e.local_name();
                 let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
-
                 if name_str == "t" {
                     in_text = false;
                 }
@@ -1114,7 +1175,6 @@ fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
         buf.clear();
     }
 
-    // Don't forget the last paragraph
     if !current_paragraph.is_empty() {
         text_parts.push(current_paragraph.join(""));
     }
@@ -1122,8 +1182,20 @@ fn extract_docx_text(file_path: &PathBuf) -> Result<String, String> {
     Ok(text_parts.join("\n\n"))
 }
 
-/// Extract text content from an ODT file
+/// Extract content from an ODT file and convert to Markdown using pandoc
+/// Falls back to basic text extraction if pandoc is not available
 fn extract_odt_text(file_path: &PathBuf) -> Result<String, String> {
+    // First, try using pandoc for high-quality conversion
+    if let Ok(markdown) = convert_with_pandoc(file_path, "odt") {
+        return Ok(markdown);
+    }
+    
+    // Fallback: basic text extraction without formatting
+    extract_odt_text_basic(file_path)
+}
+
+/// Basic ODT text extraction without formatting (fallback when pandoc unavailable)
+fn extract_odt_text_basic(file_path: &PathBuf) -> Result<String, String> {
     let file = File::open(file_path).map_err(|e| format!("Failed to open ODT file: {}", e))?;
     let mut archive = ZipArchive::new(file).map_err(|e| format!("Invalid ODT file: {}", e))?;
 

@@ -29,7 +29,7 @@ use document_manager::{
     save_document_snapshot, restore_document_to_patch,
     record_document_patch_review, get_document_patch_reviews,
     get_document_patches_needing_review, check_parent_patch_status,
-    import_document,
+    import_document, check_pandoc_available, open_url,
     DocumentManager,
 };
 use comments::{
@@ -91,6 +91,8 @@ pub fn run() {
             get_document_patches_needing_review,
             check_parent_patch_status,
             import_document,
+            check_pandoc_available,
+            open_url,
             import_patches_from_document,
             record_patch_review,
             get_patch_reviews,
