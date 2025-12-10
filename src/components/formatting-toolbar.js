@@ -24,6 +24,7 @@ export function initFormattingToolbar(editor) {
         { id: 'bold', icon: 'B', title: 'Bold (Ctrl+B)', markName: 'strong' },
         { id: 'italic', icon: 'I', title: 'Italic (Ctrl+I)', markName: 'emphasis', style: 'font-style: italic;' },
         { id: 'strike', icon: 'S', title: 'Strikethrough', markName: 'strike_through', style: 'text-decoration: line-through;' },
+        { id: 'underline', icon: 'U', title: 'Underline (Ctrl+U)', markName: 'underline', style: 'text-decoration: underline;' },
         { id: 'code', icon: '`', title: 'Inline Code', markName: 'inlineCode', style: 'font-family: monospace;' },
         { id: 'clear', icon: '⌀', title: 'Clear Formatting', action: 'clearFormat' },
         { type: 'separator' },

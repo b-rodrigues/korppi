@@ -106,6 +106,12 @@ body {
     text-decoration: underline;
 }
 
+/* Underline mark support */
+.editor-page #editor ins,
+.editor-page #editor .underline {
+    text-decoration: underline;
+}
+
 /* ===== RECENT DOCUMENTS ===== */
 .recent-documents-overlay {
     position: absolute;
@@ -1754,6 +1760,7 @@ textarea {
         padding: 16px;
     }
 }
+
 /* Review Badges */
 .review-badge {
     display: inline-block;

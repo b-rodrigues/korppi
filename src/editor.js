@@ -5,6 +5,7 @@ import { replaceAll } from "@milkdown/utils";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
+import { underlinePlugin } from "./milkdown-underline.js";
 // Re-export editorViewCtx so other modules can use it with the editor instance
 export { editorViewCtx };
 
@@ -89,8 +90,26 @@ export function doRedo() {
 }
 
 /**
+ * Pre-process markdown to convert pandoc-specific syntax to standard HTML.
+ * Converts spans like [text]{.underline} to <u>text</u>
+ * @param {string} markdown - Raw markdown from pandoc
+ * @returns {string} Processed markdown
+ */
+function preprocessMarkdown(markdown) {
+    if (!markdown) return markdown;
+
+    // Note: [text]{.underline} and ++text++ are handled by the underline remark plugin
+
+    // Convert pandoc strikethrough spans: [text]{.strikethrough} -> ~~text~~
+    let processed = markdown.replace(/\[([^\]]+)\]\{\.strikethrough\}/g, '~~$1~~');
+
+    return processed;
+}
+
+/**
  * Set the editor content from a markdown string.
  * This properly parses the markdown and renders it in WYSIWYG mode.
+ * Pre-processes pandoc-specific syntax to standard markdown/HTML.
  * @param {string} markdown - The markdown content to set
  * @returns {boolean} True if successful
  */
@@ -106,7 +125,9 @@ export function setMarkdownContent(markdown) {
     }
 
     try {
-        editor.action(replaceAll(markdown));
+        // Pre-process pandoc syntax before loading
+        const processed = preprocessMarkdown(markdown);
+        editor.action(replaceAll(processed));
         return true;
     } catch (err) {
         console.error("setMarkdownContent error:", err);
@@ -148,6 +169,7 @@ export async function initEditor() {
             })
             .use(commonmark)
             .use(gfm)
+            .use(underlinePlugin)
             .use(listener)
             .create();
     } catch (err) {
