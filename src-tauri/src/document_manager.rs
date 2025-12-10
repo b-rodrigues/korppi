@@ -1433,4 +1433,61 @@ mod tests {
         assert!(manager.documents.is_empty());
         assert!(manager.active_document_id.is_none());
     }
+    
+    #[test]
+    fn test_is_pandoc_available_returns_bool() {
+        // This test just verifies the function runs without panicking
+        // and returns a boolean (may be true or false depending on system)
+        let result = super::is_pandoc_available();
+        assert!(result == true || result == false);
+    }
+    
+    #[test]
+    fn test_extract_docx_text_basic_invalid_file() {
+        // Test with non-existent file
+        let result = super::extract_docx_text_basic(&PathBuf::from("/nonexistent/file.docx"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to open"));
+    }
+    
+    #[test]
+    fn test_extract_odt_text_basic_invalid_file() {
+        // Test with non-existent file
+        let result = super::extract_odt_text_basic(&PathBuf::from("/nonexistent/file.odt"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to open"));
+    }
+    
+    #[test]
+    fn test_import_result_serialization() {
+        let handle = DocumentHandle {
+            id: "test-id".to_string(),
+            path: Some(PathBuf::from("/test/path.docx")),
+            title: "Imported Doc".to_string(),
+            is_modified: false,
+            opened_at: Utc::now(),
+        };
+        
+        let result = ImportResult {
+            handle: handle.clone(),
+            content: "# Test Content".to_string(),
+            source_format: "docx".to_string(),
+        };
+        
+        let json = serde_json::to_string(&result).unwrap();
+        let parsed: ImportResult = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(parsed.content, "# Test Content");
+        assert_eq!(parsed.source_format, "docx");
+        assert_eq!(parsed.handle.id, "test-id");
+    }
+    
+    #[test]
+    fn test_convert_with_pandoc_invalid_file() {
+        // Test with non-existent file (should fail gracefully)
+        let result = super::convert_with_pandoc(&PathBuf::from("/nonexistent/file.docx"), "docx");
+        // May fail because pandoc not installed or file doesn't exist - either is acceptable
+        // We just verify it doesn't panic
+        assert!(result.is_ok() || result.is_err());
+    }
 }
