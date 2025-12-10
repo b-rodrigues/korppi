@@ -1,9 +1,0 @@
-{
-  "kmd_version": "0.1.0",
-  "min_reader_version": "0.1.0",
-  "created_by": {
-    "app": "korppi",
-    "version": "0.1.0"
-  },
-  "compression": "deflate"
-}
