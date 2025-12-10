@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getActiveDocumentId } from "./document-manager.js";
-import { getEditorContent } from "./editor.js";
+import { getMarkdown } from "./editor.js";
 
 /**
  * Start reconciliation process
@@ -13,8 +13,8 @@ export async function startReconciliation() {
         return;
     }
 
-    // Save current state before importing (for reset functionality)
-    const currentContent = getEditorContent();
+    // Save current state before importing (for reset functionality) - as markdown to preserve formatting
+    const currentContent = getMarkdown();
     localStorage.setItem('reconciliation-snapshot', currentContent);
 
     // Let user pick one or more .kmd files
@@ -42,10 +42,10 @@ export async function startReconciliation() {
         }
 
         const fileCount = selectedPaths.length;
-        
+
         // Refresh the timeline to show imported patches (this will also trigger conflict detection)
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
-        
+
         // Use setTimeout to allow timeline refresh and conflict detection to complete first
         setTimeout(() => {
             alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);

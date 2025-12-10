@@ -5,7 +5,7 @@ import { enterPreview, exitPreview, isPreviewActive } from "./diff-preview.js";
 import { calculateCharDiff } from "./diff-highlighter.js";
 import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGroup } from "./conflict-detection.js";
-import { getEditorContent } from "./editor.js";
+import { getEditorContent, getMarkdown, setMarkdownContent } from "./editor.js";
 import { getCachedProfile } from "./profile-service.js";
 
 // Track the currently selected/restored patch
@@ -76,9 +76,9 @@ export async function restoreToPatch(patchId) {
         // Save current state first (so users can undo the restore)
         await forceSave();
 
-        // Try to restore using the snapshot content from the patch
-        if (hasSnapshotContent(patch)) {
-            const success = restoreDocumentState(patch.data.snapshot);
+        // Try local first if patch data has snapshot and it's markdown
+        if (patch && hasSnapshotContent(patch)) {
+            const success = setMarkdownContent(patch.data.snapshot);
             if (success) {
                 restoredPatchId = patchId;
                 // Refresh the timeline to show the restored state
@@ -92,7 +92,7 @@ export async function restoreToPatch(patchId) {
         if (docId) {
             const result = await invoke("restore_document_to_patch", { id: docId, patchId });
             if (result && result.snapshot_content) {
-                const success = restoreDocumentState(result.snapshot_content);
+                const success = setMarkdownContent(result.snapshot_content);
                 if (success) {
                     restoredPatchId = patchId;
                     await refreshTimeline();
@@ -104,7 +104,7 @@ export async function restoreToPatch(patchId) {
         // Try global restore as fallback
         const result = await invoke("restore_to_patch", { patchId });
         if (result && result.snapshot_content) {
-            const success = restoreDocumentState(result.snapshot_content);
+            const success = setMarkdownContent(result.snapshot_content);
             if (success) {
                 restoredPatchId = patchId;
                 await refreshTimeline();
@@ -300,13 +300,13 @@ export async function renderPatchList(patches) {
     const getEffectiveStatus = (p) => {
         // Patches by current user are implicitly "accepted" (no review needed)
         if (p.author === currentUserId) return "accepted";
-        
+
         // Check if we have a review from current user
         if (!p.uuid) return "pending";
-        
+
         const reviews = patchReviews.get(p.uuid) || [];
         const myReview = reviews.find(r => r.reviewer_id === currentUserId);
-        
+
         return myReview ? myReview.decision : "pending";
     };
 
@@ -465,7 +465,7 @@ export async function renderPatchList(patches) {
                     }
                 }
             }
-            
+
             if (reviewerMap.size > 0) {
                 reviewBadges = '<div style="margin-top:4px;">';
                 for (const review of reviewerMap.values()) {
@@ -555,11 +555,10 @@ async function previewPatch(patchId) {
     }
 
     // Import dependencies
-    const { getEditorContent } = await import('./editor.js');
     const { mergeText } = await import('./three-way-merge.js');
 
-    // Get current editor content as the "old" state
-    const currentContent = getEditorContent();
+    // Get current editor content as markdown (the "old" state)
+    const currentContent = getMarkdown();
 
     // Calculate what the merged result would be (3-way merge simulation)
     // base: first patch snapshot
@@ -820,8 +819,8 @@ async function resetToOriginal() {
     try {
         const docId = getActiveDocumentId();
 
-        // Reset document content
-        const success = restoreDocumentState(snapshot);
+        // Reset document content using markdown-aware function
+        const success = setMarkdownContent(snapshot);
         if (!success) {
             alert("Failed to restore document");
             return;

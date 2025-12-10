@@ -7,7 +7,7 @@ import { getCachedProfile, getCurrentUserInfo } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { hexToRgba, escapeHtml } from './utils.js';
-import { getEditorContent } from './editor.js';
+import { getEditorContent, getMarkdown } from './editor.js';
 import { getConflictState } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
 
@@ -253,7 +253,7 @@ async function acceptCurrentPatch() {
         // Perform 3-way merge
         // base: original document (from first patch)
         // local: current editor content
-        // canonical: the patch being accepted
+        // canonical: the ORIGINAL patch snapshot (NOT previewState.newText which is already merged)
 
         const { fetchPatchList } = await import('./timeline.js');
         const allPatches = await fetchPatchList();
@@ -267,18 +267,18 @@ async function acceptCurrentPatch() {
             ? savePatchesOnly[0].data.snapshot
             : '';
 
-        // Get current editor content (local)
-        const currentContent = getEditorContent();
+        // Get current editor content as markdown (local)
+        const currentContent = getMarkdown();
 
-        // Get the patch content being accepted (canonical)
-        const patchContent = previewState.newText;
+        // Get the ORIGINAL patch snapshot (not the preview merged content)
+        const patchContent = patch.data?.snapshot || '';
 
         // Perform merge
         const mergedContent = mergeText(baseSnapshot, currentContent, patchContent);
 
-        // Apply merged result to editor
-        const { restoreDocumentState } = await import('./yjs-setup.js');
-        restoreDocumentState(mergedContent);
+        // Apply merged result to editor using markdown-aware function
+        const { setMarkdownContent } = await import('./editor.js');
+        setMarkdownContent(mergedContent);
 
         // Refresh timeline first
         window.dispatchEvent(new CustomEvent('patch-status-updated'));
@@ -475,8 +475,8 @@ async function switchToConflictPatch(patchId) {
         return;
     }
 
-    // Get current editor content as the "old" state
-    const currentContent = getEditorContent();
+    // Get current editor content as markdown (the "old" state)
+    const currentContent = getMarkdown();
 
     // Calculate what the merged result would be (3-way merge simulation)
     const allPatches = await fetchPatchList();

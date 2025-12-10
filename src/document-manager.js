@@ -84,12 +84,12 @@ export async function saveDocument(id = null, path = null) {
         throw new Error("No document to save");
     }
 
-    // Capture editor content before saving
+    // Capture editor content as markdown before saving (preserves formatting)
     let editorContent = "";
     try {
-        // Get content from editor
-        const { getEditorContent } = await import("./editor.js");
-        editorContent = getEditorContent();
+        // Get content from editor as markdown to preserve formatting
+        const { getMarkdown } = await import("./editor.js");
+        editorContent = getMarkdown();
     } catch (err) {
         console.warn("Could not get editor content:", err);
     }

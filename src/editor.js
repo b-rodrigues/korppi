@@ -211,7 +211,8 @@ export async function initEditor() {
                 if (semanticPatches.length === 0) return;
 
                 // Feed semantic patches into the grouper (author is now pulled from profile)
-                const currentText = newState.doc.textContent;
+                // Use getMarkdown() to preserve formatting in snapshots
+                const currentText = getMarkdown();
                 const groupedRecord = addSemanticPatches(semanticPatches, currentText);
 
                 // Only when the grouper flushes do we persist to SQLite
@@ -300,7 +301,7 @@ onDocumentChange(async (event, doc) => {
 
 // On window blur: flush semantic group + force Yjs save
 window.addEventListener("blur", () => {
-    const record = flushGroup(getEditorContent());
+    const record = flushGroup(getMarkdown());
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
@@ -317,7 +318,7 @@ window.addEventListener("blur", () => {
 // On tab hide (user switches tab)
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-        const record = flushGroup(getEditorContent());
+        const record = flushGroup(getMarkdown());
         if (record) {
             const docId = getActiveDocumentId();
             if (docId) {
@@ -332,7 +333,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Last resort: before page unload.
 window.addEventListener("beforeunload", () => {
-    const record = flushGroup(getEditorContent());
+    const record = flushGroup(getMarkdown());
     if (record) {
         const docId = getActiveDocumentId();
         if (docId) {
