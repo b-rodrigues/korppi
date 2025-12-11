@@ -23,6 +23,12 @@ Korppi supports full Markdown formatting with a visual toolbar.
 - **Toolbar:** Click ~~S~~
 - **Markdown:** `~~strikethrough~~`
 
+### Underline
+
+- **Toolbar:** Click **U**
+- **Shortcut:** `Ctrl+U`
+- **Markdown:** `<u>underlined text</u>` (HTML tag)
+
 ### Inline Code
 
 - **Toolbar:** Click `` ` ``
@@ -147,6 +153,15 @@ To insert an image:
 
 ---
 
+## Hard Break
+
+To insert a line break without starting a new paragraph:
+
+- **Toolbar:** Click **↵**
+- **Markdown:** Two spaces at the end of the line, or a backslash `\`
+
+---
+
 ## Clearing Formatting
 
 To remove all formatting from selected text:
@@ -185,7 +200,14 @@ To remove all formatting from selected text:
 |------------|----------|
 | Bold | `Ctrl+B` |
 | Italic | `Ctrl+I` |
+| Underline | `Ctrl+U` |
 | Undo | `Ctrl+Z` |
 | Redo | `Ctrl+Y` |
+| New Document | `Ctrl+N` |
+| Open Document | `Ctrl+O` |
+| Save Document | `Ctrl+S` |
+| Close Document | `Ctrl+W` |
+| Next Tab | `Ctrl+Tab` |
+| Previous Tab | `Shift+Ctrl+Tab` |
 
 See [Keyboard Shortcuts](keyboard-shortcuts.html) for the complete list.

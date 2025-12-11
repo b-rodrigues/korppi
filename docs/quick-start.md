@@ -14,6 +14,8 @@ Get writing with Korppi in just 5 minutes!
 4. Start typing in the editor!
 5. All your edits are automatically saves as *patches*
 
+> **Tip:** Have an existing file? Click **Import** to bring in Markdown, Word (.docx), or OpenDocument (.odt) files.
+
 The editor uses **Markdown** formatting, so you can write naturally:
 
 ```markdown
@@ -49,6 +51,7 @@ This is a paragraph with **bold** and *italic* text.
 The left sidebar has formatting buttons for:
 - **B** - Bold
 - *I* - Italic
+- <u>U</u> - Underline
 - ~~S~~ - Strikethrough
 - `Code` - Inline code
 - H1/H2/H3 - Headings
@@ -62,6 +65,7 @@ Just type markdown syntax directly:
 |--------------|--------------|
 | `**bold**` | **bold** |
 | `*italic*` | *italic* |
+| `<u>underline</u>` | <u>underline</u> |
 | `# Heading` | Heading |
 | `- item` | • item |
 | `` `code` `` | `code` |
@@ -71,7 +75,7 @@ Just type markdown syntax directly:
 ## Step 4: Use Context Menus
 
 **Right-click** on selected text to see formatting options:
-- Bold, Italic, Strikethrough
+- Bold, Italic, Underline, Strikethrough
 - Add links
 - Copy, Search in document
 - Add comments
@@ -103,7 +107,7 @@ the possibility to accept or reject their changes.
 
 ---
 
-## Step 6: Export Your Document
+## Step 7: Export Your Document
 
 When you're ready to share:
 

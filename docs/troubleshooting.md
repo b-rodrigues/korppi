@@ -19,22 +19,13 @@ chmod +x korppi_*.AppImage
 ./korppi_*.AppImage
 ```
 
-### Linux: Missing Libraries
-
-**Problem:** Error about missing WebKit or GTK.
-
-**Solution:**
-```bash
-# Ubuntu/Debian
-sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-
-# Fedora
-sudo dnf install webkit2gtk4.1-devel
-```
-
 ### macOS: "App is damaged"
 
-**Problem:** macOS says the app is damaged and can't be opened.
+**Problem:** macOS says the app is damaged and can't be opened. 
+This is because Apple extorts open source software developers by
+making them pay 99$ per year to distribute their software,
+otherwise that message pops up. It is however trivial and completely
+safe to ignore it.
 
 **Solution:**
 ```bash
@@ -83,6 +74,15 @@ xattr -cr /Applications/Korppi.app
    /Applications/Korppi.app/Contents/MacOS/Korppi
    ```
 4. Check for conflicting antivirus software
+
+Launch Korppi from the terminal to see error messages:
+
+```bash
+# Open a specific file
+korppi /path/to/document.kmd
+```
+
+See the error messages for more information.
 
 ---
 
@@ -215,9 +215,10 @@ xattr -cr /Applications/Korppi.app
 
 **Solutions:**
 1. Check the Comments panel (right sidebar)
-2. Look for highlight on the text
-3. Check comment filter (show "All")
-4. Reload document
+2. Click the comments counter in the bottom left to bring up the right sidebar.
+3. Look for highlight on the text
+4. Check comment filter (show "All")
+5. Reload document
 
 ---
 

@@ -6,19 +6,11 @@ Korppi includes a powerful commenting system for reviews and collaboration.
 
 ## Adding Comments
 
-### Method 1: Context Menu
-
 1. Select the text you want to comment on
 2. Right-click
 3. Click **Add Comment**
 4. Type your comment
 5. Press Enter or click outside to save
-
-### Method 2: Keyboard Shortcut
-
-1. Select text
-2. Press a keyboard shortcut (if configured)
-3. Type your comment
 
 ---
 
@@ -34,7 +26,9 @@ When you add a comment:
 
 ## The Comments Panel
 
-The right sidebar contains the **Comments** section:
+The right sidebar contains the **Comments** section (you can bring
+up the right sidebar by clicking the comments counter in the 
+bottom left of the window):
 
 - Shows all comments in the document
 - Sorted by position in document

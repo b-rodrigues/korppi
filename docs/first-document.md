@@ -107,6 +107,28 @@ On your desktop, just double-click any `.kmd` file to open it in Korppi!
 
 ---
 
+## Importing Documents
+
+You can import content from other formats into Korppi.
+
+### Supported Formats
+
+- **Markdown** (`.md`): Imports text and formatting directly.
+- **Word** (`.docx`): Imports text and formatting (requires Pandoc).
+- **OpenDocument** (`.odt`): Imports text and formatting (requires Pandoc).
+
+### How to Import
+
+1. Click **Import** in the sidebar.
+2. Select your file.
+3. Korppi converts it to a new document.
+
+> [!NOTE]
+> **For Word (.docx) and OpenDocument (.odt) files:**
+> You need to have [Pandoc](https://pandoc.org/installing.html) installed on your system. If Pandoc is missing, Korppi will only extract plain text without formatting.
+
+---
+
 ## Setting Your Author Profile
 
 Before you start writing, set up your profile:

@@ -37,17 +37,9 @@ Never lose work with automatic saving:
 1. Find the **Autosave** checkbox in Preferences
 2. Check it to enable
 
-### Set Interval
-
-Choose how often to autosave:
-
-| Interval | Best For |
-|----------|----------|
-| 1 min | Frequent savers |
-| 2 min | Active editing |
-| 5 min | Standard use (default) |
-| 10 min | Light editing |
-| 15 min | Reading/reviewing |
+We recommend setting it to 1 or 2 minutes. This is because Korppi
+keeps every change as a patch, and the smaller the patches, the easier
+it is to reconcile divergences between versions.
 
 ### How It Works
 

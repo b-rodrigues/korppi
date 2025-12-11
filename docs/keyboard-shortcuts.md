@@ -133,7 +133,8 @@ Replace `Ctrl` with `Cmd` (⌘):
 
 ## Customization
 
-*Custom keyboard shortcuts are planned for a future release.*
+Keyboard shortcuts are not configurable. This is a deliberate design choice, 
+as business users typically do not require or benefit from such customization options.
 
 ---
 

@@ -49,9 +49,10 @@ Patches are created automatically when you:
 Each patch shows:
 
 - **Timestamp** - When it was created
-- **Description** - What changed
-- **Status** - Pending, approved, or rejected
-- **Lines affected** - Which parts of the document
+- **Kind** - Type of change (e.g., Save)
+- **Author** - Who made the change
+- **Status** - Pending, accepted, or rejected (indicated by badges)
+- **Conflict** - Warning if the patch conflicts with others
 
 ---
 
@@ -59,15 +60,15 @@ Each patch shows:
 
 ### Preview a Version
 
-1. Click any patch in the timeline
-2. The **Details** panel expands
-3. Click **Preview** to see that version
-
-The editor shows the document as it was at that point.
+1. Click the **Preview** button (🔍) on any patch.
+2. The editor shows a diff view:
+    - **Red**: Content removed
+    - **Green**: Content added
+    - **Grey**: Unchanged context
 
 ### Exit Preview
 
-Click **Exit Preview** or select a different patch to return to the current version.
+Click **Exit Preview** in the editor or click the preview button again to return to the current version.
 
 ---
 
@@ -75,9 +76,9 @@ Click **Exit Preview** or select a different patch to return to the current vers
 
 ### Restore a Past Version
 
-1. Select a patch
-2. Click **Restore**
-3. Confirm the action
+1. Find the version you want to restore.
+2. Click the **Restore** button (↩).
+3. Confirm the action.
 
 ⚠️ **Warning:** This replaces your current document with the historical version!
 
@@ -89,7 +90,7 @@ Click **Exit Preview** or select a different patch to return to the current vers
 ### What Doesn't Get Restored
 
 - Comments (they maintain their own state)
-- Future patches (they're preserved)
+- Future patches (they're preserved in history)
 
 ---
 
@@ -97,18 +98,23 @@ Click **Exit Preview** or select a different patch to return to the current vers
 
 ### Pending
 
-New patches from reconciliation are "pending" until you review them:
+New patches from other authors are "pending" until you review them.
 
-- **Approve** - Accept the change
-- **Reject** - Discard the change
+### Accepted
 
-### Approved
-
-Patches you've accepted. They're part of your document history.
+Patches that have been merged into the document.
 
 ### Rejected
 
-Changes you've declined. They're hidden but not deleted.
+Patches that were declined. They remain in the history but are not applied.
+
+---
+
+## Conflict Resolution
+
+If a patch conflicts with your current version (e.g., you both edited the same line), it will be flagged with a **Conflict** warning.
+
+Use the **Merge Wizard** (accessible via the "Reconcile" button) to resolve these conflicts step-by-step.
 
 ---
 
@@ -120,15 +126,12 @@ Use the dropdown to filter:
 
 - **All** - Show everything
 - **Pending** - Only unreviewed
-- **Approved** - Only accepted
+- **Accepted** - Only accepted
+- **Rejected** - Only rejected
 
-### By Line Range
+### By Author
 
-Filter patches that affect specific lines:
-
-1. Open line range filter
-2. Enter start and end lines
-3. Only matching patches appear
+Filter patches to show only changes made by a specific author.
 
 ---
 
@@ -138,6 +141,7 @@ Sort patches by:
 
 - **Newest First** - Most recent at top
 - **Oldest First** - Chronological order
+- **By Author** - Grouped by author
 - **By Line Order** - Sorted by affected lines
 
 ---
