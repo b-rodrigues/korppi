@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Rationale - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="rationale.html" class="current">Rationale</a></li><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Documentation</div><ul><li><a href="profile.html" >Configure Profile</a></li><li><a href="first-document.html" >Your First Document</a></li><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="timeline.html" >Timeline and History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Rationale</h1>
+            </header>
+
+            <article class="content">
+<h1 id="the-korppi-rationale">The Korppi Rationale</h1>
+<p>Why did we build Korppi? To solve the "Reconciliation Hell" that
+plagues business users and writers who need version control but cannot
+use Git.</p>
+<hr />
+<h2 id="the-problem-reconciliation-hell">The Problem: Reconciliation
+Hell</h2>
+<p>Collaborating on documents is often a messy process. You email a Word
+document to a colleague, they make changes and email it back. Meanwhile,
+you've made your own changes. Now you have <code>report_v2.docx</code>
+and <code>report_final_bob_edits.docx</code>. Merging them is a manual,
+error-prone nightmare.</p>
+<h3 id="the-git-gap">The "Git Gap"</h3>
+<p>Developers solved this problem decades ago with Git. Git allows
+for:</p>
+<ul>
+<li><strong>Granular history</strong> (commits)</li>
+<li><strong>Branching and merging</strong></li>
+<li><strong>Conflict resolution</strong></li>
+</ul>
+<p>However, Git is too complex for most non-technical users. The command
+line, concepts like "staging areas" and "rebasing," and the fear of
+"breaking the repo" make it inaccessible.</p>
+<p>We've tried for 15 years to teach everyone Git. It hasn't worked.</p>
+<hr />
+<h2 id="the-solution-git-power-human-interface">The Solution: Git Power,
+Human Interface</h2>
+<p>Korppi brings the power of a Git-like workflow to a tool that feels
+familiar to anyone who has used a word processor.</p>
+<h3 id="1-patches-not-just-versions">1. Patches, Not Just Versions</h3>
+<p>In traditional editors, "Track Changes" is a mode you turn on or off.
+In Korppi, <strong>everything is a patch</strong>.</p>
+<ul>
+<li>Every time you save or pause, Korppi records the difference (diff)
+as a discrete unit of change.</li>
+<li>These patches are stored in the document history, allowing you to
+replay, undo, or cherry-pick specific changes.</li>
+<li><strong>Why?</strong> This allows for granular control. You can
+accept <em>just</em> the paragraph your editor fixed without accepting
+their deletion of your favorite section.</li>
+</ul>
+<h3 id="2-the-timeline">2. The Timeline</h3>
+<p>Instead of a cryptic list of commit hashes, Korppi presents a visual
+<strong>Timeline</strong>.</p>
+<ul>
+<li>See the evolution of your document chronologically.</li>
+<li>Filter changes by author or date.</li>
+<li>"Time travel" to any previous state of the document instantly.</li>
+</ul>
+<h3 id="3-asynchronous-reconciliation">3. Asynchronous
+Reconciliation</h3>
+<p>Real-time collaboration (Google Docs style) is great for
+brainstorming, but terrible for deep work. You don't want someone
+deleting your sentence while you're writing it.</p>
+<p>Korppi promotes an <strong>Asynchronous Workflow</strong>:</p>
+<ol type="1">
+<li><strong>Draft</strong> in peace on your local machine.</li>
+<li><strong>Send</strong> your <code>.kmd</code> file to a
+collaborator.</li>
+<li><strong>Reconcile</strong> their changes when you get the file
+back.</li>
+</ol>
+<p>The <strong>Merge Wizard</strong> makes this process painless. It
+identifies conflicts (where you both changed the same line) and guides
+you through resolving them visually, ensuring no work is lost.</p>
+<h3 id="4-content-first-formatting-later">4. Content First, Formatting
+Later</h3>
+<p>Korppi is a <strong>Markdown-based</strong> editor. We believe that
+writing and formatting are separate tasks.</p>
+<ul>
+<li><strong>Write</strong> in Korppi to focus on structure and
+content.</li>
+<li><strong>Export</strong> to Word for the final polish.</li>
+</ul>
+<p>This separation prevents the "fighting with the margin" syndrome and
+ensures your content is clean, portable, and future-proof.</p>
+<hr />
+<h2 id="technical-underpinnings">Technical Underpinnings</h2>
+<p>For the technically curious, Korppi is built on modern, robust
+technologies:</p>
+<ul>
+<li><strong>Tauri</strong>: For a lightweight, secure, and
+cross-platform desktop application.</li>
+<li><strong>CRDTs (Yjs)</strong>: We use Conflict-free Replicated Data
+Types to handle document state. This ensures that even complex merges
+can be handled mathematically correctly before human review.</li>
+<li><strong>.kmd Format</strong>: Your document is just a ZIP file
+containing standard Markdown and JSON metadata. You are never locked in.
+You can unzip a <code>.kmd</code> file and read your text with
+Notepad.</li>
+</ul>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>Korppi is not trying to replace Word for formatting. It is trying to
+replace the <em>process</em> of emailing "final_v2_revised.docx" back
+and forth. It is version control for the normies.</p>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-11</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>
