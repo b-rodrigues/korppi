@@ -62,29 +62,35 @@
 <p>Each patch shows:</p>
 <ul>
 <li><strong>Timestamp</strong> - When it was created</li>
-<li><strong>Description</strong> - What changed</li>
-<li><strong>Status</strong> - Pending, approved, or rejected</li>
-<li><strong>Lines affected</strong> - Which parts of the document</li>
+<li><strong>Kind</strong> - Type of change (e.g., Save)</li>
+<li><strong>Author</strong> - Who made the change</li>
+<li><strong>Status</strong> - Pending, accepted, or rejected (indicated
+by badges)</li>
+<li><strong>Conflict</strong> - Warning if the patch conflicts with
+others</li>
 </ul>
 <hr />
 <h2 id="viewing-history">Viewing History</h2>
 <h3 id="preview-a-version">Preview a Version</h3>
 <ol type="1">
-<li>Click any patch in the timeline</li>
-<li>The <strong>Details</strong> panel expands</li>
-<li>Click <strong>Preview</strong> to see that version</li>
+<li>Click the <strong>Preview</strong> button (🔍) on any patch.</li>
+<li>The editor shows a diff view:
+<ul>
+<li><strong>Red</strong>: Content removed</li>
+<li><strong>Green</strong>: Content added</li>
+<li><strong>Grey</strong>: Unchanged context</li>
+</ul></li>
 </ol>
-<p>The editor shows the document as it was at that point.</p>
 <h3 id="exit-preview">Exit Preview</h3>
-<p>Click <strong>Exit Preview</strong> or select a different patch to
-return to the current version.</p>
+<p>Click <strong>Exit Preview</strong> in the editor or click the
+preview button again to return to the current version.</p>
 <hr />
 <h2 id="restoring-versions">Restoring Versions</h2>
 <h3 id="restore-a-past-version">Restore a Past Version</h3>
 <ol type="1">
-<li>Select a patch</li>
-<li>Click <strong>Restore</strong></li>
-<li>Confirm the action</li>
+<li>Find the version you want to restore.</li>
+<li>Click the <strong>Restore</strong> button (↩︎).</li>
+<li>Confirm the action.</li>
 </ol>
 <p>⚠️ <strong>Warning:</strong> This replaces your current document with
 the historical version!</p>
@@ -96,21 +102,25 @@ the historical version!</p>
 <h3 id="what-doesnt-get-restored">What Doesn't Get Restored</h3>
 <ul>
 <li>Comments (they maintain their own state)</li>
-<li>Future patches (they're preserved)</li>
+<li>Future patches (they're preserved in history)</li>
 </ul>
 <hr />
 <h2 id="patch-status">Patch Status</h2>
 <h3 id="pending">Pending</h3>
-<p>New patches from reconciliation are "pending" until you review
-them:</p>
-<ul>
-<li><strong>Approve</strong> - Accept the change</li>
-<li><strong>Reject</strong> - Discard the change</li>
-</ul>
-<h3 id="approved">Approved</h3>
-<p>Patches you've accepted. They're part of your document history.</p>
+<p>New patches from other authors are "pending" until you review
+them.</p>
+<h3 id="accepted">Accepted</h3>
+<p>Patches that have been merged into the document.</p>
 <h3 id="rejected">Rejected</h3>
-<p>Changes you've declined. They're hidden but not deleted.</p>
+<p>Patches that were declined. They remain in the history but are not
+applied.</p>
+<hr />
+<h2 id="conflict-resolution">Conflict Resolution</h2>
+<p>If a patch conflicts with your current version (e.g., you both edited
+the same line), it will be flagged with a <strong>Conflict</strong>
+warning.</p>
+<p>Use the <strong>Merge Wizard</strong> (accessible via the "Reconcile"
+button) to resolve these conflicts step-by-step.</p>
 <hr />
 <h2 id="filtering-the-timeline">Filtering the Timeline</h2>
 <h3 id="by-status">By Status</h3>
@@ -118,21 +128,18 @@ them:</p>
 <ul>
 <li><strong>All</strong> - Show everything</li>
 <li><strong>Pending</strong> - Only unreviewed</li>
-<li><strong>Approved</strong> - Only accepted</li>
+<li><strong>Accepted</strong> - Only accepted</li>
+<li><strong>Rejected</strong> - Only rejected</li>
 </ul>
-<h3 id="by-line-range">By Line Range</h3>
-<p>Filter patches that affect specific lines:</p>
-<ol type="1">
-<li>Open line range filter</li>
-<li>Enter start and end lines</li>
-<li>Only matching patches appear</li>
-</ol>
+<h3 id="by-author">By Author</h3>
+<p>Filter patches to show only changes made by a specific author.</p>
 <hr />
 <h2 id="sorting-options">Sorting Options</h2>
 <p>Sort patches by:</p>
 <ul>
 <li><strong>Newest First</strong> - Most recent at top</li>
 <li><strong>Oldest First</strong> - Chronological order</li>
+<li><strong>By Author</strong> - Grouped by author</li>
 <li><strong>By Line Order</strong> - Sorted by affected lines</li>
 </ul>
 <hr />

@@ -40,24 +40,18 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run from terminal to see errors</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./korppi_*.AppImage</span></span></code></pre></div>
-<h3 id="linux-missing-libraries">Linux: Missing Libraries</h3>
-<p><strong>Problem:</strong> Error about missing WebKit or GTK.</p>
-<p><strong>Solution:</strong></p>
-<div class="sourceCode" id="cb2"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ubuntu/Debian</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Fedora</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> dnf install webkit2gtk4.1-devel</span></code></pre></div>
 <h3 id="macos-app-is-damaged">macOS: "App is damaged"</h3>
 <p><strong>Problem:</strong> macOS says the app is damaged and can't be
-opened.</p>
+opened. This is because Apple extorts open source software developers by
+making them pay 99$ per year to distribute their software, otherwise
+that message pops up. It is however trivial and completely safe to
+ignore it.</p>
 <p><strong>Solution:</strong></p>
-<div class="sourceCode" id="cb3"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove quarantine attribute</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xattr</span> <span class="at">-cr</span> /Applications/Korppi.app</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Or right-click → Open (bypasses Gatekeeper)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove quarantine attribute</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xattr</span> <span class="at">-cr</span> /Applications/Korppi.app</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Or right-click → Open (bypasses Gatekeeper)</span></span></code></pre></div>
 <h3 id="windows-smartscreen-warning">Windows: SmartScreen Warning</h3>
 <p><strong>Problem:</strong> Windows Defender SmartScreen blocks the
 installer.</p>
@@ -86,14 +80,19 @@ screen.</p>
 <li>Check system requirements</li>
 <li>Update graphics drivers</li>
 <li>Try launching from terminal for error messages:
-<div class="sourceCode" id="cb4"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./korppi_*.AppImage</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">/Applications/Korppi.app/Contents/MacOS/Korppi</span></span></code></pre></div></li>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./korppi_*.AppImage</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">/Applications/Korppi.app/Contents/MacOS/Korppi</span></span></code></pre></div></li>
 <li>Check for conflicting antivirus software</li>
 </ol>
+<p>Launch Korppi from the terminal to see error messages:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Open a specific file</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">korppi</span> /path/to/document.kmd</span></code></pre></div>
+<p>See the error messages for more information.</p>
 <hr />
 <h2 id="document-issues">Document Issues</h2>
 <h3 id="cant-open-document">Can't Open Document</h3>
@@ -206,6 +205,8 @@ wrong.</p>
 <p><strong>Solutions:</strong></p>
 <ol type="1">
 <li>Check the Comments panel (right sidebar)</li>
+<li>Click the comments counter in the bottom left to bring up the right
+sidebar.</li>
 <li>Look for highlight on the text</li>
 <li>Check comment filter (show "All")</li>
 <li>Reload document</li>
