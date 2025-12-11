@@ -27,6 +27,7 @@ let wizardState = {
     conflictZones: [], // Only zones with conflicts (2+ authors)
     currentZoneIndex: 0,
     zoneResolutions: {}, // zoneId -> resolved content
+    originalZoneContent: {}, // zoneId -> initial computed merge (for undo)
 
     // Common state
     baseSnapshot: null,
@@ -55,6 +56,7 @@ export function openPatchMergeWizard() {
         conflictZones: [],
         currentZoneIndex: 0,
         zoneResolutions: {},
+        originalZoneContent: {},
         baseSnapshot: null,
         selectedPatches: [],
         mergedContent: '',
@@ -65,6 +67,77 @@ export function openPatchMergeWizard() {
     };
 
     showWizard();
+}
+
+/**
+ * Open the patch merge wizard with specific patches pre-selected
+ * @param {number[]} patchIds - Array of patch IDs to merge
+ */
+export async function openPatchMergeWizardWithPatches(patchIds) {
+    if (!patchIds || patchIds.length < 2) {
+        console.warn('Need at least 2 patches to merge');
+        return;
+    }
+
+    wizardState = {
+        isOpen: true,
+        step: 1, // Will advance to step 2 after loading
+        mode: 'group',
+        patchA: null,
+        patchB: null,
+        conflictGroup: patchIds,
+        zones: [],
+        conflictZones: [],
+        currentZoneIndex: 0,
+        zoneResolutions: {},
+        originalZoneContent: {},
+        baseSnapshot: null,
+        selectedPatches: [],
+        mergedContent: '',
+        hasConflicts: false,
+        conflictCount: 0,
+        allPatches: [],
+        allConflictGroups: []
+    };
+
+    showWizard();
+
+    // Automatically advance to zones analysis
+    await loadPatchesAndAnalyze(patchIds);
+}
+
+/**
+ * Load patches by IDs and analyze zones
+ * @param {number[]} patchIds - Patch IDs to load
+ */
+async function loadPatchesAndAnalyze(patchIds) {
+    const docId = getActiveDocumentId();
+    if (!docId) return;
+
+    const allPatches = await invoke("list_document_patches", { docId });
+    wizardState.allPatches = allPatches;
+
+    // Find and load the specific patches
+    const selectedPatches = [];
+    for (const id of patchIds) {
+        const patch = allPatches.find(p => p.id === id);
+        if (patch) {
+            selectedPatches.push(patch);
+        }
+    }
+
+    if (selectedPatches.length < 2) {
+        console.warn('Could not find enough patches');
+        return;
+    }
+
+    wizardState.selectedPatches = selectedPatches;
+
+    // Analyze zones
+    await analyzeZones();
+
+    wizardState.step = 2;
+    await renderWizardContent();
 }
 
 /**
@@ -127,11 +200,7 @@ function createWizardModal() {
     const closeBtn = modal.querySelector('.modal-close');
     closeBtn.addEventListener('click', closePatchMergeWizard);
 
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closePatchMergeWizard();
-        }
-    });
+    // NOTE: Intentionally NOT closing on outside click to prevent accidental loss of work
 
     return modal;
 }
@@ -177,8 +246,10 @@ async function renderStep1_SelectPatches(body, footer) {
     const patches = await fetchPatchList();
     wizardState.allPatches = patches;
 
+    // Only show pending patches (filter out accepted/rejected)
     const savePatches = patches
         .filter(p => p.kind === 'Save' && hasSnapshotContent(p))
+        .filter(p => p.status !== 'accepted' && p.status !== 'rejected')
         .sort((a, b) => b.timestamp - a.timestamp);
 
     const { conflictGroups } = detectPatchConflicts(patches);
@@ -414,7 +485,7 @@ async function renderStep2_ShowZones(body, footer) {
                             <span class="zone-lines">Lines ${zone.startLine + 1}-${zone.endLine + 1}</span>
                             <span class="zone-status">
                                 ${wizardState.zoneResolutions[zone.id] ? '✓ Resolved' :
-                                  zone.hasConflict ? '⚠️ Conflict' : '✓ Auto-merged'}
+            zone.hasConflict ? '⚠️ Conflict' : '✓ Auto-merged'}
                             </span>
                         </div>
                         <div class="zone-authors">
@@ -494,7 +565,9 @@ async function renderStep3_ResolveZone(body, footer) {
 
     // Get current resolution or compute initial merge
     let currentContent = wizardState.zoneResolutions[zone.id];
+    let isFirstLoad = false;
     if (currentContent === undefined) {
+        isFirstLoad = true;
         // Try to merge the zone contents
         if (patchContents.length === 2) {
             const result = mergeWithConflicts(baseZoneContent, patchContents[0].content, patchContents[1].content,
@@ -509,97 +582,114 @@ async function renderStep3_ResolveZone(body, footer) {
                 currentContent = result.merged;
             }
         }
+        // Store original for undo
+        wizardState.originalZoneContent[zone.id] = currentContent;
     }
 
     const conflicts = parseConflicts(currentContent);
     const conflictCount = countConflicts(currentContent);
 
+
+
     body.innerHTML = `
-        <div class="wizard-step-content zone-editor-step">
-            <div class="zone-progress-bar">
-                <div class="progress-info">
-                    <span>Zone ${wizardState.currentZoneIndex + 1} of ${wizardState.conflictZones.length}</span>
-                    <span>Lines ${zone.startLine + 1}-${zone.endLine + 1}</span>
-                </div>
-                <div class="progress-track">
-                    <div class="progress-fill" style="width: ${((wizardState.currentZoneIndex + 1) / wizardState.conflictZones.length) * 100}%"></div>
-                </div>
-            </div>
-
-            <div class="zone-context-info">
-                <div class="zone-authors-involved">
-                    Authors: ${zone.patches.map(p => `
-                        <span class="zone-author-badge" style="background-color: ${p.authorColor}">${p.authorName}</span>
-                    `).join(' ')}
-                </div>
-            </div>
-
-            ${context.before ? `
-                <div class="zone-context before">
-                    <span class="context-label">Context before:</span>
-                    <pre>${escapeHtml(context.before)}</pre>
-                </div>
-            ` : ''}
-
-            <div class="merge-status-bar">
-                ${conflictCount > 0 ? `
-                    <span class="conflict-indicator-text">
-                        <span class="conflict-icon">⚠</span>
-                        ${conflictCount} conflict${conflictCount !== 1 ? 's' : ''} in this zone
-                    </span>
-                ` : `
-                    <span class="no-conflict-indicator">
-                        <span class="success-icon">✓</span>
-                        Zone resolved!
-                    </span>
-                `}
-            </div>
-
-            <div class="merge-editor-container">
-                <div class="merge-editor-toolbar">
-                    <span class="toolbar-label">Zone Content:</span>
-                    ${conflicts.length > 0 ? `
-                        <div class="quick-resolve-buttons">
-                            ${patchContents.map((p, i) => `
-                                <button class="resolve-all-btn" data-author-idx="${i}">
-                                    Use ${p.authorName}
-                                </button>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                </div>
-                <textarea id="zone-editor" class="merge-editor-textarea">${escapeHtml(currentContent)}</textarea>
-            </div>
-
-            ${context.after ? `
-                <div class="zone-context after">
-                    <span class="context-label">Context after:</span>
-                    <pre>${escapeHtml(context.after)}</pre>
-                </div>
-            ` : ''}
-
-            ${conflicts.length > 0 ? `
-                <div class="conflict-navigator">
-                    <h4>Conflicts in this zone</h4>
-                    <div class="conflict-list">
-                        ${conflicts.map((c, idx) => `
-                            <div class="conflict-nav-item" data-conflict-idx="${idx}">
-                                <span class="conflict-num">#${idx + 1}</span>
-                                <div class="conflict-actions">
-                                    <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="A">Use ${c.labelA || 'A'}</button>
-                                    <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="B">Use ${c.labelB || 'B'}</button>
-                                    <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="both">Keep Both</button>
-                                </div>
-                            </div>
-                        `).join('')}
+        <div class="wizard-step-content zone-editor-step zone-editor-two-column">
+            <!-- Left Panel: Info & Controls -->
+            <div class="zone-editor-left">
+                <div class="zone-progress-bar">
+                    <div class="progress-info">
+                        <span>Zone ${wizardState.currentZoneIndex + 1} of ${wizardState.conflictZones.length}</span>
+                        <span>Lines ${zone.startLine + 1}-${zone.endLine + 1}</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: ${((wizardState.currentZoneIndex + 1) / wizardState.conflictZones.length) * 100}%"></div>
                     </div>
                 </div>
-            ` : ''}
+
+                <div class="zone-context-info">
+                    <div class="zone-authors-involved">
+                        <strong>Authors:</strong>
+                        ${zone.patches.map(p => `
+                            <span class="zone-author-badge" style="background-color: ${p.authorColor}">${p.authorName}</span>
+                        `).join(' ')}
+                    </div>
+                </div>
+
+                <div class="merge-status-bar">
+                    ${conflictCount > 0 ? `
+                        <span class="conflict-indicator-text">
+                            <span class="conflict-icon">⚠</span>
+                            ${conflictCount} conflict${conflictCount !== 1 ? 's' : ''} remaining
+                        </span>
+                    ` : `
+                        <span class="no-conflict-indicator">
+                            <span class="success-icon">✓</span>
+                            Zone resolved!
+                        </span>
+                    `}
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="zone-quick-actions">
+                    <h4>Quick Actions</h4>
+                    <div class="action-button-grid">
+                        ${patchContents.map((p, i) => `
+                            <button class="resolve-all-btn" data-author-idx="${i}" style="border-left: 3px solid ${p.authorColor}">
+                                Use ${p.authorName}'s version
+                            </button>
+                        `).join('')}
+                        <button class="undo-zone-btn" id="undo-zone-btn">
+                            ↶ Undo Changes
+                        </button>
+                    </div>
+                </div>
+
+                ${conflicts.length > 0 ? `
+                    <div class="conflict-navigator">
+                        <h4>Conflicts (${conflicts.length})</h4>
+                        <div class="conflict-list">
+                            ${conflicts.map((c, idx) => `
+                                <div class="conflict-nav-item" data-conflict-idx="${idx}">
+                                    <span class="conflict-num">#${idx + 1}</span>
+                                    <div class="conflict-actions">
+                                        <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="A">${c.labelA || 'A'}</button>
+                                        <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="B">${c.labelB || 'B'}</button>
+                                        <button class="conflict-resolve-btn" data-idx="${idx}" data-resolution="both">Both</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${context.before ? `
+                    <div class="zone-context before">
+                        <span class="context-label">Context before:</span>
+                        <pre>${escapeHtml(context.before)}</pre>
+                    </div>
+                ` : ''}
+
+                ${context.after ? `
+                    <div class="zone-context after">
+                        <span class="context-label">Context after:</span>
+                        <pre>${escapeHtml(context.after)}</pre>
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Right Panel: Editor -->
+            <div class="zone-editor-right">
+                <div class="editor-header">
+                    <span class="editor-title">Edit Zone Content</span>
+                    <span class="editor-hint">Resolve conflict markers below</span>
+                </div>
+                <textarea id="zone-editor" class="merge-editor-textarea-large">${escapeHtml(currentContent)}</textarea>
+            </div>
         </div>
     `;
 
     // Bind editor changes
     const editor = body.querySelector('#zone-editor');
+
     editor.addEventListener('input', () => {
         wizardState.zoneResolutions[zone.id] = editor.value;
         updateZoneConflictStatus(zone.id);
@@ -615,6 +705,19 @@ async function renderStep3_ResolveZone(body, footer) {
             updateZoneConflictStatus(zone.id);
         });
     });
+
+    // Bind undo button
+    const undoBtn = body.querySelector('#undo-zone-btn');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', () => {
+            const originalContent = wizardState.originalZoneContent[zone.id];
+            if (originalContent !== undefined) {
+                wizardState.zoneResolutions[zone.id] = originalContent;
+                editor.value = originalContent;
+                updateZoneConflictStatus(zone.id);
+            }
+        });
+    }
 
     // Bind conflict resolution buttons
     body.querySelectorAll('.conflict-resolve-btn').forEach(btn => {
@@ -669,6 +772,46 @@ async function renderStep3_ResolveZone(body, footer) {
             await renderWizardContent();
         }
     });
+}
+
+/**
+ * Generate author-highlighted preview HTML
+ * Lines are colored based on which author's content they match
+ */
+function generateAuthorHighlightedPreview(content, patchContents) {
+    const lines = content.split('\n');
+    const htmlLines = [];
+
+    for (const line of lines) {
+        // Check if line is a conflict marker
+        if (line.match(/^[╔╠╚]═{6}/)) {
+            htmlLines.push(`<div class="preview-line conflict-marker">${escapeHtml(line)}</div>`);
+            continue;
+        }
+
+        // Try to attribute line to an author
+        let authorColor = null;
+        let authorName = null;
+
+        for (const patch of patchContents) {
+            const patchLines = patch.content.split('\n');
+            if (patchLines.includes(line)) {
+                authorColor = patch.authorColor;
+                authorName = patch.authorName;
+                break;
+            }
+        }
+
+        if (authorColor) {
+            // Author-attributed line with subtle background
+            htmlLines.push(`<div class="preview-line" style="background-color: ${authorColor}20; border-left: 3px solid ${authorColor};" title="${authorName}">${escapeHtml(line) || '&nbsp;'}</div>`);
+        } else {
+            // Unattributed line (merged or new content)
+            htmlLines.push(`<div class="preview-line">${escapeHtml(line) || '&nbsp;'}</div>`);
+        }
+    }
+
+    return htmlLines.join('');
 }
 
 /**
@@ -793,10 +936,64 @@ async function renderStep4_Confirm(body, footer) {
  */
 async function applyMerge() {
     try {
+        const docId = getActiveDocumentId();
+        if (!docId) {
+            alert('No active document');
+            return;
+        }
+
+        // First, mark all source patches as accepted
+        console.log('Marking source patches as accepted:', wizardState.selectedPatches.map(p => ({ id: p.id, uuid: p.uuid })));
+
+        for (const patch of wizardState.selectedPatches) {
+            console.log(`Processing patch ${patch.id}, uuid: ${patch.uuid}`);
+            if (patch.uuid) {
+                try {
+                    await invoke("record_document_patch_review", {
+                        docId,
+                        patchUuid: patch.uuid,
+                        reviewerId: "merge-wizard",
+                        decision: "accepted",
+                        reviewerName: "Conflict Resolved"
+                    });
+                    console.log(`Successfully marked patch ${patch.id} as accepted`);
+                } catch (err) {
+                    console.error(`Failed to mark patch ${patch.id} as accepted:`, err);
+                }
+            } else {
+                console.warn(`Patch ${patch.id} has no uuid, cannot mark as accepted`);
+            }
+        }
+
+        // Create an explicit merge patch record
+        // Use current user as author so it's implicitly accepted
+        const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
+
+        const mergeSnapshot = wizardState.mergedContent;
+        const sourcePatchIds = wizardState.selectedPatches.map(p => p.id);
+        const sourceAuthors = [...new Set(wizardState.selectedPatches.map(p => p.data?.authorName || p.author))];
+
+        const mergePatch = {
+            kind: "Save",
+            timestamp: Date.now(),
+            author: currentUserId, // Use current user so it's implicitly accepted
+            data: {
+                authorName: "Merge Patch",
+                authorColor: "#9C27B0", // Purple for merge patches
+                snapshot: mergeSnapshot,
+                sourcePatches: sourcePatchIds,
+                description: `Merged patches from: ${sourceAuthors.join(', ')}`,
+                isMergePatch: true // Flag to identify this as a merge patch
+            }
+        };
+
+        // Record the merge patch
+        await invoke("record_document_patch", { id: docId, patch: mergePatch });
+
+        // Now set the editor content (this may trigger normal edit-based patches, but that's fine)
         const success = setMarkdownContent(wizardState.mergedContent);
         if (!success) {
-            alert('Failed to apply merged content.');
-            return;
+            console.warn('Warning: Failed to apply merged content to editor, but patch was saved.');
         }
 
         closePatchMergeWizard();
@@ -806,7 +1003,7 @@ async function applyMerge() {
             `- ${p.data?.authorName || 'Unknown'} (#${p.id})`
         ).join('\n');
 
-        alert(`Merge applied successfully!\n\nCombined patches from:\n${patchList}`);
+        alert(`Merge applied successfully!\n\nCombined patches from:\n${patchList}\n\nA new "Merge Patch" has been created and source patches marked as accepted.`);
     } catch (err) {
         console.error('Failed to apply merge:', err);
         alert(`Error: ${err.message || err}`);
@@ -842,7 +1039,7 @@ function updateNextButton() {
     const nextBtn = document.getElementById('wizard-next-btn');
     if (!nextBtn) return;
     const canProceed = (wizardState.conflictGroup && wizardState.conflictGroup.length >= 2) ||
-                       (wizardState.patchA && wizardState.patchB);
+        (wizardState.patchA && wizardState.patchB);
     nextBtn.disabled = !canProceed;
 }
 
@@ -863,7 +1060,7 @@ function addWizardStyles() {
     style.id = 'patch-merge-wizard-styles';
     style.textContent = `
         .patch-merge-wizard-modal { z-index: 1100; }
-        .patch-merge-wizard-content { max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; }
+        .patch-merge-wizard-content { max-width: 95vw; width: 95vw; max-height: 90vh; height: 90vh; display: flex; flex-direction: column; }
         .patch-merge-wizard-header { display: flex; align-items: center; gap: 16px; }
         .patch-merge-wizard-header h2 { flex: 1; }
         .wizard-step-indicator { font-size: 12px; color: var(--text-muted); background: var(--bg-panel); padding: 4px 12px; border-radius: 12px; }
@@ -924,15 +1121,20 @@ function addWizardStyles() {
         .zone-author-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; color: white; }
         .zone-preview { font-family: monospace; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* Zone Editor */
+        /* Zone Editor - Two Column Layout */
         .zone-editor-step { display: flex; flex-direction: column; gap: 12px; }
+        .zone-editor-two-column { display: grid; grid-template-columns: 340px 1fr; gap: 24px; height: 100%; min-height: 400px; }
+        
+        .zone-editor-left { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+        .zone-editor-right { display: flex; flex-direction: column; gap: 8px; min-height: 100%; }
+
         .zone-progress-bar { padding: 12px 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white; }
         .progress-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
         .progress-track { height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; }
         .progress-fill { height: 100%; background: white; border-radius: 3px; transition: width 0.3s; }
 
         .zone-context-info { padding: 8px 12px; background: var(--bg-panel); border-radius: 6px; }
-        .zone-authors-involved { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .zone-authors-involved { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
 
         .zone-context { padding: 8px 12px; background: var(--bg-sidebar); border-radius: 4px; font-size: 11px; }
         .zone-context pre { margin: 4px 0 0; white-space: pre-wrap; color: var(--text-muted); }
@@ -942,12 +1144,35 @@ function addWizardStyles() {
         .conflict-indicator-text { color: #f44336; font-weight: 600; display: flex; align-items: center; gap: 8px; }
         .no-conflict-indicator { color: #4caf50; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 
+        /* Quick Actions Section */
+        .zone-quick-actions { padding: 12px; background: var(--bg-panel); border-radius: 6px; border: 1px solid var(--border-color); }
+        .zone-quick-actions h4 { margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary); }
+        .action-button-grid { display: flex; flex-direction: column; gap: 8px; }
+        .resolve-all-btn { padding: 8px 12px; font-size: 11px; background: var(--btn-bg); border: 1px solid var(--btn-border); border-radius: 4px; cursor: pointer; text-align: left; }
+        .resolve-all-btn:hover { background: var(--btn-bg-hover); }
+        
+        .undo-zone-btn { padding: 8px 12px; font-size: 11px; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; color: var(--text-secondary); }
+        .undo-zone-btn:hover { background: var(--btn-bg-hover); color: var(--text-primary); }
+
+        /* Right Panel - Editor */
+        .editor-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-bottom: none; border-radius: 6px 6px 0 0; }
+        .editor-title { font-weight: 600; font-size: 12px; }
+        .editor-hint { font-size: 10px; color: var(--text-muted); }
+
+        .merge-editor-textarea-large { flex: 1; min-height: 200px; padding: 12px; font-family: monospace; font-size: 13px; line-height: 1.5; background: var(--bg-page); border: 1px solid var(--border-color); border-radius: 0; color: var(--text-primary); resize: none; }
+        .merge-editor-textarea-large:focus { outline: none; border-color: var(--accent); }
+
+        /* Author Preview */
+        .author-preview-container { border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 6px 6px; background: var(--bg-panel); }
+        .author-preview-header { padding: 6px 12px; font-size: 10px; color: var(--text-muted); background: var(--bg-sidebar); border-bottom: 1px solid var(--border-light); }
+        .author-preview { max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 12px; line-height: 1.4; }
+        .preview-line { padding: 2px 12px; border-left: 3px solid transparent; }
+        .preview-line.conflict-marker { background: rgba(244, 67, 54, 0.15); color: #f44336; font-weight: 600; border-left-color: #f44336; }
+
         .merge-editor-container { display: flex; flex-direction: column; }
         .merge-editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-bottom: none; border-radius: 6px 6px 0 0; }
         .toolbar-label { font-weight: 600; font-size: 12px; }
         .quick-resolve-buttons { display: flex; gap: 8px; }
-        .resolve-all-btn { padding: 4px 10px; font-size: 11px; background: var(--btn-bg); border: 1px solid var(--btn-border); border-radius: 4px; cursor: pointer; }
-        .resolve-all-btn:hover { background: var(--btn-bg-hover); }
 
         .merge-editor-textarea { min-height: 150px; padding: 12px; font-family: monospace; font-size: 13px; line-height: 1.5; background: var(--bg-page); border: 1px solid var(--border-color); border-radius: 0 0 6px 6px; color: var(--text-primary); resize: vertical; }
         .merge-editor-textarea:focus { outline: none; border-color: var(--accent); }
@@ -976,7 +1201,15 @@ function addWizardStyles() {
         .merge-patches-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
         .merge-patches-btn:hover { opacity: 0.9; }
 
-        @media (max-width: 768px) { .patch-selection-grid { grid-template-columns: 1fr; } .zones-summary { flex-direction: column; } }
+        /* Timeline merge action button at top */
+        .timeline-merge-action { padding: 8px; border-bottom: 1px solid var(--border-light); }
+        .timeline-merge-action .merge-patches-btn { padding: 8px 12px; font-size: 12px; }
+
+        @media (max-width: 768px) { 
+            .patch-selection-grid { grid-template-columns: 1fr; } 
+            .zones-summary { flex-direction: column; }
+            .zone-editor-two-column { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+        }
     `;
 
     document.head.appendChild(style);

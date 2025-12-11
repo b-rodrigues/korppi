@@ -332,13 +332,20 @@ export async function renderPatchList(patches) {
         // Patches by current user are implicitly "accepted" (no review needed)
         if (p.author === currentUserId) return "accepted";
 
-        // Check if we have a review from current user
+        // Check if we have reviews
         if (!p.uuid) return "pending";
 
         const reviews = patchReviews.get(p.uuid) || [];
-        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
 
-        return myReview ? myReview.decision : "pending";
+        // First check for current user's review
+        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+        if (myReview) return myReview.decision;
+
+        // Also check for merge-wizard reviews (conflict resolution)
+        const mergeReview = reviews.find(r => r.reviewer_id === "merge-wizard");
+        if (mergeReview) return mergeReview.decision;
+
+        return "pending";
     };
 
     // Filter patches

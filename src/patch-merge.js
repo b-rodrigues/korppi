@@ -273,11 +273,11 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
             } else {
                 // Different insertions - conflict!
                 conflictCount++;
-                result.push(`<<<<<<< ${labelA}`);
+                result.push(`╔══════ ${labelA}`);
                 result.push(...aInsertions);
-                result.push('=======');
+                result.push('╠══════');
                 result.push(...bInsertions);
-                result.push(`>>>>>>> ${labelB}`);
+                result.push(`╚══════ ${labelB}`);
             }
         } else if (aInsertions.length > 0) {
             result.push(...aInsertions);
@@ -298,11 +298,11 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
             if (bReplacement !== null && bReplacement !== baseLines[baseIdx]) {
                 // B replaced with different content - conflict
                 conflictCount++;
-                result.push(`<<<<<<< ${labelA}`);
+                result.push(`╔══════ ${labelA}`);
                 result.push(baseLines[baseIdx]);
-                result.push('=======');
+                result.push('╠══════');
                 if (bReplacement) result.push(bReplacement);
-                result.push(`>>>>>>> ${labelB}`);
+                result.push(`╚══════ ${labelB}`);
             } else {
                 // B just deleted - honor B's deletion (don't output)
             }
@@ -313,11 +313,11 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
             if (aReplacement !== null && aReplacement !== baseLines[baseIdx]) {
                 // A replaced with different content - conflict
                 conflictCount++;
-                result.push(`<<<<<<< ${labelA}`);
+                result.push(`╔══════ ${labelA}`);
                 if (aReplacement) result.push(aReplacement);
-                result.push('=======');
+                result.push('╠══════');
                 result.push(baseLines[baseIdx]);
-                result.push(`>>>>>>> ${labelB}`);
+                result.push(`╚══════ ${labelB}`);
             } else {
                 // A just deleted - honor A's deletion (don't output)
             }
@@ -335,11 +335,11 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
             } else {
                 // Different modifications - conflict
                 conflictCount++;
-                result.push(`<<<<<<< ${labelA}`);
+                result.push(`╔══════ ${labelA}`);
                 if (aReplacement) result.push(aReplacement);
-                result.push('=======');
+                result.push('╠══════');
                 if (bReplacement) result.push(bReplacement);
-                result.push(`>>>>>>> ${labelB}`);
+                result.push(`╚══════ ${labelB}`);
             }
         }
     }
@@ -366,11 +366,11 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
             result.push(...aRemaining);
         } else {
             conflictCount++;
-            result.push(`<<<<<<< ${labelA}`);
+            result.push(`╔══════ ${labelA}`);
             result.push(...aRemaining);
-            result.push('=======');
+            result.push('╠══════');
             result.push(...bRemaining);
-            result.push(`>>>>>>> ${labelB}`);
+            result.push(`╚══════ ${labelB}`);
         }
     } else if (aRemaining.length > 0) {
         result.push(...aRemaining);
@@ -435,7 +435,7 @@ export function parseConflicts(text) {
     let i = 0;
 
     while (i < lines.length) {
-        const startMatch = lines[i].match(/^<{7}\s*(.*)$/);
+        const startMatch = lines[i].match(/^╔═{6}\s*(.*)$/);
         if (startMatch) {
             const conflict = {
                 startLine: i,
@@ -447,21 +447,21 @@ export function parseConflicts(text) {
 
             i++;
             // Collect content A
-            while (i < lines.length && !lines[i].startsWith('=======')) {
+            while (i < lines.length && !lines[i].startsWith('╠══════')) {
                 conflict.contentA.push(lines[i]);
                 i++;
             }
 
-            if (i < lines.length && lines[i].startsWith('=======')) {
+            if (i < lines.length && lines[i].startsWith('╠══════')) {
                 i++;
                 // Collect content B
-                while (i < lines.length && !lines[i].match(/^>{7}/)) {
+                while (i < lines.length && !lines[i].match(/^╚═{6}/)) {
                     conflict.contentB.push(lines[i]);
                     i++;
                 }
 
                 if (i < lines.length) {
-                    const endMatch = lines[i].match(/^>{7}\s*(.*)$/);
+                    const endMatch = lines[i].match(/^╚═{6}\s*(.*)$/);
                     if (endMatch) {
                         conflict.labelB = endMatch[1];
                         conflict.endLine = i;
@@ -518,7 +518,7 @@ export function resolveConflict(mergedText, conflictIndex, resolution) {
  * @returns {boolean}
  */
 export function hasUnresolvedConflicts(text) {
-    return /^<{7}/m.test(text);
+    return /^╔═{6}/m.test(text);
 }
 
 /**
@@ -527,6 +527,6 @@ export function hasUnresolvedConflicts(text) {
  * @returns {number}
  */
 export function countConflicts(text) {
-    const matches = text.match(/^<{7}/gm);
+    const matches = text.match(/^╔═{6}/gm);
     return matches ? matches.length : 0;
 }
