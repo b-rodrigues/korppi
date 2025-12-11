@@ -26,23 +26,115 @@
             </header>
 
             <article class="content">
-<h1 id="profile">Profile</h1>
-<p>Your profile is used to link patches and comments to you. Please take
-a minute to configure it!</p>
-<h2 id="profile-settings">Profile Settings</h2>
-<h3 id="setting-your-name">Setting Your Name</h3>
+<h1 id="user-profile">User Profile</h1>
+<p>Your profile is your identity in Korppi. It ensures that your
+contributions—whether they are document edits, comments, or patches—are
+correctly attributed to you.</p>
+<hr />
+<h2 id="why-set-up-a-profile">Why Set Up a Profile?</h2>
+<p>Korppi is designed for collaboration. Even if you work alone,
+maintaining a consistent identity helps track the history of your
+document.</p>
+<p>When you set up your profile, Korppi uses this information to:</p>
 <ol type="1">
-<li>Click your <strong>profile avatar</strong> (top left)</li>
-<li>Enter your name, and optionally an Email address and a profile
-picture</li>
-<li>Your name appears on:
-<ul>
-<li>Comments you create</li>
-<li>Document metadata</li>
-<li>Timeline patches</li>
-</ul></li>
-<li>Choose a colour to make it easy to quickly identify your edits</li>
+<li><strong>Tag Your Patches</strong>: Every change you make is recorded
+as a patch. Your profile attaches your name and unique ID to these
+patches, so you (and others) know who did what.</li>
+<li><strong>Attribute Comments</strong>: When you leave feedback or
+notes, your name and avatar appear next to them.</li>
+<li><strong>Color-Code Contributions</strong>: You can choose a unique
+color. In the timeline and conflict resolution views, your changes will
+be highlighted in this color, making them instantly recognizable.</li>
 </ol>
+<hr />
+<h2 id="configuring-your-profile">Configuring Your Profile</h2>
+<p>You can update your profile at any time.</p>
+<ol type="1">
+<li><strong>Open Settings</strong>: Click on your
+<strong>avatar</strong> (or initials) in the top-left corner of the
+application window.</li>
+<li><strong>Edit Details</strong>:
+<ul>
+<li><strong>Name</strong>: This is how you will appear to others.
+(Required)</li>
+<li><strong>Email</strong>: Optional, but useful for contact info in
+shared documents.</li>
+<li><strong>Avatar</strong>: Upload a picture to personalize your
+profile. If you don't, Korppi will generate initials for you.</li>
+<li><strong>Color</strong>: Pick a color that represents you. This color
+will be used in the timeline and diff views.</li>
+</ul></li>
+<li><strong>Save</strong>: Click <strong>Save Profile</strong> to apply
+your changes.</li>
+</ol>
+<blockquote>
+<p>[!NOTE] Your profile data is stored locally on your machine. When you
+share a <code>.kmd</code> file, only the necessary attribution data
+(name, ID, color) embedded in the patches and comments is shared.</p>
+</blockquote>
+<hr />
+<h2 id="first-time-setup">First-Time Setup</h2>
+<p>If you are launching Korppi for the first time, you might be prompted
+to set up your profile immediately. We recommend doing this right away
+so your initial edits are properly attributed.</p>
+<p>If you skip this step, Korppi will assign a default "Local User"
+identity, but we strongly suggest personalizing it to get the most out
+of the collaboration features.</p>
+<hr />
+<h2 id="profile-id">Profile ID</h2>
+<p>Under the hood, Korppi generates a unique <strong>Profile ID</strong>
+(UUID) for you. This ID is what truly identifies you, allowing you to
+change your display name later without breaking the history of your past
+contributions. You can see this ID in the profile settings modal, though
+you rarely need to use it directly.</p>
+<hr />
+<h2 id="backup-and-restore">Backup and Restore</h2>
+<p>Your profile configuration, including your unique ID, is stored in a
+simple text file named <code>profile.toml</code>.</p>
+<p>If you move to a new computer and want to keep your identity (so your
+past contributions are still recognized as yours), you should back up
+this file.</p>
+<h3 id="using-the-interface-recommended">Using the Interface
+(Recommended)</h3>
+<ol type="1">
+<li>Open <strong>Profile Settings</strong> (click your avatar).</li>
+<li>Click <strong>Backup Profile</strong> to save your configuration to
+a <code>.toml</code> file.</li>
+<li>On your new machine, open Profile Settings and click <strong>Restore
+Profile</strong> to load your backup file.</li>
+</ol>
+<blockquote>
+<p>[!WARNING] Restoring a profile will overwrite your current profile
+settings.</p>
+</blockquote>
+<h3 id="manual-method-advanced">Manual Method (Advanced)</h3>
+<p>You can also manually copy the configuration file.</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Operating System</th>
+<th style="text-align: left;">Path</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Linux</strong></td>
+<td
+style="text-align: left;"><code>~/.config/korppi/profile.toml</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>macOS</strong></td>
+<td
+style="text-align: left;"><code>~/Library/Application Support/korppi/profile.toml</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Windows</strong></td>
+<td style="text-align: left;"><code>%APPDATA%\korppi\profile.toml</code>
+<br> <em>(typically
+<code>C:\Users\&lt;YourUser&gt;\AppData\Roaming\korppi\profile.toml</code>)</em></td>
+</tr>
+</tbody>
+</table>
             </article>
 
             <footer class="footer">
