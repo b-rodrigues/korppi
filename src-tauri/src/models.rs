@@ -1,45 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct PatchInfo {
-    pub hash: String,
-    pub description: String,
-    pub timestamp: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct ConflictInfo {
-    pub has_conflict: bool,
-    pub locations: Vec<ConflictLocation>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct ConflictLocation {
-    pub path: String,
-    pub line: Option<usize>,
-    pub conflict_type: String,
-    pub description: String,
-}
-
-#[derive(Debug, Serialize)]
-#[allow(dead_code)]
-pub struct TestResult {
-    pub success: bool,
-    pub message: String,
-    pub details: Option<String>,
-}
-
 /// Represents a detected conflict between two versions
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Conflict {
     pub id: String,
     pub conflict_type: ConflictType,
-    pub base_version: TextSpan,      // Common ancestor
-    pub local_version: TextSpan,     // Our changes
-    pub remote_version: TextSpan,    // Their changes
+    pub base_version: TextSpan,   // Common ancestor
+    pub local_version: TextSpan,  // Our changes
+    pub remote_version: TextSpan, // Their changes
     pub status: ConflictStatus,
     pub detected_at: i64,
 }
@@ -59,10 +27,10 @@ pub enum ConflictType {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ConflictStatus {
     Unresolved,
-    ResolvedLocal,   // Kept local version
-    ResolvedRemote,  // Kept remote version
-    ResolvedMerged,  // Manual merge
-    ResolvedBoth,    // Kept both
+    ResolvedLocal,  // Kept local version
+    ResolvedRemote, // Kept remote version
+    ResolvedMerged, // Manual merge
+    ResolvedBoth,   // Kept both
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

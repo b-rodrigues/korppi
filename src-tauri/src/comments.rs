@@ -16,8 +16,8 @@ use crate::document_manager::DocumentManager;
 pub struct CommentInput {
     pub author: String,
     pub author_color: Option<String>,
-    pub start_anchor: String,  // JSON-serialized Yjs RelativePosition
-    pub end_anchor: String,    // JSON-serialized Yjs RelativePosition
+    pub start_anchor: String, // JSON-serialized Yjs RelativePosition
+    pub end_anchor: String,   // JSON-serialized Yjs RelativePosition
     pub selected_text: String,
     pub content: String,
     pub parent_id: Option<i64>,
@@ -122,18 +122,22 @@ pub fn list_comments(
     let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
     init_comments_table(&conn)?;
 
-    let query = match &status_filter {
-        Some(status) => format!(
-            "SELECT id, timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id FROM comments WHERE status = '{}' ORDER BY timestamp ASC",
-            status
-        ),
-        None => "SELECT id, timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id FROM comments ORDER BY timestamp ASC".to_string(),
-    };
+    let base_query = "SELECT id, timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id FROM comments";
 
-    let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
+    let comments = if let Some(status) = &status_filter {
+        // Validate status to prevent injection (only allow known values)
+        let valid_statuses = ["unresolved", "resolved", "deleted"];
+        if !valid_statuses.contains(&status.as_str()) {
+            return Err(format!(
+                "Invalid status filter: {}. Must be one of: unresolved, resolved, deleted",
+                status
+            ));
+        }
 
-    let comments = stmt
-        .query_map([], |row| {
+        let query = format!("{} WHERE status = ?1 ORDER BY timestamp ASC", base_query);
+        let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
+
+        stmt.query_map(params![status], |row| {
             Ok(Comment {
                 id: row.get(0)?,
                 timestamp: row.get(1)?,
@@ -149,7 +153,29 @@ pub fn list_comments(
         })
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+    } else {
+        let query = format!("{} ORDER BY timestamp ASC", base_query);
+        let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
+
+        stmt.query_map([], |row| {
+            Ok(Comment {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                author: row.get(2)?,
+                author_color: row.get(3)?,
+                start_anchor: row.get(4)?,
+                end_anchor: row.get(5)?,
+                selected_text: row.get(6)?,
+                content: row.get(7)?,
+                status: row.get(8)?,
+                parent_id: row.get(9)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    };
 
     Ok(comments)
 }
@@ -352,7 +378,11 @@ mod tests {
 
         // Verify table exists
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='comments'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='comments'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(count, 1);
     }
@@ -370,7 +400,11 @@ mod tests {
         let id = insert_test_comment(&conn, "TestUser", "Test comment");
 
         let status: String = conn
-            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .query_row(
+                "SELECT status FROM comments WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(status, "unresolved");
     }
@@ -380,10 +414,18 @@ mod tests {
         let conn = create_test_db();
         let id = insert_test_comment(&conn, "TestUser", "Test comment");
 
-        conn.execute("UPDATE comments SET status = 'resolved' WHERE id = ?1", params![id]).unwrap();
+        conn.execute(
+            "UPDATE comments SET status = 'resolved' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
 
         let status: String = conn
-            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .query_row(
+                "SELECT status FROM comments WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(status, "resolved");
     }
@@ -393,10 +435,18 @@ mod tests {
         let conn = create_test_db();
         let id = insert_test_comment(&conn, "TestUser", "Test comment");
 
-        conn.execute("UPDATE comments SET status = 'deleted' WHERE id = ?1", params![id]).unwrap();
+        conn.execute(
+            "UPDATE comments SET status = 'deleted' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
 
         let status: String = conn
-            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .query_row(
+                "SELECT status FROM comments WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(status, "deleted");
     }
@@ -407,11 +457,23 @@ mod tests {
         let id = insert_test_comment(&conn, "TestUser", "Test comment");
 
         // Delete then restore
-        conn.execute("UPDATE comments SET status = 'deleted' WHERE id = ?1", params![id]).unwrap();
-        conn.execute("UPDATE comments SET status = 'unresolved' WHERE id = ?1", params![id]).unwrap();
+        conn.execute(
+            "UPDATE comments SET status = 'deleted' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE comments SET status = 'unresolved' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
 
         let status: String = conn
-            .query_row("SELECT status FROM comments WHERE id = ?1", params![id], |r| r.get(0))
+            .query_row(
+                "SELECT status FROM comments WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(status, "unresolved");
     }
@@ -432,7 +494,11 @@ mod tests {
 
         // Verify parent_id is set
         let fetched_parent: Option<i64> = conn
-            .query_row("SELECT parent_id FROM comments WHERE id = ?1", params![reply_id], |r| r.get(0))
+            .query_row(
+                "SELECT parent_id FROM comments WHERE id = ?1",
+                params![reply_id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(fetched_parent, Some(parent_id));
     }
@@ -454,11 +520,16 @@ mod tests {
         conn.execute(
             "UPDATE comments SET status = 'deleted' WHERE id = ?1 OR parent_id = ?1",
             params![parent_id],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Both should be deleted
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM comments WHERE status = 'deleted'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM comments WHERE status = 'deleted'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(count, 2);
     }
