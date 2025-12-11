@@ -96,13 +96,67 @@ When reviewing a patch:
 
 ## Conflict Resolution
 
-When the same line changed in both documents:
+When the same lines are modified in both documents, Korppi detects a **conflict**. You have two approaches to resolve them:
 
-1. Korppi detects the conflict
-2. All versions are shown
-3. You choose which to keep (or edit manually)
+### Simple Approach: Accept or Reject
 
----
+For straightforward conflicts:
+
+1. Click the conflicting patch in the timeline
+2. Review the diff preview
+3. Click **Accept** or **Reject**
+
+If you accept, the patch's content replaces what's in your document.
+
+### Advanced Approach: Merge Wizard
+
+For complex conflicts or when you want to combine changes from multiple patches:
+
+1. Click the conflicting patch in the timeline
+2. Go to the **Conflicts** tab in the preview
+3. Click **Resolve Conflict** to open the Merge Wizard
+
+The wizard guides you through:
+
+1. **Zone Detection** - Korppi breaks down conflicts into independent zones (sections of the document that can be resolved separately)
+2. **Zone Resolution** - For each zone, you see both versions and can:
+   - Choose one version entirely
+   - Manually edit to combine both
+   - Use the conflict markers to pick line-by-line
+
+### Understanding Conflict Markers
+
+In the zone editor, conflicts appear as:
+
+```
+╔══════ Author A
+Content from first patch
+╠══════
+Content from second patch
+╚══════ Author B
+```
+
+You can:
+- Delete everything except the version you want
+- Edit the content to merge both manually
+- Use the quick-resolve buttons to pick a version
+
+### After Resolution
+
+When you complete the merge:
+
+- A new **Merge Patch** is created with your resolved content
+- Source patches are marked as **accepted** (and move to the accepted filter)
+- Your document is updated with the merged result
+
+### When to Use the Merge Wizard
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Simple text change | Accept/Reject |
+| Multiple authors edited same section | Merge Wizard |
+| Want to combine parts from both versions | Merge Wizard |
+| Many overlapping patches | Merge Wizard |
 
 ## Line-Based Review
 
