@@ -21,7 +21,7 @@ use zip::write::FileOptions;
 use zip::ZipWriter;
 
 use docx_rs::*;
-use pulldown_cmark::{Event, Tag, TagEnd, Parser, HeadingLevel, CodeBlockKind, Options};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 pub const KMD_VERSION: &str = "0.1.0";
 pub const MIN_READER_VERSION: &str = "0.1.0";
@@ -141,7 +141,9 @@ pub struct SyncState {
 
 /// Get the path to the Yjs document file
 fn get_yjs_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let mut path = app.path().app_data_dir()
+    let mut path = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("document.yjs");
     Ok(path)
@@ -149,7 +151,9 @@ fn get_yjs_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 /// Get the path to the history database
 fn get_history_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let mut path = app.path().app_data_dir()
+    let mut path = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("korppi_history.db");
     Ok(path)
@@ -157,7 +161,9 @@ fn get_history_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 /// Get the path to the document metadata file
 fn get_meta_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let mut path = app.path().app_data_dir()
+    let mut path = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     path.push("document_meta.json");
     Ok(path)
@@ -350,11 +356,7 @@ pub fn check_version_compatibility(format_info: &FormatInfo) -> Result<(), Strin
             .take(3)
             .map(|s| {
                 // Handle prerelease suffixes like "0-beta" by taking only the numeric part
-                s.split('-')
-                    .next()
-                    .unwrap_or("0")
-                    .parse()
-                    .unwrap_or(0)
+                s.split('-').next().unwrap_or("0").parse().unwrap_or(0)
             })
             .collect();
         (
@@ -431,14 +433,14 @@ pub fn export_markdown(path: String, content: String) -> Result<(), String> {
 /// Convert markdown to DOCX format
 fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     let mut docx = Docx::new();
-    
+
     let mut current_paragraph = Paragraph::new();
     let mut current_text = String::new();
     let mut in_paragraph = false;
     let mut list_items: Vec<Paragraph> = Vec::new();
     let mut in_list = false;
     let mut is_ordered_list = false;
-    
+
     // Stack to track formatting
     let mut bold_depth: i32 = 0;
     let mut italic_depth: i32 = 0;
@@ -446,9 +448,14 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     let mut in_code_block = false;
     let mut code_text = String::new();
     let mut paragraph_style: Option<String> = None;
-    
+
     // Helper function to flush current text with formatting
-    let flush_text = |para: Paragraph, text: &str, is_bold: bool, is_italic: bool, is_strike: bool| -> Paragraph {
+    let flush_text = |para: Paragraph,
+                      text: &str,
+                      is_bold: bool,
+                      is_italic: bool,
+                      is_strike: bool|
+     -> Paragraph {
         if text.is_empty() {
             return para;
         }
@@ -464,12 +471,12 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
         }
         para.add_run(run)
     };
-    
+
     // Enable GFM extensions (strikethrough)
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(markdown, options);
-    
+
     for event in parser {
         match event {
             Event::Start(tag) => {
@@ -477,13 +484,19 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Heading { level, .. } => {
                         // Flush any existing paragraph
                         if in_paragraph && !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         if in_paragraph {
                             docx = docx.add_paragraph(current_paragraph);
                         }
-                        
+
                         // Create heading with appropriate level
                         let heading_level = match level {
                             HeadingLevel::H1 => 1,
@@ -504,7 +517,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Strong => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         bold_depth += 1;
@@ -512,7 +531,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Emphasis => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         italic_depth += 1;
@@ -520,7 +545,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Strikethrough => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         strikethrough_depth += 1;
@@ -534,7 +565,8 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                         current_paragraph = Paragraph::new();
                         in_paragraph = true;
                     }
-                    Tag::CodeBlock(CodeBlockKind::Fenced(_)) | Tag::CodeBlock(CodeBlockKind::Indented) => {
+                    Tag::CodeBlock(CodeBlockKind::Fenced(_))
+                    | Tag::CodeBlock(CodeBlockKind::Indented) => {
                         in_code_block = true;
                         code_text.clear();
                     }
@@ -551,21 +583,27 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Heading(_) | TagEnd::Paragraph => {
                         if in_paragraph {
                             if !current_text.is_empty() {
-                                current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                                current_paragraph = flush_text(
+                                    current_paragraph,
+                                    &current_text,
+                                    bold_depth > 0,
+                                    italic_depth > 0,
+                                    strikethrough_depth > 0,
+                                );
                                 current_text.clear();
                             }
-                            
+
                             // Apply style if any
                             if let Some(ref style) = paragraph_style {
                                 current_paragraph = current_paragraph.style(style);
                             }
-                            
+
                             if in_list {
                                 list_items.push(current_paragraph);
                             } else {
                                 docx = docx.add_paragraph(current_paragraph);
                             }
-                            
+
                             current_paragraph = Paragraph::new();
                             in_paragraph = false;
                             paragraph_style = None;
@@ -574,7 +612,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Strong => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         bold_depth = bold_depth.saturating_sub(1);
@@ -582,7 +626,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Emphasis => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         italic_depth = italic_depth.saturating_sub(1);
@@ -590,7 +640,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Strikethrough => {
                         // Flush current text before changing format
                         if !current_text.is_empty() {
-                            current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                            current_paragraph = flush_text(
+                                current_paragraph,
+                                &current_text,
+                                bold_depth > 0,
+                                italic_depth > 0,
+                                strikethrough_depth > 0,
+                            );
                             current_text.clear();
                         }
                         strikethrough_depth = strikethrough_depth.saturating_sub(1);
@@ -599,15 +655,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                         // Add all collected list items
                         for item in list_items.drain(..) {
                             let indented_item = if is_ordered_list {
-                                item.numbering(
-                                    NumberingId::new(2),
-                                    IndentLevel::new(0),
-                                )
+                                item.numbering(NumberingId::new(2), IndentLevel::new(0))
                             } else {
-                                item.numbering(
-                                    NumberingId::new(1),
-                                    IndentLevel::new(0),
-                                )
+                                item.numbering(NumberingId::new(1), IndentLevel::new(0))
                             };
                             docx = docx.add_paragraph(indented_item);
                         }
@@ -620,13 +670,12 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::CodeBlock => {
                         if in_code_block {
                             // Add code block as paragraph with monospace font
-                            let code_para = Paragraph::new()
-                                .add_run(
-                                    Run::new()
-                                        .add_text(&code_text)
-                                        .fonts(RunFonts::new().ascii("Courier New"))
-                                        .size(20)
-                                );
+                            let code_para = Paragraph::new().add_run(
+                                Run::new()
+                                    .add_text(&code_text)
+                                    .fonts(RunFonts::new().ascii("Courier New"))
+                                    .size(20),
+                            );
                             docx = docx.add_paragraph(code_para);
                             in_code_block = false;
                             code_text.clear();
@@ -635,7 +684,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::BlockQuote(_) => {
                         if in_paragraph {
                             if !current_text.is_empty() {
-                                current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                                current_paragraph = flush_text(
+                                    current_paragraph,
+                                    &current_text,
+                                    bold_depth > 0,
+                                    italic_depth > 0,
+                                    strikethrough_depth > 0,
+                                );
                                 current_text.clear();
                             }
                             if let Some(ref style) = paragraph_style {
@@ -660,7 +715,13 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
             Event::Code(code) => {
                 // Inline code - flush current text first
                 if !current_text.is_empty() {
-                    current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+                    current_paragraph = flush_text(
+                        current_paragraph,
+                        &current_text,
+                        bold_depth > 0,
+                        italic_depth > 0,
+                        strikethrough_depth > 0,
+                    );
                     current_text.clear();
                 }
                 let code_run = Run::new()
@@ -679,10 +740,16 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
             _ => {}
         }
     }
-    
+
     // Flush any remaining content
     if !current_text.is_empty() {
-        current_paragraph = flush_text(current_paragraph, &current_text, bold_depth > 0, italic_depth > 0, strikethrough_depth > 0);
+        current_paragraph = flush_text(
+            current_paragraph,
+            &current_text,
+            bold_depth > 0,
+            italic_depth > 0,
+            strikethrough_depth > 0,
+        );
     }
     if in_paragraph {
         if let Some(ref style) = paragraph_style {
@@ -690,23 +757,20 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
         }
         docx = docx.add_paragraph(current_paragraph);
     }
-    
+
     Ok(docx)
 }
 
 /// Export markdown content as a DOCX file
 #[tauri::command]
 pub fn export_docx(path: String, content: String) -> Result<(), String> {
-    // Debug: log the markdown content being exported
-    println!("[DOCX Export] Markdown content:\n{}", content);
-    
     let docx = markdown_to_docx(&content)?;
-    
+
     let file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
     docx.build()
         .pack(file)
         .map_err(|e| format!("Failed to write DOCX: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -887,13 +951,13 @@ mod tests {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test.docx");
         let path_str = file_path.to_str().unwrap().to_string();
-        
+
         let markdown = "# Test Document\n\nThis is a test.";
         let result = export_docx(path_str.clone(), markdown.to_string());
-        
+
         assert!(result.is_ok());
         assert!(file_path.exists());
-        
+
         // Check file is not empty
         let metadata = fs::metadata(&file_path).unwrap();
         assert!(metadata.len() > 0);
