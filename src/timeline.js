@@ -270,11 +270,7 @@ export async function renderPatchList(patches) {
     // Detect conflicts in patches
     conflictState = detectPatchConflicts(patches);
 
-    // Show alert if conflicts detected AND we should show it (only on document open or after reconciliation)
-    if (conflictState.conflictGroups.length > 0 && showConflictAlertOnNextRefresh) {
-        showConflictAlertOnNextRefresh = false;
-        showConflictAlert(conflictState.conflictGroups, patches);
-    }
+    // Reset the flag (we no longer show alerts, conflicts are visible in timeline)
 
     // Get filter values
     const authorFilter = document.getElementById("filter-author")?.value || "all";
@@ -530,7 +526,6 @@ export async function renderPatchList(patches) {
                 </div>
                 <div class="timeline-item-actions">
                     <button class="preview-btn" data-patch-id="${patch.id}" title="Preview diff">🔍 Preview</button>
-                    <button class="view-btn" data-patch-id="${patch.id}" title="View content">👁️</button>
                     <button class="restore-btn" data-patch-id="${patch.id}" title="Restore to this version">↩</button>
                 </div>
             </div>
@@ -568,15 +563,6 @@ export async function renderPatchList(patches) {
             e.stopPropagation();
             const patchId = parseInt(btn.dataset.patchId);
             await restoreToPatch(patchId);
-        });
-    });
-
-    // Add click handlers for view buttons
-    list.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const patchId = parseInt(btn.dataset.patchId);
-            await viewPatchContent(patchId);
         });
     });
 }
@@ -625,36 +611,6 @@ async function previewPatch(patchId) {
     // Show diff from current content to merged result
     // This shows "what will change if you accept this patch"
     enterPreview(patchId, currentContent, mergedResult);
-}
-
-/**
- * View the content of a patch in a modal
- * @param {number} patchId - The ID of the patch to view
- */
-async function viewPatchContent(patchId) {
-    const patch = await fetchPatch(patchId);
-    if (!patch) {
-        alert("Failed to load patch");
-        return;
-    }
-
-    const content = patch.data?.snapshot || "No content available";
-
-    // Get previous SAVE patch for diff (not edit patches)
-    const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches.filter(p => hasSnapshotContent(p));
-    const currentIndex = savePatchesOnly.findIndex(p => p.id === patchId);
-    let diff = null;
-
-    if (currentIndex > 0) {
-        const previousPatch = savePatchesOnly[currentIndex - 1];
-        const previousContent = previousPatch.data?.snapshot || '';
-        diff = calculateDiff(previousContent, content);
-    } else {
-        diff = "No previous version to compare with";
-    }
-
-    showContentModal(patchId, content, diff);
 }
 
 /**
@@ -713,106 +669,6 @@ function calculateDiff(oldText, newText) {
     return lines.join('\n');
 }
 
-/**
- * Show a modal with patch content
- * @param {number} patchId - Patch ID
- * @param {string} content - Content to display
- * @param {string} diff - Diff to display
- */
-function showContentModal(patchId, content, diff) {
-    let modal = document.getElementById("patch-content-modal");
-
-    if (!modal) {
-        // Create modal on first use
-        modal = document.createElement("div");
-        modal.id = "patch-content-modal";
-        modal.className = "modal";
-
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Patch Content</h2>
-                    <span class="modal-close">&times;</span>
-                </div>
-                <div class="modal-tabs">
-                    <button class="tab-btn active" data-tab="content">Content</button>
-                    <button class="tab-btn" data-tab="diff">Diff</button>
-                </div>
-                <div class="modal-body">
-                    <pre id="patch-content" class="tab-content visible"></pre>
-                    <pre id="patch-diff" class="tab-content"></pre>
-                </div>
-                <div class="modal-footer">
-                    <button class="modal-close-btn">Close</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        // Close handlers
-        const closeModal = () => { modal.style.display = "none"; };
-        modal.querySelector(".modal-close").onclick = closeModal;
-        modal.querySelector(".modal-close-btn").onclick = closeModal;
-
-        // Click outside to close
-        modal.addEventListener("click", (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-
-        // Tab switching
-        modal.querySelectorAll(".tab-btn").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-                const tab = e.target.dataset.tab;
-
-                // Update button states
-                modal.querySelectorAll(".tab-btn").forEach(b => {
-                    b.classList.remove("active");
-                });
-                e.target.classList.add("active");
-
-                // Show/hide content
-                modal.querySelectorAll(".tab-content").forEach(c => {
-                    c.classList.remove("visible");
-                });
-
-                if (tab === "content") {
-                    modal.querySelector("#patch-content").classList.add("visible");
-                } else if (tab === "diff") {
-                    modal.querySelector("#patch-diff").classList.add("visible");
-                }
-            });
-        });
-    }
-
-    // Update content
-    const contentEl = modal.querySelector("#patch-content");
-    const diffEl = modal.querySelector("#patch-diff");
-    const headerEl = modal.querySelector(".modal-header h2");
-
-    if (contentEl) contentEl.textContent = content;
-    if (diffEl) diffEl.textContent = diff || "No diff available";
-    if (headerEl) headerEl.textContent = `Patch #${patchId}`;
-
-    // Reset to content tab
-    modal.querySelectorAll(".tab-btn").forEach(b => {
-        b.classList.remove("active");
-    });
-    const contentBtn = modal.querySelector('[data-tab="content"]');
-    if (contentBtn) {
-        contentBtn.classList.add("active");
-    }
-
-    modal.querySelectorAll(".tab-content").forEach(c => {
-        c.classList.remove("visible");
-    });
-    modal.querySelector("#patch-content").classList.add("visible");
-
-    // Show modal
-    modal.style.display = "block";
-}
 
 export function renderPatchDetails(patch) {
     const details = document.getElementById("timeline-details");
@@ -887,30 +743,6 @@ async function resetToOriginal() {
 // Track last alert time to prevent spam
 let lastConflictAlertTime = 0;
 
-/**
- * Show alert when conflicts are detected
- * @param {Array<Array<number>>} conflictGroups - Groups of conflicting patch IDs
- * @param {Array} patches - All patches
- */
-function showConflictAlert(conflictGroups, patches) {
-    // Only show alert once per timeline load (avoid spam on filters)
-    const timeSinceLastAlert = Date.now() - lastConflictAlertTime;
-    if (timeSinceLastAlert < 5000) {
-        return; // Don't spam alerts
-    }
-    lastConflictAlertTime = Date.now();
-
-    const groupCount = conflictGroups.length;
-    let message = `⚠️ ${groupCount} conflict group${groupCount > 1 ? 's' : ''} detected.\n\n`;
-
-    // Add details about each group
-    conflictGroups.forEach((group, index) => {
-        const patchIds = group.map(id => `#${id}`).join(', ');
-        message += `Group ${index + 1}: Patches ${patchIds} modify the same text.\n`;
-    });
-
-    alert(message);
-}
 
 /**
  * Get the current conflict state (for use by other modules)

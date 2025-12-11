@@ -50,11 +50,6 @@ export async function startReconciliation() {
         // Auto-show the right sidebar with timeline tab for patch review
         showRightSidebar('timeline');
 
-        // Use setTimeout to allow timeline refresh and conflict detection to complete first
-        setTimeout(() => {
-            alert(`Patches imported from ${fileCount} file${fileCount > 1 ? 's' : ''} successfully! Check the timeline to review and accept them.`);
-        }, 100);
-
     } catch (err) {
         console.error("Reconciliation failed:", err);
         alert(`Failed to import patches: ${err}`);
