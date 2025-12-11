@@ -8,11 +8,13 @@
 # 3. Push to main branch
 
 SECTION: Getting Started
+rationale|Rationale
 installation|Installation
 quick-start|Quick Start
-first-document|Your First Document
 
-SECTION: Features
+SECTION: Documentation
+profile|Configure Profile
+first-document|Your First Document
 formatting|Text Formatting
 comments|Comments and Reviews
 timeline|Timeline and History

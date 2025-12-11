@@ -130,9 +130,8 @@ When you're ready to share:
 
 ## What's Next?
 
-- Learn about [Text Formatting](formatting.html)
-- Explore the [Timeline & History](timeline.html)
-- Set up your [Profile](configuration.html)
+- Set up your [Profile](profile.html)
+- Draft your [first Document](first-document.html)
 
 ---
 

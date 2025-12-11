@@ -14,26 +14,6 @@ The **Preferences** section is at the top of the left sidebar:
 
 ---
 
-## Profile Settings
-
-### Setting Your Name
-
-1. Click your **profile avatar** (top left)
-2. Enter your name
-3. Your name appears on:
-   - Comments you create
-   - Document metadata
-   - Timeline patches
-
-### Choosing a Color
-
-1. Click your profile avatar
-2. Select a color
-3. This color is used for:
-   - Comment highlights
-   - Author identification
-
----
 
 ## Theme
 
