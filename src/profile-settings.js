@@ -1,5 +1,7 @@
 // src/profile-settings.js
-import { getProfile, saveProfile, getCachedProfile } from "./profile-service.js";
+import { getProfile, saveProfile, getCachedProfile, initProfile } from "./profile-service.js";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 let modal = null;
 let nameInput = null;
@@ -10,6 +12,8 @@ let profileIdDisplay = null;
 let saveBtn = null;
 let closeBtn = null;
 let settingsBtn = null;
+let backupBtn = null;
+let restoreBtn = null;
 
 /**
  * Initialize the profile settings UI
@@ -25,6 +29,8 @@ export function initProfileSettings() {
     saveBtn = document.getElementById("profile-save-btn");
     closeBtn = document.getElementById("profile-modal-close");
     settingsBtn = document.getElementById("settings-btn");
+    backupBtn = document.getElementById("profile-backup-btn");
+    restoreBtn = document.getElementById("profile-restore-btn");
 
     if (!modal || !settingsBtn) {
         console.warn("Profile settings elements not found");
@@ -35,6 +41,14 @@ export function initProfileSettings() {
     settingsBtn.addEventListener("click", openModal);
     closeBtn.addEventListener("click", closeModal);
     saveBtn.addEventListener("click", handleSave);
+
+    if (backupBtn) {
+        backupBtn.addEventListener("click", handleBackup);
+    }
+
+    if (restoreBtn) {
+        restoreBtn.addEventListener("click", handleRestore);
+    }
 
     // Update color value display when color changes
     colorInput.addEventListener("input", () => {
@@ -141,5 +155,64 @@ async function handleSave() {
     } catch (err) {
         console.error("Failed to save profile:", err);
         alert("Failed to save profile: " + err);
+    }
+}
+
+/**
+ * Handle backup button click
+ */
+async function handleBackup() {
+    try {
+        const path = await save({
+            defaultPath: 'profile_backup.toml',
+            filters: [{
+                name: 'TOML Config',
+                extensions: ['toml']
+            }]
+        });
+
+        if (path) {
+            await invoke("export_profile", { path });
+            alert("Profile backed up successfully!");
+        }
+    } catch (err) {
+        console.error("Failed to backup profile:", err);
+        alert("Failed to backup profile: " + err);
+    }
+}
+
+/**
+ * Handle restore button click
+ */
+async function handleRestore() {
+    if (!confirm("Restoring a profile will overwrite your current settings. Are you sure?")) {
+        return;
+    }
+
+    try {
+        const path = await open({
+            multiple: false,
+            filters: [{
+                name: 'TOML Config',
+                extensions: ['toml']
+            }]
+        });
+
+        if (path) {
+            await invoke("import_profile", { path });
+
+            // Reload profile to update UI
+            await initProfile();
+
+            // Refresh modal if open
+            if (modal.style.display !== "none") {
+                await openModal();
+            }
+
+            alert("Profile restored successfully!");
+        }
+    } catch (err) {
+        console.error("Failed to restore profile:", err);
+        alert("Failed to restore profile: " + err);
     }
 }

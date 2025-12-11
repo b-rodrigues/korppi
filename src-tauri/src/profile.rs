@@ -79,6 +79,47 @@ pub fn get_profile_path(_app: AppHandle) -> Result<PathBuf, String> {
     get_config_dir()
 }
 
+/// Export the current profile to the specified path
+#[tauri::command]
+pub fn export_profile(_app: AppHandle, path: PathBuf) -> Result<(), String> {
+    let profile_path = get_profile_file_path()?;
+    
+    if !profile_path.exists() {
+        return Err("No profile found to export".to_string());
+    }
+    
+    fs::copy(&profile_path, &path)
+        .map_err(|e| format!("Failed to export profile: {}", e))?;
+        
+    Ok(())
+}
+
+/// Import a profile from the specified path
+#[tauri::command]
+pub fn import_profile(_app: AppHandle, path: PathBuf) -> Result<(), String> {
+    let profile_path = get_profile_file_path()?;
+    let config_dir = get_config_dir()?;
+    
+    // Ensure config directory exists
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    
+    // Validate that the file is a valid profile
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read import file: {}", e))?;
+        
+    let _profile: UserProfile = toml::from_str(&content)
+        .map_err(|e| format!("Invalid profile file: {}", e))?;
+    
+    // Copy the file
+    fs::copy(&path, &profile_path)
+        .map_err(|e| format!("Failed to import profile: {}", e))?;
+        
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

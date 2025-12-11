@@ -18,6 +18,8 @@ commands.allow = [
     "get_profile",
     "save_profile",
     "get_profile_path",
+    "export_profile",
+    "import_profile",
     "export_kmd",
     "import_kmd",
     "export_markdown",

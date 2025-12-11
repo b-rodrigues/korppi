@@ -18,7 +18,7 @@ use patch_log::{
 };
 use yjs_store::{load_doc, store_update};
 use conflict_commands::{detect_conflicts, get_conflicts, resolve_conflict, get_conflict_count};
-use profile::{get_profile, save_profile, get_profile_path};
+use profile::{get_profile, save_profile, get_profile_path, export_profile, import_profile};
 use kmd::{export_kmd, export_markdown, export_docx, get_document_meta, set_document_title, write_text_file};
 use document_manager::{
     new_document, open_document, save_document, close_document,
@@ -61,6 +61,8 @@ pub fn run() {
             get_profile,
             save_profile,
             get_profile_path,
+            export_profile,
+            import_profile,
             export_kmd,
             export_markdown,
             export_docx,

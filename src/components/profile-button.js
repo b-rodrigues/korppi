@@ -1,7 +1,9 @@
 // src/components/profile-button.js
 // Profile button with avatar display and modal trigger
 
-import { getProfile, saveProfile } from "../profile-service.js";
+import { getProfile, saveProfile, initProfile } from "../profile-service.js";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 let profileModal = null;
 let currentProfile = null;
@@ -84,6 +86,8 @@ function setupProfileModal() {
 
     const closeBtn = document.getElementById('profile-modal-close');
     const saveBtn = document.getElementById('profile-save-btn');
+    const backupBtn = document.getElementById('profile-backup-btn');
+    const restoreBtn = document.getElementById('profile-restore-btn');
     const avatarInput = document.getElementById('profile-avatar-input');
     const avatarPreview = document.getElementById('profile-avatar-preview');
 
@@ -95,6 +99,16 @@ function setupProfileModal() {
     // Save button
     if (saveBtn) {
         saveBtn.addEventListener('click', handleSaveProfile);
+    }
+
+    // Backup button
+    if (backupBtn) {
+        backupBtn.addEventListener('click', handleBackup);
+    }
+
+    // Restore button
+    if (restoreBtn) {
+        restoreBtn.addEventListener('click', handleRestore);
     }
 
     // Click outside to close
@@ -213,5 +227,65 @@ async function handleSaveProfile() {
     } catch (err) {
         console.error('Failed to save profile:', err);
         alert('Failed to save profile: ' + err);
+    }
+}
+
+/**
+ * Handle backup button click
+ */
+async function handleBackup() {
+    try {
+        const path = await save({
+            defaultPath: 'profile_backup.toml',
+            filters: [{
+                name: 'TOML Config',
+                extensions: ['toml']
+            }]
+        });
+
+        if (path) {
+            await invoke("export_profile", { path });
+            alert("Profile backed up successfully!");
+        }
+    } catch (err) {
+        console.error("Failed to backup profile:", err);
+        alert("Failed to backup profile: " + err);
+    }
+}
+
+/**
+ * Handle restore button click
+ */
+async function handleRestore() {
+    if (!confirm("Restoring a profile will overwrite your current settings. Are you sure?")) {
+        return;
+    }
+
+    try {
+        const path = await open({
+            multiple: false,
+            filters: [{
+                name: 'TOML Config',
+                extensions: ['toml']
+            }]
+        });
+
+        if (path) {
+            await invoke("import_profile", { path });
+
+            // Reload profile to update UI
+            await initProfile();
+            await refreshProfileDisplay();
+
+            // Refresh modal if open
+            if (profileModal.style.display !== "none") {
+                await openProfileModal();
+            }
+
+            alert("Profile restored successfully!");
+        }
+    } catch (err) {
+        console.error("Failed to restore profile:", err);
+        alert("Failed to restore profile: " + err);
     }
 }
