@@ -124,7 +124,23 @@ pub fn list_comments(
 
     let base_query = "SELECT id, timestamp, author, author_color, start_anchor, end_anchor, selected_text, content, status, parent_id FROM comments";
 
-    let comments = if let Some(status) = &status_filter {
+    // Helper closure to map rows to Comment
+    let map_row = |row: &rusqlite::Row| -> rusqlite::Result<Comment> {
+        Ok(Comment {
+            id: row.get(0)?,
+            timestamp: row.get(1)?,
+            author: row.get(2)?,
+            author_color: row.get(3)?,
+            start_anchor: row.get(4)?,
+            end_anchor: row.get(5)?,
+            selected_text: row.get(6)?,
+            content: row.get(7)?,
+            status: row.get(8)?,
+            parent_id: row.get(9)?,
+        })
+    };
+
+    if let Some(status) = &status_filter {
         // Validate status to prevent injection (only allow known values)
         let valid_statuses = ["unresolved", "resolved", "deleted"];
         if !valid_statuses.contains(&status.as_str()) {
@@ -136,48 +152,22 @@ pub fn list_comments(
 
         let query = format!("{} WHERE status = ?1 ORDER BY timestamp ASC", base_query);
         let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-
-        stmt.query_map(params![status], |row| {
-            Ok(Comment {
-                id: row.get(0)?,
-                timestamp: row.get(1)?,
-                author: row.get(2)?,
-                author_color: row.get(3)?,
-                start_anchor: row.get(4)?,
-                end_anchor: row.get(5)?,
-                selected_text: row.get(6)?,
-                content: row.get(7)?,
-                status: row.get(8)?,
-                parent_id: row.get(9)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
+        let comments: Vec<Comment> = stmt
+            .query_map(params![status], map_row)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        Ok(comments)
     } else {
         let query = format!("{} ORDER BY timestamp ASC", base_query);
         let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-
-        stmt.query_map([], |row| {
-            Ok(Comment {
-                id: row.get(0)?,
-                timestamp: row.get(1)?,
-                author: row.get(2)?,
-                author_color: row.get(3)?,
-                start_anchor: row.get(4)?,
-                end_anchor: row.get(5)?,
-                selected_text: row.get(6)?,
-                content: row.get(7)?,
-                status: row.get(8)?,
-                parent_id: row.get(9)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
-    };
-
-    Ok(comments)
+        let comments: Vec<Comment> = stmt
+            .query_map([], map_row)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        Ok(comments)
+    }
 }
 
 /// Add a reply to an existing comment
