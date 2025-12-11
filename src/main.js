@@ -32,6 +32,7 @@ import { initSearch } from "./search.js";
 import { initAutosave } from "./autosave.js";
 import { initWordCount } from "./word-count.js";
 import { initSidebarController } from "./components/sidebar-controller.js";
+import { initPatchMergeWizard, openPatchMergeWizard } from "./patch-merge-wizard.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -359,6 +360,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     initSearch();
     initAutosave();
     initWordCount();
+    initPatchMergeWizard();
+
+    // Wire up Merge Patches button
+    const mergePatchesBtn = document.getElementById("merge-patches-btn");
+    if (mergePatchesBtn) {
+        mergePatchesBtn.addEventListener("click", () => {
+            openPatchMergeWizard();
+        });
+    }
 
     // 4. Initialize Recent Documents Panel Buttons
     const newDocumentBtn = document.getElementById("new-document-btn");

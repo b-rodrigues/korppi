@@ -457,6 +457,20 @@ async function updateConflictTabs() {
 
         tabsContainer.appendChild(tab);
     }
+
+    // Add "Resolve Conflict" button if there are multiple conflicting patches
+    const resolveBtn = document.createElement('button');
+    resolveBtn.className = 'resolve-conflict-btn';
+    resolveBtn.innerHTML = '🔀 Resolve Conflict';
+    resolveBtn.style.cssText = 'margin-left:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;';
+    resolveBtn.addEventListener('click', async () => {
+        // Exit preview first
+        exitPreview();
+        // Open merge wizard with these patches
+        const { openPatchMergeWizardWithPatches } = await import('./patch-merge-wizard.js');
+        openPatchMergeWizardWithPatches(pendingPatchIds);
+    });
+    tabsContainer.appendChild(resolveBtn);
 }
 
 /**
