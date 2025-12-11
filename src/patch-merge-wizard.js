@@ -246,24 +246,62 @@ async function renderStep1_SelectPatches(body, footer) {
     const patches = await fetchPatchList();
     wizardState.allPatches = patches;
 
-    // Only show pending patches (filter out accepted/rejected)
-    const savePatches = patches
+    const docId = getActiveDocumentId();
+    const { id: currentUserId } = getCurrentUserInfo();
+
+    // Fetch reviews for all patches with uuids
+    const patchReviews = new Map();
+    if (docId) {
+        const patchesWithUuid = patches.filter(p => p.uuid);
+        const reviewPromises = patchesWithUuid.map(patch =>
+            invoke("get_document_patch_reviews", {
+                docId,
+                patchUuid: patch.uuid
+            }).catch(() => []).then(reviews => ({ uuid: patch.uuid, reviews }))
+        );
+        const reviewResults = await Promise.all(reviewPromises);
+        for (const { uuid, reviews } of reviewResults) {
+            patchReviews.set(uuid, reviews);
+        }
+    }
+
+    // Helper to get effective status (same logic as timeline.js)
+    const getEffectiveStatus = (p) => {
+        if (p.author === currentUserId) return "accepted";
+        if (!p.uuid) return "pending";
+        const reviews = patchReviews.get(p.uuid) || [];
+        const myReview = reviews.find(r => r.reviewer_id === currentUserId);
+        if (myReview) return myReview.decision;
+        const mergeReview = reviews.find(r => r.reviewer_id === "merge-wizard");
+        if (mergeReview) return mergeReview.decision;
+        return "pending";
+    };
+
+    // All save patches with snapshots (for conflict detection and base computation)
+    const allSavePatches = patches
         .filter(p => p.kind === 'Save' && hasSnapshotContent(p))
-        .filter(p => p.status !== 'accepted' && p.status !== 'rejected')
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    // Only pending patches for selection UI
+    const pendingPatches = allSavePatches
+        .filter(p => getEffectiveStatus(p) === 'pending')
         .sort((a, b) => b.timestamp - a.timestamp);
 
-    const { conflictGroups } = detectPatchConflicts(patches);
+    // Conflict detection uses ALL save patches
+    const { conflictGroups } = detectPatchConflicts(allSavePatches);
     wizardState.allConflictGroups = conflictGroups;
 
+    // Conflict groups for display: only show groups with 2+ PENDING patches
     const conflictGroupsWithDetails = conflictGroups.map(group => {
-        const groupPatches = group.map(id => savePatches.find(p => p.id === id)).filter(Boolean);
+        // Find patches in the group that are pending
+        const groupPatches = group.map(id => pendingPatches.find(p => p.id === id)).filter(Boolean);
         const authors = [...new Set(groupPatches.map(p => p.data?.authorName || p.author))];
         return { ids: group, patches: groupPatches, authors, size: groupPatches.length };
     }).filter(g => g.size >= 2);
 
-    const sortedByTime = [...savePatches].sort((a, b) => a.timestamp - b.timestamp);
-    if (sortedByTime.length > 0) {
-        wizardState.baseSnapshot = sortedByTime[0].data.snapshot;
+    // Base snapshot is the EARLIEST patch (regardless of status)
+    if (allSavePatches.length > 0) {
+        wizardState.baseSnapshot = allSavePatches[0].data.snapshot;
     }
 
     body.innerHTML = `
@@ -309,7 +347,7 @@ async function renderStep1_SelectPatches(body, footer) {
                     <div class="patch-selection-column">
                         <h4>First Patch</h4>
                         <div class="patch-selection-list" id="patch-list-a">
-                            ${savePatches.map(p => `
+                            ${pendingPatches.map(p => `
                                 <div class="patch-selection-item ${wizardState.patchA?.id === p.id ? 'selected' : ''}"
                                      data-patch-id="${p.id}" data-list="a">
                                     <div class="patch-selection-info">
@@ -326,7 +364,7 @@ async function renderStep1_SelectPatches(body, footer) {
                     <div class="patch-selection-column">
                         <h4>Second Patch</h4>
                         <div class="patch-selection-list" id="patch-list-b">
-                            ${savePatches.map(p => `
+                            ${pendingPatches.map(p => `
                                 <div class="patch-selection-item ${wizardState.patchB?.id === p.id ? 'selected' : ''}"
                                      data-patch-id="${p.id}" data-list="b">
                                     <div class="patch-selection-info">
@@ -371,7 +409,7 @@ async function renderStep1_SelectPatches(body, footer) {
         item.addEventListener('click', () => {
             const patchId = parseInt(item.dataset.patchId);
             const list = item.dataset.list;
-            const patch = savePatches.find(p => p.id === patchId);
+            const patch = pendingPatches.find(p => p.id === patchId);
 
             wizardState.conflictGroup = null;
             wizardState.mode = 'manual';
