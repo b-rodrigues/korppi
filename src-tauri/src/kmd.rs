@@ -9,16 +9,16 @@
 //! - authors/: Author profile cache
 
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 use zip::write::FileOptions;
-use zip::{ZipArchive, ZipWriter};
+use zip::ZipWriter;
 
 use docx_rs::*;
 use pulldown_cmark::{Event, Tag, TagEnd, Parser, HeadingLevel, CodeBlockKind, Options};

@@ -183,9 +183,7 @@ export function initTimeline() {
     const filterAuthor = document.getElementById("filter-author");
     const filterStatus = document.getElementById("filter-status");
     const resetBtn = document.getElementById("reset-to-original-btn");
-    const lineStart = document.getElementById("filter-line-start");
-    const lineRange = document.getElementById("filter-line-range");
-    const clearLineFilter = document.getElementById("clear-line-filter");
+
 
     // Wire up sort dropdown
     if (sortSelect) {
@@ -207,27 +205,7 @@ export function initTimeline() {
         });
     }
 
-    // Wire up line range filter inputs
-    if (lineStart) {
-        lineStart.addEventListener("change", () => {
-            refreshTimeline();
-        });
-    }
 
-    if (lineRange) {
-        lineRange.addEventListener("change", () => {
-            refreshTimeline();
-        });
-    }
-
-    // Wire up clear line filter button
-    if (clearLineFilter) {
-        clearLineFilter.addEventListener("click", () => {
-            if (lineStart) lineStart.value = "";
-            if (lineRange) lineRange.value = "";
-            refreshTimeline();
-        });
-    }
 
     // Wire up reset button
     if (resetBtn) {
@@ -276,11 +254,7 @@ export async function renderPatchList(patches) {
     const authorFilter = document.getElementById("filter-author")?.value || "all";
     const statusFilter = document.getElementById("filter-status")?.value || "all";
     const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
-    const lineStart = parseInt(document.getElementById("filter-line-start")?.value) || null;
-    const lineRange = parseInt(document.getElementById("filter-line-range")?.value) || null;
 
-    // Calculate line end from start + range
-    const lineEnd = (lineStart !== null && lineRange !== null) ? lineStart + lineRange : null;
 
     // Populate author dropdown with unique authors (use ID for value, name for display)
     const filterAuthorSelect = document.getElementById("filter-author");
@@ -472,23 +446,7 @@ export async function renderPatchList(patches) {
             conflictInfo = formatConflictInfo(patch.id, conflictingIds);
         }
 
-        // Apply line range filter if set
-        if (lineStart !== null || lineEnd !== null) {
-            if (!patch._lineRange) {
-                return; // Skip patches without line range data when filtering
-            }
 
-            const patchStart = patch._lineRange.startLine;
-            const patchEnd = patch._lineRange.endLine;
-
-            // Check if patch overlaps with the requested range
-            if (lineStart !== null && patchEnd < lineStart) {
-                return; // Patch is entirely before the requested range
-            }
-            if (lineEnd !== null && patchStart > lineEnd) {
-                return; // Patch is entirely after the requested range
-            }
-        }
 
         // Get review badges for this patch (excluding current user's self-review)
         let reviewBadges = '';
