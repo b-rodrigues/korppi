@@ -158,16 +158,6 @@ When you complete the merge:
 | Want to combine parts from both versions | Merge Wizard |
 | Many overlapping patches | Merge Wizard |
 
-## Line-Based Review
-
-Filter patches by the lines they affect:
-
-1. In the timeline, click the line filter
-2. Enter a range (e.g., 1-50)
-3. Only patches affecting those lines appear
-
-Great for reviewing changes to specific sections!
-
 ---
 
 ## Best Practices
