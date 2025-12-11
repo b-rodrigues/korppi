@@ -41,6 +41,27 @@ body {
     min-height: 100%;
 }
 
+/* Raw markdown editor (textarea) */
+.raw-editor {
+    width: 100%;
+    min-height: 500px;
+    height: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 0;
+    margin: 0;
+}
+
+.raw-editor:focus {
+    outline: none;
+}
+
 /* Milkdown typography in page view */
 .editor-page #editor {
     font-size: 14px;
