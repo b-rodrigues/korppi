@@ -204,17 +204,27 @@ export function hasConflicts(base, patchA, patchB) {
  * @returns {Object} - { merged: string, hasConflicts: boolean, conflictCount: number }
  */
 export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', labelB = 'Patch B') {
+    console.log('[MERGE DEBUG] mergeWithConflicts called');
+    console.log('[MERGE DEBUG] base:', base);
+    console.log('[MERGE DEBUG] patchA:', patchA);
+    console.log('[MERGE DEBUG] patchB:', patchB);
+    console.log('[MERGE DEBUG] labelA:', labelA, 'labelB:', labelB);
+
     // Fast paths
     if (patchA === base && patchB === base) {
+        console.log('[MERGE DEBUG] Fast path: both equal to base');
         return { merged: base, hasConflicts: false, conflictCount: 0 };
     }
     if (patchA === base) {
+        console.log('[MERGE DEBUG] Fast path: patchA equals base, using patchB');
         return { merged: patchB, hasConflicts: false, conflictCount: 0 };
     }
     if (patchB === base) {
+        console.log('[MERGE DEBUG] Fast path: patchB equals base, using patchA');
         return { merged: patchA, hasConflicts: false, conflictCount: 0 };
     }
     if (patchA === patchB) {
+        console.log('[MERGE DEBUG] Fast path: patchA equals patchB');
         return { merged: patchA, hasConflicts: false, conflictCount: 0 };
     }
 
@@ -223,9 +233,57 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
     const aLines = patchA.split('\n');
     const bLines = patchB.split('\n');
 
+    console.log('[MERGE DEBUG] baseLines count:', baseLines.length);
+    console.log('[MERGE DEBUG] aLines count:', aLines.length);
+    console.log('[MERGE DEBUG] bLines count:', bLines.length);
+
     // Get LCS pairs
     const pairsA = lcsPairs(baseLines, aLines);
     const pairsB = lcsPairs(baseLines, bLines);
+
+    console.log('[MERGE DEBUG] pairsA:', pairsA);
+    console.log('[MERGE DEBUG] pairsB:', pairsB);
+
+    // Special case: if neither patch has ANY matching lines to base,
+    // treat the entire content as a single conflict (not line-by-line)
+    if (pairsA.length === 0 && pairsB.length === 0) {
+        console.log('[MERGE DEBUG] Special case: no matching lines on either side');
+        // Both patches completely replaced base - single conflict
+        if (patchA === patchB) {
+            return { merged: patchA, hasConflicts: false, conflictCount: 0 };
+        }
+        const result = [];
+        result.push(`╔══════ ${labelA}`);
+        result.push(...aLines);
+        result.push('╠══════');
+        result.push(...bLines);
+        result.push(`╚══════ ${labelB}`);
+        return {
+            merged: result.join('\n'),
+            hasConflicts: true,
+            conflictCount: 1
+        };
+    }
+
+    // Special case: if ONE patch has no matching lines to base,
+    // treat it as: that patch completely replaced, the other made edits
+    // Create a single conflict between the complete replacement and the edited version
+    if (pairsA.length === 0 || pairsB.length === 0) {
+        console.log('[MERGE DEBUG] Special case: one side has no matching lines');
+        // One side completely replaced, other side edited
+        // Create single conflict between the two versions
+        const result = [];
+        result.push(`╔══════ ${labelA}`);
+        result.push(...aLines);
+        result.push('╠══════');
+        result.push(...bLines);
+        result.push(`╚══════ ${labelB}`);
+        return {
+            merged: result.join('\n'),
+            hasConflicts: true,
+            conflictCount: 1
+        };
+    }
 
     // Build maps
     const baseToA = new Map(pairsA);
@@ -237,6 +295,8 @@ export function mergeWithConflicts(base, patchA, patchB, labelA = 'Patch A', lab
     let aIdx = 0;
     let bIdx = 0;
     let conflictCount = 0;
+
+    console.log('[MERGE DEBUG] Starting main loop, baseLines.length:', baseLines.length);
 
     for (let baseIdx = 0; baseIdx < baseLines.length; baseIdx++) {
         const aMatch = baseToA.get(baseIdx);

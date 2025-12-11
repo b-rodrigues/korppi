@@ -568,11 +568,18 @@ async function renderStep3_ResolveZone(body, footer) {
     let isFirstLoad = false;
     if (currentContent === undefined) {
         isFirstLoad = true;
+        console.log('[ZONE DEBUG] Computing initial merge for zone', zone.id);
+        console.log('[ZONE DEBUG] baseZoneContent:', baseZoneContent);
+        console.log('[ZONE DEBUG] patchContents:', patchContents.map(p => ({ author: p.authorName, content: p.content })));
+
         // Try to merge the zone contents
         if (patchContents.length === 2) {
+            console.log('[ZONE DEBUG] Merging 2 patches');
             const result = mergeWithConflicts(baseZoneContent, patchContents[0].content, patchContents[1].content,
                 patchContents[0].authorName, patchContents[1].authorName);
             currentContent = result.merged;
+            console.log('[ZONE DEBUG] Merge result:', result);
+            console.log('[ZONE DEBUG] currentContent after merge:', currentContent);
         } else {
             // For 3+ patches, merge sequentially
             currentContent = patchContents[0].content;
