@@ -182,6 +182,7 @@
 .editor-page {
     max-width: 800px;
     margin: 0 auto;
+    margin-bottom: 50vh;
     background: var(--bg-page);
     padding: 48px 64px;
     min-height: 100%;
