@@ -21,6 +21,7 @@ Korppi supports full Markdown formatting with a visual toolbar.
 ### Strikethrough
 
 - **Toolbar:** Click ~~S~~
+- **Shortcut:** `Ctrl+Shift+X`
 - **Markdown:** `~~strikethrough~~`
 
 ### Underline
@@ -201,13 +202,18 @@ To remove all formatting from selected text:
 | Bold | `Ctrl+B` |
 | Italic | `Ctrl+I` |
 | Underline | `Ctrl+U` |
+| Strikethrough | `Ctrl+Shift+X` |
 | Undo | `Ctrl+Z` |
 | Redo | `Ctrl+Y` |
+| Find | `Ctrl+F` |
+| Find & Replace | `Ctrl+H` |
 | New Document | `Ctrl+N` |
 | Open Document | `Ctrl+O` |
 | Save Document | `Ctrl+S` |
+| Save As | `Ctrl+Shift+S` |
 | Close Document | `Ctrl+W` |
 | Next Tab | `Ctrl+Tab` |
-| Previous Tab | `Shift+Ctrl+Tab` |
+| Previous Tab | `Ctrl+Shift+Tab` |
+| Shortcuts Cheat Sheet | `Alt+Shift+K` |
 
 See [Keyboard Shortcuts](keyboard-shortcuts.html) for the complete list.
