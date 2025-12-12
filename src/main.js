@@ -12,6 +12,7 @@ import {
     openDocument,
     importDocument,
     saveDocument,
+    saveDocumentAs,
     getRecentDocuments,
     clearRecentDocuments,
     getOpenDocuments,
@@ -23,6 +24,7 @@ import { initKeyboardShortcuts } from "./keyboard-shortcuts.js";
 // New UI components
 import { initResizableSidebars } from "./components/resizable-sidebar.js";
 import { initThemeToggle } from "./components/theme-toggle.js";
+import { initEditorModeToggle, syncRawEditor } from "./components/editor-mode-toggle.js";
 import { initProfileButton } from "./components/profile-button.js";
 import { initFormattingToolbar } from "./components/formatting-toolbar.js";
 import { initCommentsPanel, initEditorContextMenu } from "./comments-ui.js";
@@ -215,6 +217,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const newDocBtn = document.getElementById("new-doc-btn");
     const openDocBtn = document.getElementById("open-doc-btn");
     const saveDocBtn = document.getElementById("save-doc-btn");
+    const saveAsBtn = document.getElementById("save-as-btn");
     const reconcileBtn = document.getElementById("reconcile-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
     const exportDocxBtn = document.getElementById("export-docx-btn");
@@ -299,6 +302,19 @@ window.addEventListener("DOMContentLoaded", async () => {
             try {
                 await forceSave();
                 await saveDocument();
+            } catch (err) {
+                if (!err.toString().includes("cancelled")) {
+                    console.error("Failed to save document:", err);
+                }
+            }
+        });
+    }
+
+    if (saveAsBtn) {
+        saveAsBtn.addEventListener("click", async () => {
+            try {
+                await forceSave();
+                await saveDocumentAs();
             } catch (err) {
                 if (!err.toString().includes("cancelled")) {
                     console.error("Failed to save document:", err);
@@ -454,6 +470,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     // 7. Listen for document changes
     onDocumentChange((event, doc) => {
         updateDocumentUI();
+        // Sync raw editor content when document changes
+        if (event === "activeChange") {
+            syncRawEditor();
+        }
     });
 
     // 8. Initialize Editor
@@ -463,6 +483,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         initFormattingToolbar(editor);
         // Initialize comments context menu
         initEditorContextMenu();
+        // Initialize editor mode toggle (raw/rendered)
+        initEditorModeToggle();
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }

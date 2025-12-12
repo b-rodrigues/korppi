@@ -48,6 +48,16 @@
                         </button>
                     </div>
 
+                    <!-- Editor Mode Toggle -->
+                    <div class="preference-row">
+                        <span class="pref-icon">📝</span>
+                        <span class="pref-label">View</span>
+                        <button id="editor-mode-toggle" class="theme-toggle-compact" title="Toggle raw markdown view">
+                            <span class="icon">📄</span>
+                            <span class="label">Raw</span>
+                        </button>
+                    </div>
+
                     <!-- Autosave -->
                     <div class="preference-row">
                         <label class="config-toggle">
@@ -112,6 +122,11 @@
                             <span class="label">Save</span>
                             <span class="shortcut">Ctrl+S</span>
                         </button>
+                        <button id="save-as-btn" class="action-btn" title="Save As (Ctrl+Shift+S)">
+                            <span class="icon">💾</span>
+                            <span class="label">Save As</span>
+                            <span class="shortcut">Ctrl+⇧+S</span>
+                        </button>
                         <button id="reconcile-btn" class="action-btn" title="Reconcile Changes">
                             <span class="icon">📋</span>
                             <span class="label">Reconcile</span>
@@ -152,6 +167,7 @@
                 <div class="editor-scroll">
                     <div class="editor-page">
                         <div id="editor"></div>
+                        <textarea id="raw-editor" class="raw-editor" style="display: none;" spellcheck="false"></textarea>
                     </div>
                 </div>
 

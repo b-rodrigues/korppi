@@ -2,6 +2,8 @@
 
 Master Korppi with these keyboard shortcuts.
 
+> **Tip:** Press `Alt+Shift+K` (or `Option+Shift+K` on Mac) to open the keyboard shortcuts cheat sheet anytime!
+
 ---
 
 ## File Operations
@@ -25,6 +27,7 @@ Master Korppi with these keyboard shortcuts.
 | `Ctrl+X` | Cut |
 | `Ctrl+C` | Copy |
 | `Ctrl+V` | Paste |
+| `Ctrl+Shift+V` | Paste as plain text |
 | `Ctrl+A` | Select all |
 
 ---
@@ -35,7 +38,8 @@ Master Korppi with these keyboard shortcuts.
 |----------|--------|
 | `Ctrl+B` | Bold |
 | `Ctrl+I` | Italic |
-| `Ctrl+U` | Underline (if supported) |
+| `Ctrl+U` | Underline |
+| `Ctrl+Shift+X` | Strikethrough |
 
 ---
 
@@ -81,6 +85,14 @@ Master Korppi with these keyboard shortcuts.
 
 ---
 
+## Help
+
+| Shortcut | Action |
+|----------|--------|
+| `Alt+Shift+K` | Show keyboard shortcuts cheat sheet |
+
+---
+
 ## Special Actions
 
 | Shortcut | Action |
@@ -118,15 +130,19 @@ Focus on these essential shortcuts:
 
 1. `Ctrl+S` - Save (muscle memory!)
 2. `Ctrl+Z` / `Ctrl+Y` - Undo/Redo
-3. `Ctrl+B` / `Ctrl+I` - Bold/Italic
-4. `Ctrl+F` - Find
+3. `Ctrl+B` / `Ctrl+I` / `Ctrl+U` - Bold/Italic/Underline
+4. `Ctrl+Shift+X` - Strikethrough
+5. `Ctrl+F` - Find
+6. `Alt+Shift+K` - Show shortcuts cheat sheet
 
 ### macOS Users
 
-Replace `Ctrl` with `Cmd` (⌘):
+Replace `Ctrl` with `Cmd` (⌘) and `Alt` with `Option` (⌥):
 
 - `Cmd+S` - Save
 - `Cmd+B` - Bold
+- `Cmd+Shift+X` - Strikethrough
+- `Option+Shift+K` - Shortcuts cheat sheet
 - etc.
 
 ---

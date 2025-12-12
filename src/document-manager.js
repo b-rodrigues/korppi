@@ -2,6 +2,7 @@
 // Frontend service for managing multiple documents
 
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { getCachedProfile } from "./profile-service.js";
 
 let activeDocumentId = null;
@@ -134,6 +135,35 @@ export async function saveDocument(id = null, path = null) {
 
     notifyListeners("save", handle);
     return handle;
+}
+
+/**
+ * Save As - prompts for a new file location and saves a copy
+ * @param {string|null} id - Document ID (uses active if null)
+ * @returns {Promise<Object>} The updated document handle
+ */
+export async function saveDocumentAs(id = null) {
+    const docId = id || activeDocumentId;
+    if (!docId) {
+        throw new Error("No document to save");
+    }
+
+    // Get current document title for default filename
+    const doc = openDocuments.get(docId);
+    const defaultName = doc?.title || "document";
+
+    // Show save dialog
+    const path = await save({
+        filters: [{ name: "Korppi Document", extensions: ["kmd"] }],
+        defaultPath: `${defaultName}.kmd`
+    });
+
+    if (!path) {
+        throw new Error("Save cancelled");
+    }
+
+    // Use existing saveDocument with the new path
+    return await saveDocument(docId, path);
 }
 
 /**

@@ -5,13 +5,25 @@ import {
     newDocument,
     openDocument,
     saveDocument,
+    saveDocumentAs,
     closeDocument,
     getActiveDocumentId,
     getOpenDocuments
 } from "./document-manager.js";
 import { switchToNextTab, switchToPreviousTab } from "./document-tabs.js";
 import { doUndo, doRedo } from "./editor.js";
+import { toggleBold, toggleItalic, toggleUnderline, toggleStrikethrough } from "./components/formatting-toolbar.js";
+import { toggleShortcutsCheatsheet } from "./components/shortcuts-cheatsheet.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
+
+/**
+ * Check if focus is inside the editor
+ */
+function isEditorFocused() {
+    const activeEl = document.activeElement;
+    const editor = document.getElementById('editor');
+    return editor && (editor.contains(activeEl) || activeEl?.closest('#editor'));
+}
 
 /**
  * Initialize keyboard shortcuts
@@ -65,10 +77,8 @@ async function handleKeyDown(e) {
                 }
 
                 if (e.shiftKey) {
-                    // Save As - pass null to trigger the save dialog
-                    // For a true "Save As", we need to pass a special indicator
-                    // Currently this behaves same as Save for unsaved documents
-                    await saveDocument(activeId, null);
+                    // Save As - always shows file dialog for new location
+                    await saveDocumentAs(activeId);
                 } else {
                     // Regular save
                     await saveDocument(activeId);
@@ -120,14 +130,54 @@ async function handleKeyDown(e) {
 
         case "z":
             // Ctrl/Cmd + Z: Undo
-            e.preventDefault();
-            doUndo();
+            // Let ProseMirror/yUndoPlugin handle it when editor is focused
+            if (!isEditorFocused()) {
+                e.preventDefault();
+                doUndo();
+            }
+            // When editor is focused, don't prevent default - let yUndoPlugin handle it
             break;
 
         case "y":
             // Ctrl/Cmd + Y: Redo (Microsoft Word style)
-            e.preventDefault();
-            doRedo();
+            // Let ProseMirror/yUndoPlugin handle it when editor is focused
+            if (!isEditorFocused()) {
+                e.preventDefault();
+                doRedo();
+            }
+            // When editor is focused, don't prevent default - let yUndoPlugin handle it
+            break;
+
+        case "b":
+            // Ctrl/Cmd + B: Bold
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleBold();
+            }
+            break;
+
+        case "i":
+            // Ctrl/Cmd + I: Italic
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleItalic();
+            }
+            break;
+
+        case "u":
+            // Ctrl/Cmd + U: Underline
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleUnderline();
+            }
+            break;
+
+        case "x":
+            // Ctrl/Cmd + Shift + X: Strikethrough
+            if (e.shiftKey && isEditorFocused()) {
+                e.preventDefault();
+                toggleStrikethrough();
+            }
             break;
 
         case "tab":
@@ -140,6 +190,17 @@ async function handleKeyDown(e) {
                 switchToNextTab();
             }
             break;
+    }
+
+    // Handle Alt+Shift shortcuts (separate from Ctrl/Cmd)
+    if (e.altKey && e.shiftKey && !isMod) {
+        switch (e.key.toLowerCase()) {
+            case "k":
+                // Alt/Option + Shift + K: Show keyboard shortcuts cheat sheet
+                e.preventDefault();
+                toggleShortcutsCheatsheet();
+                break;
+        }
     }
 }
 
