@@ -540,20 +540,6 @@ fn preprocess_markdown_for_docx(markdown: &str, registry: &CrossRefRegistry) -> 
     result
 }
 
-/// Parse a figure from markdown syntax
-/// Returns (caption, src, label) if this is a figure, None otherwise
-fn parse_figure_syntax(text: &str) -> Option<(String, String, String)> {
-    let figure_re = Regex::new(r"^!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}$").unwrap();
-    if let Some(caps) = figure_re.captures(text.trim()) {
-        let caption = caps.get(1).map(|m| m.as_str()).unwrap_or("").to_string();
-        let src = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
-        let label = caps.get(3).map(|m| m.as_str()).unwrap_or("").to_string();
-        Some((caption, src, label))
-    } else {
-        None
-    }
-}
-
 /// Extract figure info from parsed text (alt text followed by {#fig:label})
 /// This handles text collected from pulldown-cmark events
 fn extract_figure_from_parsed_text(text: &str) -> Option<(String, String)> {
@@ -595,9 +581,6 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     let mut in_code_block = false;
     let mut code_text = String::new();
     let mut paragraph_style: Option<String> = None;
-
-    // Track if we're collecting text that might be a figure
-    let mut pending_figure_text = String::new();
 
     // Helper function to flush current text with formatting
     let flush_text = |para: Paragraph,
@@ -663,7 +646,6 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Paragraph => {
                         in_paragraph = true;
                         paragraph_style = None;
-                        pending_figure_text.clear();
                     }
                     Tag::Strong => {
                         // Flush current text before changing format
@@ -737,13 +719,10 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Heading(_) | TagEnd::Paragraph => {
                         if in_paragraph {
                             // Check if this paragraph is a figure
-                            // Try both raw markdown syntax and parsed text format
                             let full_text = current_text.trim().to_string();
-                            let figure_info = parse_figure_syntax(&full_text)
-                                .map(|(caption, _src, label)| (caption, label))
-                                .or_else(|| extract_figure_from_parsed_text(&full_text));
-
-                            if let Some((caption, label)) = figure_info {
+                            if let Some((caption, label)) =
+                                extract_figure_from_parsed_text(&full_text)
+                            {
                                 // This is a figure - output it as such
                                 let fig_num =
                                     crossref_registry.figures.get(&label).copied().unwrap_or(0);
@@ -1241,28 +1220,22 @@ See @fig:sales for the sales data.
     }
 
     #[test]
-    fn test_parse_figure_syntax() {
-        let text = "![My Chart](http://example.com/chart.png){#fig:chart1}";
-        let result = parse_figure_syntax(text);
-
+    fn test_extract_figure_from_parsed_text() {
+        // Figure with label
+        let text = "My Chart Caption{#fig:chart1}";
+        let result = extract_figure_from_parsed_text(text);
         assert!(result.is_some());
-        let (caption, src, label) = result.unwrap();
-        assert_eq!(caption, "My Chart");
-        assert_eq!(src, "http://example.com/chart.png");
+        let (caption, label) = result.unwrap();
+        assert_eq!(caption, "My Chart Caption");
         assert_eq!(label, "fig:chart1");
-    }
 
-    #[test]
-    fn test_parse_figure_syntax_not_figure() {
-        // Regular image without figure label
-        let text = "![Alt text](image.png)";
-        let result = parse_figure_syntax(text);
-        assert!(result.is_none());
+        // Not a figure (no label)
+        let text2 = "Just some text";
+        assert!(extract_figure_from_parsed_text(text2).is_none());
 
-        // Plain text
-        let text2 = "This is just text";
-        let result2 = parse_figure_syntax(text2);
-        assert!(result2.is_none());
+        // Not a figure (wrong label type)
+        let text3 = "Some text{#sec:section1}";
+        assert!(extract_figure_from_parsed_text(text3).is_none());
     }
 
     #[test]
@@ -1519,21 +1492,6 @@ See @sec:intro, @fig:test, and @tbl:test for details.
         let text = extract_text_content(&docx_bytes)
             .expect("Failed to extract text content from reference document DOCX");
 
-        // Debug: print more text to see figure section
-        eprintln!("Full text length: {}", text.len());
-        eprintln!(
-            "Extracted text (first 4000 chars): {}",
-            &text[..text.len().min(4000)]
-        );
-
-        // Check for unresolved references (would appear as [fig:label])
-        if text.contains("[fig:") {
-            eprintln!("WARNING: Found unresolved figure references [fig:...]!");
-        }
-        if text.contains("@fig:") {
-            eprintln!("WARNING: Found unreplaced @fig: references!");
-        }
-
         // Verify cross-references are resolved
         // The reference doc has figures 1-5, sections 1-12, tables 1-3
         assert!(text.contains("Figure 1"), "Missing Figure 1 reference");
@@ -1585,8 +1543,5 @@ See @sec:intro, @fig:test, and @tbl:test for details.
             hash1, hash2,
             "Reference document DOCX export is not deterministic"
         );
-
-        // Log the hash for golden file tracking
-        eprintln!("Reference document document.xml hash: {}", hash1);
     }
 }
