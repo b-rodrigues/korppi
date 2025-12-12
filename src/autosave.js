@@ -7,7 +7,7 @@ const STORAGE_KEY = "korppi_autosave_settings";
 
 let autosaveState = {
     enabled: false,
-    intervalMinutes: 5,
+    intervalMinutes: 2,
     intervalId: null
 };
 
@@ -138,7 +138,7 @@ function loadSettings() {
         if (saved) {
             const parsed = JSON.parse(saved);
             autosaveState.enabled = parsed.enabled ?? false;
-            autosaveState.intervalMinutes = parsed.intervalMinutes ?? 5;
+            autosaveState.intervalMinutes = parsed.intervalMinutes ?? 2;
         }
     } catch (e) {
         console.warn("Failed to load autosave settings:", e);
