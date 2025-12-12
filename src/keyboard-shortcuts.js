@@ -5,6 +5,7 @@ import {
     newDocument,
     openDocument,
     saveDocument,
+    saveDocumentAs,
     closeDocument,
     getActiveDocumentId,
     getOpenDocuments
@@ -65,10 +66,8 @@ async function handleKeyDown(e) {
                 }
 
                 if (e.shiftKey) {
-                    // Save As - pass null to trigger the save dialog
-                    // For a true "Save As", we need to pass a special indicator
-                    // Currently this behaves same as Save for unsaved documents
-                    await saveDocument(activeId, null);
+                    // Save As - always shows file dialog for new location
+                    await saveDocumentAs(activeId);
                 } else {
                     // Regular save
                     await saveDocument(activeId);

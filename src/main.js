@@ -12,6 +12,7 @@ import {
     openDocument,
     importDocument,
     saveDocument,
+    saveDocumentAs,
     getRecentDocuments,
     clearRecentDocuments,
     getOpenDocuments,
@@ -216,6 +217,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const newDocBtn = document.getElementById("new-doc-btn");
     const openDocBtn = document.getElementById("open-doc-btn");
     const saveDocBtn = document.getElementById("save-doc-btn");
+    const saveAsBtn = document.getElementById("save-as-btn");
     const reconcileBtn = document.getElementById("reconcile-btn");
     const exportMdBtn = document.getElementById("export-md-btn");
     const exportDocxBtn = document.getElementById("export-docx-btn");
@@ -300,6 +302,19 @@ window.addEventListener("DOMContentLoaded", async () => {
             try {
                 await forceSave();
                 await saveDocument();
+            } catch (err) {
+                if (!err.toString().includes("cancelled")) {
+                    console.error("Failed to save document:", err);
+                }
+            }
+        });
+    }
+
+    if (saveAsBtn) {
+        saveAsBtn.addEventListener("click", async () => {
+            try {
+                await forceSave();
+                await saveDocumentAs();
             } catch (err) {
                 if (!err.toString().includes("cancelled")) {
                     console.error("Failed to save document:", err);
