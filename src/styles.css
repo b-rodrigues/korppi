@@ -359,6 +359,109 @@ textarea {
     gap: 8px;
 }
 
+.modal-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close-btn:hover {
+    color: var(--text-primary);
+}
+
+/* ===== KEYBOARD SHORTCUTS CHEATSHEET ===== */
+.shortcuts-cheatsheet-content {
+    max-width: 700px;
+    max-height: 80vh;
+}
+
+.shortcuts-cheatsheet-content .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.shortcuts-cheatsheet-content .modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.shortcuts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 16px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.shortcut-category h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    gap: 12px;
+}
+
+.shortcut-item kbd {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.shortcut-item span {
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+.shortcuts-cheatsheet-content .modal-footer {
+    justify-content: center;
+    padding: 12px 16px;
+}
+
+.shortcut-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.shortcut-hint kbd {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 10px;
+}
+
 /* ===== WELCOME MODAL ===== */
 .welcome-modal-content {
     max-width: 480px;

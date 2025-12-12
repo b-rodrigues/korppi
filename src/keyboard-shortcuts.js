@@ -12,7 +12,8 @@ import {
 } from "./document-manager.js";
 import { switchToNextTab, switchToPreviousTab } from "./document-tabs.js";
 import { doUndo, doRedo } from "./editor.js";
-import { toggleBold, toggleItalic, toggleUnderline } from "./components/formatting-toolbar.js";
+import { toggleBold, toggleItalic, toggleUnderline, toggleStrikethrough } from "./components/formatting-toolbar.js";
+import { toggleShortcutsCheatsheet } from "./components/shortcuts-cheatsheet.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
 
 /**
@@ -171,6 +172,14 @@ async function handleKeyDown(e) {
             }
             break;
 
+        case "x":
+            // Ctrl/Cmd + Shift + X: Strikethrough
+            if (e.shiftKey && isEditorFocused()) {
+                e.preventDefault();
+                toggleStrikethrough();
+            }
+            break;
+
         case "tab":
             // Ctrl/Cmd + Tab: Switch to next tab
             // Ctrl/Cmd + Shift + Tab: Switch to previous tab
@@ -181,6 +190,17 @@ async function handleKeyDown(e) {
                 switchToNextTab();
             }
             break;
+    }
+
+    // Handle Alt+Shift shortcuts (separate from Ctrl/Cmd)
+    if (e.altKey && e.shiftKey && !isMod) {
+        switch (e.key.toLowerCase()) {
+            case "k":
+                // Alt/Option + Shift + K: Show keyboard shortcuts cheat sheet
+                e.preventDefault();
+                toggleShortcutsCheatsheet();
+                break;
+        }
     }
 }
 

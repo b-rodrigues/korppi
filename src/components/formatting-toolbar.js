@@ -540,3 +540,10 @@ export function toggleItalic() {
 export function toggleUnderline() {
     toggleMarkCommand('underline');
 }
+
+/**
+ * Toggle strikethrough formatting (exported for keyboard shortcuts)
+ */
+export function toggleStrikethrough() {
+    toggleMarkCommand('strike_through');
+}
