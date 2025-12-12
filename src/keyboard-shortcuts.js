@@ -12,7 +12,17 @@ import {
 } from "./document-manager.js";
 import { switchToNextTab, switchToPreviousTab } from "./document-tabs.js";
 import { doUndo, doRedo } from "./editor.js";
+import { toggleBold, toggleItalic, toggleUnderline } from "./components/formatting-toolbar.js";
 import { confirm } from "@tauri-apps/plugin-dialog";
+
+/**
+ * Check if focus is inside the editor
+ */
+function isEditorFocused() {
+    const activeEl = document.activeElement;
+    const editor = document.getElementById('editor');
+    return editor && (editor.contains(activeEl) || activeEl?.closest('#editor'));
+}
 
 /**
  * Initialize keyboard shortcuts
@@ -119,14 +129,46 @@ async function handleKeyDown(e) {
 
         case "z":
             // Ctrl/Cmd + Z: Undo
-            e.preventDefault();
-            doUndo();
+            // Let ProseMirror/yUndoPlugin handle it when editor is focused
+            if (!isEditorFocused()) {
+                e.preventDefault();
+                doUndo();
+            }
+            // When editor is focused, don't prevent default - let yUndoPlugin handle it
             break;
 
         case "y":
             // Ctrl/Cmd + Y: Redo (Microsoft Word style)
-            e.preventDefault();
-            doRedo();
+            // Let ProseMirror/yUndoPlugin handle it when editor is focused
+            if (!isEditorFocused()) {
+                e.preventDefault();
+                doRedo();
+            }
+            // When editor is focused, don't prevent default - let yUndoPlugin handle it
+            break;
+
+        case "b":
+            // Ctrl/Cmd + B: Bold
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleBold();
+            }
+            break;
+
+        case "i":
+            // Ctrl/Cmd + I: Italic
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleItalic();
+            }
+            break;
+
+        case "u":
+            // Ctrl/Cmd + U: Underline
+            if (isEditorFocused()) {
+                e.preventDefault();
+                toggleUnderline();
+            }
             break;
 
         case "tab":

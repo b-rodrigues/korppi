@@ -514,8 +514,29 @@ function clearFormattingCommand() {
 }
 
 /**
- * Update formatting toolbar to show editor instance 
+ * Update formatting toolbar to show editor instance
  */
 export function setEditorInstance(editor) {
     editorInstance = editor;
+}
+
+/**
+ * Toggle bold formatting (exported for keyboard shortcuts)
+ */
+export function toggleBold() {
+    toggleMarkCommand('strong');
+}
+
+/**
+ * Toggle italic formatting (exported for keyboard shortcuts)
+ */
+export function toggleItalic() {
+    toggleMarkCommand('emphasis');
+}
+
+/**
+ * Toggle underline formatting (exported for keyboard shortcuts)
+ */
+export function toggleUnderline() {
+    toggleMarkCommand('underline');
 }
