@@ -6,8 +6,11 @@ import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { underlinePlugin } from "./milkdown-underline.js";
+import { figurePlugin, rebuildFigureRegistry, resetFigureRegistry } from "./milkdown-figure.js";
 // Re-export editorViewCtx so other modules can use it with the editor instance
 export { editorViewCtx };
+// Re-export figure registry functions for use by other modules
+export { rebuildFigureRegistry, resetFigureRegistry };
 
 import { Plugin } from "@milkdown/prose/state";
 import { ySyncPlugin, yUndoPlugin, undo, redo } from "y-prosemirror";
@@ -127,6 +130,10 @@ export function setMarkdownContent(markdown) {
     try {
         // Pre-process pandoc syntax before loading
         const processed = preprocessMarkdown(markdown);
+
+        // Rebuild figure registry to assign correct numbers
+        rebuildFigureRegistry(processed);
+
         editor.action(replaceAll(processed));
         return true;
     } catch (err) {
@@ -170,6 +177,7 @@ export async function initEditor() {
             .use(commonmark)
             .use(gfm)
             .use(underlinePlugin)
+            .use(figurePlugin)
             .use(listener)
             .create();
     } catch (err) {

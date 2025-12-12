@@ -133,6 +133,112 @@ body {
     text-decoration: underline;
 }
 
+/* ===== FIGURES AND CROSS-REFERENCES ===== */
+.editor-page #editor figure,
+.editor-page #editor .figure {
+    margin: 1.5rem 0;
+    padding: 0;
+    text-align: center;
+    background: var(--bg-panel);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.editor-page #editor figure .figure-content,
+.editor-page #editor .figure .figure-content {
+    padding: 12px;
+}
+
+.editor-page #editor figure img,
+.editor-page #editor .figure img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+}
+
+.editor-page #editor figcaption {
+    padding: 10px 16px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    font-style: italic;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* Cross-reference links (figures, sections, tables) */
+.editor-page #editor a.cross-ref,
+.editor-page #editor .cross-ref,
+.editor-page #editor a.figure-ref,
+.editor-page #editor .figure-ref {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg-panel);
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+}
+
+.editor-page #editor a.cross-ref:hover,
+.editor-page #editor .cross-ref:hover,
+.editor-page #editor a.figure-ref:hover,
+.editor-page #editor .figure-ref:hover {
+    background: var(--accent);
+    color: var(--bg-page);
+    text-decoration: none;
+}
+
+/* Section references - slightly different styling */
+.editor-page #editor .sec-ref {
+    color: var(--text-primary);
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-subtle);
+}
+
+.editor-page #editor .sec-ref:hover {
+    background: var(--accent);
+    color: var(--bg-page);
+    border-color: var(--accent);
+}
+
+/* Table references */
+.editor-page #editor .tbl-ref {
+    color: var(--accent);
+    font-style: italic;
+}
+
+/* Unresolved cross-references */
+.editor-page #editor .cross-ref[data-unresolved="true"],
+.editor-page #editor .figure-ref[data-unresolved="true"] {
+    color: var(--text-muted);
+    background: var(--bg-sidebar);
+}
+
+/* Section labels in headings (shown subtly) */
+.editor-page #editor h1 .sec-label,
+.editor-page #editor h2 .sec-label,
+.editor-page #editor h3 .sec-label,
+.editor-page #editor h4 .sec-label,
+.editor-page #editor h5 .sec-label,
+.editor-page #editor h6 .sec-label {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    font-weight: normal;
+    margin-left: 8px;
+}
+
+/* Table labels */
+.editor-page #editor .table-label {
+    display: block;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin-top: 4px;
+}
+
 /* ===== RECENT DOCUMENTS ===== */
 .recent-documents-overlay {
     position: absolute;

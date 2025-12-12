@@ -2131,6 +2131,7 @@ dependencies = [
  "open",
  "pulldown-cmark",
  "quick-xml 0.31.0",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

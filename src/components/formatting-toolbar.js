@@ -5,6 +5,7 @@ import { editorViewCtx } from "@milkdown/core";
 import { toggleMark } from "@milkdown/prose/commands";
 import { setBlockType, wrapIn, lift } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
+import { registerFigure, figureRegistry, sectionRegistry, tableRegistry, getReferenceText } from "../milkdown-figure.js";
 
 let editorInstance = null;
 
@@ -46,7 +47,10 @@ export function initFormattingToolbar(editor) {
         // Insert elements
         { id: 'link', icon: '🔗', title: 'Insert Link', action: 'link' },
         { id: 'image', icon: '🖼️', title: 'Insert Image', action: 'image' },
+        { id: 'figure', icon: '📊', title: 'Insert Figure (with caption)', action: 'figure' },
+        { id: 'crossref', icon: '§', title: 'Insert Cross-Reference', action: 'crossref' },
         { id: 'table', icon: '⊞', title: 'Insert Table', action: 'table' },
+        { id: 'tablelabel', icon: '#T', title: 'Add Table Label', action: 'tablelabel' },
         { id: 'break', icon: '↵', title: 'Hard Break', action: 'hardbreak' },
     ];
 
@@ -80,8 +84,14 @@ export function initFormattingToolbar(editor) {
                     insertLinkCommand();
                 } else if (btn.action === 'image') {
                     insertImageCommand();
+                } else if (btn.action === 'figure') {
+                    insertFigureCommand();
+                } else if (btn.action === 'crossref') {
+                    insertCrossRefCommand();
                 } else if (btn.action === 'table') {
                     insertTableCommand();
+                } else if (btn.action === 'tablelabel') {
+                    insertTableLabelCommand();
                 } else if (btn.action === 'hardbreak') {
                     insertHardBreakCommand();
                 } else if (btn.action === 'insertHr') {
@@ -437,6 +447,301 @@ function showTableDialog(callback) {
     });
 }
 
+/**
+ * Insert a figure with caption and label
+ */
+function insertFigureCommand() {
+    if (!editorInstance) return;
+
+    showFigureDialog((url, caption, label) => {
+        editorInstance.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from } = state.selection;
+
+            // Register the figure and get its number
+            const figNum = registerFigure(label);
+
+            // Create the figure markdown syntax
+            const figureMarkdown = `![${caption}](${url}){#${label}}`;
+
+            // Insert as text - the figure plugin will parse it
+            const tr = state.tr.insertText(figureMarkdown, from);
+            dispatch(tr);
+            view.focus();
+        });
+    });
+}
+
+/**
+ * Show dialog for inserting a figure
+ */
+function showFigureDialog(callback) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+
+    // Get next available figure number for suggestion
+    const nextNum = figureRegistry.size + 1;
+    const suggestedLabel = `fig:figure${nextNum}`;
+
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Insert Figure</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="figure-url">Image URL:</label>
+                    <input type="text" id="figure-url" placeholder="https://example.com/image.png" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="figure-caption">Caption:</label>
+                    <input type="text" id="figure-caption" placeholder="Description of the figure" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="figure-label">Label (for cross-references):</label>
+                    <input type="text" id="figure-label" value="${suggestedLabel}" style="width: 100%;">
+                    <small style="color: var(--text-muted);">Use @${suggestedLabel} to reference this figure</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="figure-cancel" class="btn-secondary">Cancel</button>
+                <button id="figure-insert" class="btn-primary">Insert</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const urlInput = overlay.querySelector('#figure-url');
+    const captionInput = overlay.querySelector('#figure-caption');
+    const labelInput = overlay.querySelector('#figure-label');
+    const insertBtn = overlay.querySelector('#figure-insert');
+    const cancelBtn = overlay.querySelector('#figure-cancel');
+
+    urlInput.focus();
+
+    const cleanup = () => {
+        document.body.removeChild(overlay);
+    };
+
+    insertBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        const caption = captionInput.value.trim() || 'Figure';
+        let label = labelInput.value.trim();
+
+        if (!url) {
+            urlInput.focus();
+            return;
+        }
+
+        // Ensure label has fig: prefix
+        if (!label.startsWith('fig:')) {
+            label = 'fig:' + label;
+        }
+
+        cleanup();
+        callback(url, caption, label);
+    });
+
+    cancelBtn.addEventListener('click', cleanup);
+
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            insertBtn.click();
+        } else if (e.key === 'Escape') {
+            cleanup();
+        }
+    };
+
+    urlInput.addEventListener('keydown', handleKeydown);
+    captionInput.addEventListener('keydown', handleKeydown);
+    labelInput.addEventListener('keydown', handleKeydown);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup();
+    });
+}
+
+/**
+ * Insert a cross-reference (figure, section, or table)
+ */
+function insertCrossRefCommand() {
+    if (!editorInstance) return;
+
+    // Get all available references
+    const figures = Array.from(figureRegistry.entries()).map(([label, num]) => ({
+        label,
+        num,
+        type: 'Figure'
+    }));
+    const sections = Array.from(sectionRegistry.entries()).map(([label, num]) => ({
+        label,
+        num,
+        type: 'Section'
+    }));
+    const tables = Array.from(tableRegistry.entries()).map(([label, num]) => ({
+        label,
+        num,
+        type: 'Table'
+    }));
+
+    const allRefs = [...figures, ...sections, ...tables];
+
+    if (allRefs.length === 0) {
+        alert('No labeled elements found in the document.\n\nTo create labels:\n- Figures: ![Caption](url){#fig:label}\n- Sections: # Heading {#sec:label}\n- Tables: Add {#tbl:label} after your table');
+        return;
+    }
+
+    showCrossRefDialog(allRefs, (label) => {
+        editorInstance.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from } = state.selection;
+
+            // Insert the reference syntax
+            const refText = `@${label}`;
+            const tr = state.tr.insertText(refText, from);
+            dispatch(tr);
+            view.focus();
+        });
+    });
+}
+
+/**
+ * Show dialog for selecting a cross-reference
+ */
+function showCrossRefDialog(refs, callback) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+
+    // Group references by type
+    const figureOptions = refs
+        .filter(r => r.type === 'Figure')
+        .map(r => `<option value="${r.label}">Figure ${r.num} (${r.label})</option>`)
+        .join('');
+    const sectionOptions = refs
+        .filter(r => r.type === 'Section')
+        .map(r => `<option value="${r.label}">Section ${r.num} (${r.label})</option>`)
+        .join('');
+    const tableOptions = refs
+        .filter(r => r.type === 'Table')
+        .map(r => `<option value="${r.label}">Table ${r.num} (${r.label})</option>`)
+        .join('');
+
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Insert Cross-Reference</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="crossref-select">Select reference:</label>
+                    <select id="crossref-select" style="width: 100%;">
+                        ${figureOptions ? `<optgroup label="Figures">${figureOptions}</optgroup>` : ''}
+                        ${sectionOptions ? `<optgroup label="Sections">${sectionOptions}</optgroup>` : ''}
+                        ${tableOptions ? `<optgroup label="Tables">${tableOptions}</optgroup>` : ''}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <small style="color: var(--text-muted);">Or type a label manually:</small>
+                    <input type="text" id="crossref-manual" placeholder="fig:label, sec:label, or tbl:label" style="width: 100%; margin-top: 4px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="crossref-cancel" class="btn-secondary">Cancel</button>
+                <button id="crossref-insert" class="btn-primary">Insert</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const selectEl = overlay.querySelector('#crossref-select');
+    const manualInput = overlay.querySelector('#crossref-manual');
+    const insertBtn = overlay.querySelector('#crossref-insert');
+    const cancelBtn = overlay.querySelector('#crossref-cancel');
+
+    selectEl.focus();
+
+    const cleanup = () => {
+        document.body.removeChild(overlay);
+    };
+
+    insertBtn.addEventListener('click', () => {
+        let label = manualInput.value.trim() || selectEl.value;
+
+        if (!label) {
+            selectEl.focus();
+            return;
+        }
+
+        // Validate label format
+        if (!label.match(/^(fig|sec|tbl):/)) {
+            alert('Label must start with fig:, sec:, or tbl:');
+            manualInput.focus();
+            return;
+        }
+
+        cleanup();
+        callback(label);
+    });
+
+    cancelBtn.addEventListener('click', cleanup);
+
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            insertBtn.click();
+        } else if (e.key === 'Escape') {
+            cleanup();
+        }
+    };
+
+    selectEl.addEventListener('keydown', handleKeydown);
+    manualInput.addEventListener('keydown', handleKeydown);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup();
+    });
+}
+
+/**
+ * Insert a table label
+ */
+function insertTableLabelCommand() {
+    if (!editorInstance) return;
+
+    const nextNum = tableRegistry.size + 1;
+    const suggestedLabel = `tbl:table${nextNum}`;
+
+    const label = prompt(`Enter table label (for cross-references):\n\nSuggested: ${suggestedLabel}\n\nUsage: Place {#tbl:label} on a new line after your table`, suggestedLabel);
+
+    if (!label) return;
+
+    let finalLabel = label.trim();
+    if (!finalLabel.startsWith('tbl:')) {
+        finalLabel = 'tbl:' + finalLabel;
+    }
+
+    editorInstance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const { from } = state.selection;
+
+        // Insert the table label syntax
+        const labelText = `\n\n{#${finalLabel}}`;
+        const tr = state.tr.insertText(labelText, from);
+        dispatch(tr);
+        view.focus();
+
+        // Register the table
+        registerFigure(finalLabel);
+    });
+}
 
 /**
  * Insert hard break (line break within paragraph)

@@ -22,6 +22,8 @@ use zip::ZipWriter;
 
 use docx_rs::*;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use regex::Regex;
+use std::collections::HashMap;
 
 pub const KMD_VERSION: &str = "0.1.0";
 pub const MIN_READER_VERSION: &str = "0.1.0";
@@ -430,8 +432,139 @@ pub fn export_markdown(path: String, content: String) -> Result<(), String> {
     write_text_file(path, content)
 }
 
+/// Cross-reference registries for figures, sections, and tables
+#[derive(Debug, Clone, Default)]
+struct CrossRefRegistry {
+    figures: HashMap<String, u32>,
+    sections: HashMap<String, u32>,
+    tables: HashMap<String, u32>,
+}
+
+/// Build registries for all cross-reference types by scanning the markdown
+fn build_crossref_registry(markdown: &str) -> CrossRefRegistry {
+    let mut registry = CrossRefRegistry::default();
+    let mut fig_counter = 0u32;
+    let mut sec_counter = 0u32;
+    let mut tbl_counter = 0u32;
+
+    // Remove fenced code blocks and inline code before scanning to avoid matching examples
+    let code_block_re = Regex::new(r"(?s)```.*?```").unwrap();
+    let markdown_no_code = code_block_re.replace_all(markdown, "");
+    // Also remove inline code (backticks)
+    let inline_code_re = Regex::new(r"`[^`]+`").unwrap();
+    let markdown_no_code = inline_code_re.replace_all(&markdown_no_code, "");
+
+    // Match figure syntax: ![caption](url){#fig:label}
+    let figure_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}").unwrap();
+    for caps in figure_re.captures_iter(&markdown_no_code) {
+        if let Some(label_match) = caps.get(3) {
+            let label = label_match.as_str().to_string();
+            if !registry.figures.contains_key(&label) {
+                fig_counter += 1;
+                registry.figures.insert(label, fig_counter);
+            }
+        }
+    }
+
+    // Match section syntax: # Heading {#sec:label}
+    let section_re = Regex::new(r"(?m)^#{1,6}\s+.*\{#(sec:[^}]+)\}").unwrap();
+    for caps in section_re.captures_iter(&markdown_no_code) {
+        if let Some(label_match) = caps.get(1) {
+            let label = label_match.as_str().to_string();
+            if !registry.sections.contains_key(&label) {
+                sec_counter += 1;
+                registry.sections.insert(label, sec_counter);
+            }
+        }
+    }
+
+    // Match table syntax: {#tbl:label}
+    let table_re = Regex::new(r"\{#(tbl:[^}]+)\}").unwrap();
+    for caps in table_re.captures_iter(&markdown_no_code) {
+        if let Some(label_match) = caps.get(1) {
+            let label = label_match.as_str().to_string();
+            if !registry.tables.contains_key(&label) {
+                tbl_counter += 1;
+                registry.tables.insert(label, tbl_counter);
+            }
+        }
+    }
+
+    registry
+}
+
+/// Get reference text for a label
+fn get_reference_text(label: &str, registry: &CrossRefRegistry) -> String {
+    if label.starts_with("fig:") {
+        if let Some(&num) = registry.figures.get(label) {
+            return format!("Figure {}", num);
+        }
+    } else if label.starts_with("sec:") {
+        if let Some(&num) = registry.sections.get(label) {
+            return format!("Section {}", num);
+        }
+    } else if label.starts_with("tbl:") {
+        if let Some(&num) = registry.tables.get(label) {
+            return format!("Table {}", num);
+        }
+    }
+    format!("[{}]", label)
+}
+
+/// Pre-process markdown to handle cross-references
+/// - Replaces @fig:label with "Figure N"
+/// - Replaces @sec:label with "Section N"
+/// - Replaces @tbl:label with "Table N"
+/// - Removes {#sec:label} from headings
+/// - Removes {#tbl:label} from after tables
+fn preprocess_markdown_for_docx(markdown: &str, registry: &CrossRefRegistry) -> String {
+    let mut result = markdown.to_string();
+
+    // Replace all cross-references: @fig:label, @sec:label, @tbl:label
+    let ref_re = Regex::new(r"@((?:fig|sec|tbl):[a-zA-Z0-9_-]+)").unwrap();
+    result = ref_re
+        .replace_all(&result, |caps: &regex::Captures| {
+            let label = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            get_reference_text(label, registry)
+        })
+        .to_string();
+
+    // Remove {#sec:label} from headings (keep the heading text)
+    let sec_label_re = Regex::new(r"(\s*)\{#sec:[^}]+\}").unwrap();
+    result = sec_label_re.replace_all(&result, "").to_string();
+
+    // Remove standalone {#tbl:label} lines or inline occurrences
+    let tbl_label_re = Regex::new(r"\s*\{#tbl:[^}]+\}").unwrap();
+    result = tbl_label_re.replace_all(&result, "").to_string();
+
+    result
+}
+
+/// Extract figure info from parsed text (alt text followed by {#fig:label})
+/// This handles text collected from pulldown-cmark events
+fn extract_figure_from_parsed_text(text: &str) -> Option<(String, String)> {
+    let figure_re = Regex::new(r"^(.*?)\{#(fig:[^}]+)\}$").unwrap();
+    if let Some(caps) = figure_re.captures(text.trim()) {
+        let caption = caps
+            .get(1)
+            .map(|m| m.as_str().trim())
+            .unwrap_or("")
+            .to_string();
+        let label = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
+        Some((caption, label))
+    } else {
+        None
+    }
+}
+
 /// Convert markdown to DOCX format
 fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
+    // Build cross-reference registry for all types (figures, sections, tables)
+    let crossref_registry = build_crossref_registry(markdown);
+
+    // Pre-process markdown to resolve cross-references
+    let processed_markdown = preprocess_markdown_for_docx(markdown, &crossref_registry);
+
     let mut docx = Docx::new();
 
     let mut current_paragraph = Paragraph::new();
@@ -475,7 +608,7 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     // Enable GFM extensions (strikethrough)
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
-    let parser = Parser::new_ext(markdown, options);
+    let parser = Parser::new_ext(&processed_markdown, options);
 
     for event in parser {
         match event {
@@ -575,6 +708,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                         current_paragraph = Paragraph::new();
                         in_paragraph = true;
                     }
+                    Tag::Image { .. } => {
+                        // Images are handled at the Event::End
+                    }
                     _ => {}
                 }
             }
@@ -582,31 +718,65 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                 match tag {
                     TagEnd::Heading(_) | TagEnd::Paragraph => {
                         if in_paragraph {
-                            if !current_text.is_empty() {
-                                current_paragraph = flush_text(
-                                    current_paragraph,
-                                    &current_text,
-                                    bold_depth > 0,
-                                    italic_depth > 0,
-                                    strikethrough_depth > 0,
-                                );
+                            // Check if this paragraph is a figure
+                            let full_text = current_text.trim().to_string();
+                            if let Some((caption, label)) =
+                                extract_figure_from_parsed_text(&full_text)
+                            {
+                                // This is a figure - output it as such
+                                let fig_num =
+                                    crossref_registry.figures.get(&label).copied().unwrap_or(0);
+
+                                // Create centered paragraph for the figure placeholder
+                                let figure_para = Paragraph::new()
+                                    .add_run(Run::new().add_text(format!("[Image: {}]", caption)))
+                                    .align(AlignmentType::Center);
+                                docx = docx.add_paragraph(figure_para);
+
+                                // Create caption paragraph
+                                let caption_text = if fig_num > 0 {
+                                    format!("Figure {}: {}", fig_num, caption)
+                                } else {
+                                    format!("Figure: {}", caption)
+                                };
+                                let caption_para = Paragraph::new()
+                                    .add_run(Run::new().add_text(caption_text).italic())
+                                    .align(AlignmentType::Center)
+                                    .style("Caption");
+                                docx = docx.add_paragraph(caption_para);
+
                                 current_text.clear();
-                            }
-
-                            // Apply style if any
-                            if let Some(ref style) = paragraph_style {
-                                current_paragraph = current_paragraph.style(style);
-                            }
-
-                            if in_list {
-                                list_items.push(current_paragraph);
+                                current_paragraph = Paragraph::new();
+                                in_paragraph = false;
+                                paragraph_style = None;
                             } else {
-                                docx = docx.add_paragraph(current_paragraph);
-                            }
+                                // Regular paragraph
+                                if !current_text.is_empty() {
+                                    current_paragraph = flush_text(
+                                        current_paragraph,
+                                        &current_text,
+                                        bold_depth > 0,
+                                        italic_depth > 0,
+                                        strikethrough_depth > 0,
+                                    );
+                                    current_text.clear();
+                                }
 
-                            current_paragraph = Paragraph::new();
-                            in_paragraph = false;
-                            paragraph_style = None;
+                                // Apply style if any
+                                if let Some(ref style) = paragraph_style {
+                                    current_paragraph = current_paragraph.style(style);
+                                }
+
+                                if in_list {
+                                    list_items.push(current_paragraph);
+                                } else {
+                                    docx = docx.add_paragraph(current_paragraph);
+                                }
+
+                                current_paragraph = Paragraph::new();
+                                in_paragraph = false;
+                                paragraph_style = None;
+                            }
                         }
                     }
                     TagEnd::Strong => {
@@ -701,6 +871,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                             in_paragraph = false;
                             paragraph_style = None;
                         }
+                    }
+                    TagEnd::Image => {
+                        // Image was already processed through the text events
                     }
                     _ => {}
                 }
@@ -961,5 +1134,414 @@ mod tests {
         // Check file is not empty
         let metadata = fs::metadata(&file_path).unwrap();
         assert!(metadata.len() > 0);
+    }
+
+    #[test]
+    fn test_build_crossref_registry() {
+        let markdown = r#"
+# Introduction {#sec:intro}
+
+![Chart showing sales data](chart.png){#fig:sales}
+
+Some text here.
+
+## Methods {#sec:methods}
+
+![Another chart](chart2.png){#fig:revenue}
+
+| Col1 | Col2 |
+|------|------|
+| A    | B    |
+
+{#tbl:data}
+
+See @fig:sales for the sales data.
+"#;
+
+        let registry = build_crossref_registry(markdown);
+        assert_eq!(registry.figures.len(), 2);
+        assert_eq!(registry.figures.get("fig:sales"), Some(&1));
+        assert_eq!(registry.figures.get("fig:revenue"), Some(&2));
+        assert_eq!(registry.sections.len(), 2);
+        assert_eq!(registry.sections.get("sec:intro"), Some(&1));
+        assert_eq!(registry.sections.get("sec:methods"), Some(&2));
+        assert_eq!(registry.tables.len(), 1);
+        assert_eq!(registry.tables.get("tbl:data"), Some(&1));
+    }
+
+    #[test]
+    fn test_preprocess_cross_references() {
+        let markdown = "See @fig:test for details. Also check @sec:intro and @tbl:data.";
+        let mut registry = CrossRefRegistry::default();
+        registry.figures.insert("fig:test".to_string(), 1);
+        registry.sections.insert("sec:intro".to_string(), 2);
+        registry.tables.insert("tbl:data".to_string(), 3);
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(result.contains("Figure 1"));
+        assert!(result.contains("Section 2"));
+        assert!(result.contains("Table 3"));
+        assert!(!result.contains("@fig:test"));
+        assert!(!result.contains("@sec:intro"));
+        assert!(!result.contains("@tbl:data"));
+    }
+
+    #[test]
+    fn test_preprocess_unresolved_reference() {
+        let markdown = "See @fig:missing and @sec:unknown for details.";
+        let registry = CrossRefRegistry::default();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(result.contains("[fig:missing]"));
+        assert!(result.contains("[sec:unknown]"));
+    }
+
+    #[test]
+    fn test_preprocess_removes_section_labels() {
+        let markdown = "# Introduction {#sec:intro}\n\nSome text.";
+        let registry = CrossRefRegistry::default();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(!result.contains("{#sec:intro}"));
+        assert!(result.contains("# Introduction"));
+    }
+
+    #[test]
+    fn test_preprocess_removes_table_labels() {
+        let markdown = "| A | B |\n|---|---|\n| 1 | 2 |\n\n{#tbl:data}";
+        let registry = CrossRefRegistry::default();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(!result.contains("{#tbl:data}"));
+    }
+
+    #[test]
+    fn test_extract_figure_from_parsed_text() {
+        // Figure with label
+        let text = "My Chart Caption{#fig:chart1}";
+        let result = extract_figure_from_parsed_text(text);
+        assert!(result.is_some());
+        let (caption, label) = result.unwrap();
+        assert_eq!(caption, "My Chart Caption");
+        assert_eq!(label, "fig:chart1");
+
+        // Not a figure (no label)
+        let text2 = "Just some text";
+        assert!(extract_figure_from_parsed_text(text2).is_none());
+
+        // Not a figure (wrong label type)
+        let text3 = "Some text{#sec:section1}";
+        assert!(extract_figure_from_parsed_text(text3).is_none());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_figures() {
+        let markdown = r#"
+# Document
+
+![Sales Chart](chart.png){#fig:sales}
+
+As shown in @fig:sales, sales are increasing.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_multiple_figures() {
+        let markdown = r#"
+# Analysis
+
+![First Chart](chart1.png){#fig:first}
+
+![Second Chart](chart2.png){#fig:second}
+
+Compare @fig:first with @fig:second to see the trend.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_sections() {
+        let markdown = r#"
+# Introduction {#sec:intro}
+
+This is the introduction.
+
+## Methods {#sec:methods}
+
+As described in @sec:intro, we use certain methods.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_tables() {
+        let markdown = r#"
+# Data
+
+| Name | Value |
+|------|-------|
+| A    | 1     |
+| B    | 2     |
+
+{#tbl:data}
+
+See @tbl:data for the complete dataset.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_all_crossrefs() {
+        let markdown = r#"
+# Introduction {#sec:intro}
+
+![Main Figure](main.png){#fig:main}
+
+| Col1 | Col2 |
+|------|------|
+| X    | Y    |
+
+{#tbl:summary}
+
+In @sec:intro, we present @fig:main which summarizes the data in @tbl:summary.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    /// Helper function to convert Docx to bytes
+    fn docx_to_bytes(docx: Docx) -> Result<Vec<u8>, String> {
+        use std::io::Cursor;
+
+        let mut buffer = Cursor::new(Vec::new());
+        docx.build()
+            .pack(&mut buffer)
+            .map_err(|e| format!("Failed to pack DOCX: {}", e))?;
+        Ok(buffer.into_inner())
+    }
+
+    /// Helper function to extract document.xml content from DOCX bytes
+    fn extract_document_xml(docx_bytes: &[u8]) -> Option<String> {
+        use std::io::{Cursor, Read};
+        use zip::ZipArchive;
+
+        let cursor = Cursor::new(docx_bytes);
+        let mut archive = ZipArchive::new(cursor).ok()?;
+
+        let mut file = archive.by_name("word/document.xml").ok()?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).ok()?;
+
+        Some(contents)
+    }
+
+    /// Extract plain text content from document.xml (strips all XML tags)
+    fn extract_text_content(docx_bytes: &[u8]) -> Option<String> {
+        let xml = extract_document_xml(docx_bytes)?;
+        // Extract text content from <w:t> elements, preserving spaces
+        let text_re = Regex::new(r"<w:t[^>]*>([^<]*)</w:t>").unwrap();
+        let text: String = text_re
+            .captures_iter(&xml)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str()))
+            .collect::<Vec<_>>()
+            .join(" "); // Join with space to preserve word boundaries
+        Some(text)
+    }
+
+    /// Normalize document.xml by removing variable content (IDs, timestamps)
+    fn normalize_document_xml(xml: &str) -> String {
+        // Remove rsidR, rsidRPr, rsidP attributes (revision IDs that vary)
+        let rsid_re = Regex::new(r#"\s*w:rsid[A-Za-z]*="[^"]*""#).unwrap();
+        let result = rsid_re.replace_all(xml, "");
+
+        // Remove w14:paraId and w14:textId attributes
+        let para_id_re = Regex::new(r#"\s*w14:(paraId|textId)="[^"]*""#).unwrap();
+        let result = para_id_re.replace_all(&result, "");
+
+        result.to_string()
+    }
+
+    /// Hash the normalized document.xml content for comparison
+    fn hash_document_xml(docx_bytes: &[u8]) -> Option<String> {
+        use sha2::{Digest, Sha256};
+
+        let xml = extract_document_xml(docx_bytes)?;
+        let normalized = normalize_document_xml(&xml);
+        let mut hasher = Sha256::new();
+        hasher.update(normalized.as_bytes());
+        let result = hasher.finalize();
+        Some(format!("{:x}", result))
+    }
+
+    #[test]
+    fn test_docx_determinism() {
+        // Test that the same input produces identical output
+        let markdown = r#"
+# Test Document {#sec:intro}
+
+This is a test paragraph with **bold** and *italic* text.
+
+![Test Figure](test.png){#fig:test}
+
+| Column A | Column B |
+|----------|----------|
+| Value 1  | Value 2  |
+
+{#tbl:test}
+
+See @sec:intro, @fig:test, and @tbl:test for details.
+"#;
+
+        // Generate DOCX twice
+        let docx1 = markdown_to_docx(markdown).expect("First DOCX generation failed");
+        let docx2 = markdown_to_docx(markdown).expect("Second DOCX generation failed");
+
+        // Convert to bytes
+        let bytes1 = docx_to_bytes(docx1).expect("Failed to pack first DOCX");
+        let bytes2 = docx_to_bytes(docx2).expect("Failed to pack second DOCX");
+
+        // Extract and hash document.xml from both
+        let hash1 = hash_document_xml(&bytes1).expect("Failed to hash first DOCX");
+        let hash2 = hash_document_xml(&bytes2).expect("Failed to hash second DOCX");
+
+        assert_eq!(
+            hash1, hash2,
+            "DOCX output is not deterministic - document.xml differs between runs"
+        );
+    }
+
+    #[test]
+    fn test_docx_structure_valid() {
+        // Test that the generated DOCX has valid structure
+        let markdown = "# Hello World\n\nThis is a test.";
+        let docx = markdown_to_docx(markdown).expect("DOCX generation failed");
+        let bytes = docx_to_bytes(docx).expect("Failed to pack DOCX");
+
+        // Verify document.xml can be extracted
+        let xml = extract_document_xml(&bytes);
+        assert!(xml.is_some(), "Could not extract document.xml from DOCX");
+
+        let xml_content = xml.unwrap();
+
+        // Verify basic DOCX XML structure
+        assert!(
+            xml_content.contains("w:document"),
+            "Missing w:document element"
+        );
+        assert!(xml_content.contains("w:body"), "Missing w:body element");
+        assert!(
+            xml_content.contains("Hello World"),
+            "Missing heading content"
+        );
+        assert!(
+            xml_content.contains("This is a test"),
+            "Missing paragraph content"
+        );
+    }
+
+    #[test]
+    fn test_reference_document_export() {
+        // Test exporting the reference document to verify cross-references work end-to-end
+        use std::fs;
+        use std::path::Path;
+
+        // Load the reference document
+        let ref_doc_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("example")
+            .join("reference_doc.md");
+
+        // Skip test if reference doc doesn't exist
+        if !ref_doc_path.exists() {
+            eprintln!(
+                "Skipping test: reference_doc.md not found at {:?}",
+                ref_doc_path
+            );
+            return;
+        }
+
+        let markdown =
+            fs::read_to_string(&ref_doc_path).expect("Failed to read reference document");
+
+        // Generate DOCX
+        let docx = markdown_to_docx(&markdown);
+        assert!(
+            docx.is_ok(),
+            "Failed to generate DOCX from reference document: {:?}",
+            docx.err()
+        );
+
+        let docx_bytes = docx_to_bytes(docx.unwrap()).expect("Failed to pack DOCX");
+
+        // Extract plain text content from document
+        let text = extract_text_content(&docx_bytes)
+            .expect("Failed to extract text content from reference document DOCX");
+
+        // Verify cross-references are resolved
+        // The reference doc has figures 1-5, sections 1-12, tables 1-3
+        assert!(text.contains("Figure 1"), "Missing Figure 1 reference");
+        assert!(text.contains("Figure 5"), "Missing Figure 5 reference");
+        assert!(text.contains("Section 1"), "Missing Section 1 reference");
+        assert!(text.contains("Section 12"), "Missing Section 12 reference");
+        assert!(text.contains("Table 1"), "Missing Table 1 reference");
+        assert!(text.contains("Table 3"), "Missing Table 3 reference");
+
+        // Verify references (@type:label) are resolved - these should NOT appear in output
+        // Note: We don't check for {#type:label} patterns because the reference doc
+        // contains documentation examples that legitimately show these patterns
+        assert!(!text.contains("@fig:"), "Figure references not resolved");
+        assert!(!text.contains("@sec:"), "Section references not resolved");
+        assert!(!text.contains("@tbl:"), "Table references not resolved");
+    }
+
+    #[test]
+    fn test_reference_document_hash_stability() {
+        // Golden file test: verify the reference document produces consistent output
+        use std::fs;
+        use std::path::Path;
+
+        let ref_doc_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("example")
+            .join("reference_doc.md");
+
+        if !ref_doc_path.exists() {
+            eprintln!("Skipping test: reference_doc.md not found");
+            return;
+        }
+
+        let markdown =
+            fs::read_to_string(&ref_doc_path).expect("Failed to read reference document");
+
+        // Generate DOCX multiple times and verify consistency
+        let docx1 = markdown_to_docx(&markdown).expect("First generation failed");
+        let docx2 = markdown_to_docx(&markdown).expect("Second generation failed");
+
+        let bytes1 = docx_to_bytes(docx1).expect("Failed to pack first DOCX");
+        let bytes2 = docx_to_bytes(docx2).expect("Failed to pack second DOCX");
+
+        let hash1 = hash_document_xml(&bytes1).expect("Failed to hash first result");
+        let hash2 = hash_document_xml(&bytes2).expect("Failed to hash second result");
+
+        assert_eq!(
+            hash1, hash2,
+            "Reference document DOCX export is not deterministic"
+        );
     }
 }
