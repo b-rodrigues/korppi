@@ -447,9 +447,16 @@ fn build_crossref_registry(markdown: &str) -> CrossRefRegistry {
     let mut sec_counter = 0u32;
     let mut tbl_counter = 0u32;
 
+    // Remove fenced code blocks and inline code before scanning to avoid matching examples
+    let code_block_re = Regex::new(r"(?s)```.*?```").unwrap();
+    let markdown_no_code = code_block_re.replace_all(markdown, "");
+    // Also remove inline code (backticks)
+    let inline_code_re = Regex::new(r"`[^`]+`").unwrap();
+    let markdown_no_code = inline_code_re.replace_all(&markdown_no_code, "");
+
     // Match figure syntax: ![caption](url){#fig:label}
     let figure_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}").unwrap();
-    for caps in figure_re.captures_iter(markdown) {
+    for caps in figure_re.captures_iter(&markdown_no_code) {
         if let Some(label_match) = caps.get(3) {
             let label = label_match.as_str().to_string();
             if !registry.figures.contains_key(&label) {
@@ -461,7 +468,7 @@ fn build_crossref_registry(markdown: &str) -> CrossRefRegistry {
 
     // Match section syntax: # Heading {#sec:label}
     let section_re = Regex::new(r"(?m)^#{1,6}\s+.*\{#(sec:[^}]+)\}").unwrap();
-    for caps in section_re.captures_iter(markdown) {
+    for caps in section_re.captures_iter(&markdown_no_code) {
         if let Some(label_match) = caps.get(1) {
             let label = label_match.as_str().to_string();
             if !registry.sections.contains_key(&label) {
@@ -473,7 +480,7 @@ fn build_crossref_registry(markdown: &str) -> CrossRefRegistry {
 
     // Match table syntax: {#tbl:label}
     let table_re = Regex::new(r"\{#(tbl:[^}]+)\}").unwrap();
-    for caps in table_re.captures_iter(markdown) {
+    for caps in table_re.captures_iter(&markdown_no_code) {
         if let Some(label_match) = caps.get(1) {
             let label = label_match.as_str().to_string();
             if !registry.tables.contains_key(&label) {
@@ -542,6 +549,23 @@ fn parse_figure_syntax(text: &str) -> Option<(String, String, String)> {
         let src = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
         let label = caps.get(3).map(|m| m.as_str()).unwrap_or("").to_string();
         Some((caption, src, label))
+    } else {
+        None
+    }
+}
+
+/// Extract figure info from parsed text (alt text followed by {#fig:label})
+/// This handles text collected from pulldown-cmark events
+fn extract_figure_from_parsed_text(text: &str) -> Option<(String, String)> {
+    let figure_re = Regex::new(r"^(.*?)\{#(fig:[^}]+)\}$").unwrap();
+    if let Some(caps) = figure_re.captures(text.trim()) {
+        let caption = caps
+            .get(1)
+            .map(|m| m.as_str().trim())
+            .unwrap_or("")
+            .to_string();
+        let label = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
+        Some((caption, label))
     } else {
         None
     }
@@ -713,10 +737,16 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     TagEnd::Heading(_) | TagEnd::Paragraph => {
                         if in_paragraph {
                             // Check if this paragraph is a figure
+                            // Try both raw markdown syntax and parsed text format
                             let full_text = current_text.trim().to_string();
-                            if let Some((caption, _src, label)) = parse_figure_syntax(&full_text) {
+                            let figure_info = parse_figure_syntax(&full_text)
+                                .map(|(caption, _src, label)| (caption, label))
+                                .or_else(|| extract_figure_from_parsed_text(&full_text));
+
+                            if let Some((caption, label)) = figure_info {
                                 // This is a figure - output it as such
-                                let fig_num = crossref_registry.figures.get(&label).copied().unwrap_or(0);
+                                let fig_num =
+                                    crossref_registry.figures.get(&label).copied().unwrap_or(0);
 
                                 // Create centered paragraph for the figure placeholder
                                 let figure_para = Paragraph::new()
@@ -1318,5 +1348,245 @@ In @sec:intro, we present @fig:main which summarizes the data in @tbl:summary.
 
         let result = markdown_to_docx(markdown);
         assert!(result.is_ok());
+    }
+
+    /// Helper function to convert Docx to bytes
+    fn docx_to_bytes(docx: Docx) -> Result<Vec<u8>, String> {
+        use std::io::Cursor;
+
+        let mut buffer = Cursor::new(Vec::new());
+        docx.build()
+            .pack(&mut buffer)
+            .map_err(|e| format!("Failed to pack DOCX: {}", e))?;
+        Ok(buffer.into_inner())
+    }
+
+    /// Helper function to extract document.xml content from DOCX bytes
+    fn extract_document_xml(docx_bytes: &[u8]) -> Option<String> {
+        use std::io::{Cursor, Read};
+        use zip::ZipArchive;
+
+        let cursor = Cursor::new(docx_bytes);
+        let mut archive = ZipArchive::new(cursor).ok()?;
+
+        let mut file = archive.by_name("word/document.xml").ok()?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).ok()?;
+
+        Some(contents)
+    }
+
+    /// Extract plain text content from document.xml (strips all XML tags)
+    fn extract_text_content(docx_bytes: &[u8]) -> Option<String> {
+        let xml = extract_document_xml(docx_bytes)?;
+        // Extract text content from <w:t> elements, preserving spaces
+        let text_re = Regex::new(r"<w:t[^>]*>([^<]*)</w:t>").unwrap();
+        let text: String = text_re
+            .captures_iter(&xml)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str()))
+            .collect::<Vec<_>>()
+            .join(" "); // Join with space to preserve word boundaries
+        Some(text)
+    }
+
+    /// Normalize document.xml by removing variable content (IDs, timestamps)
+    fn normalize_document_xml(xml: &str) -> String {
+        // Remove rsidR, rsidRPr, rsidP attributes (revision IDs that vary)
+        let rsid_re = Regex::new(r#"\s*w:rsid[A-Za-z]*="[^"]*""#).unwrap();
+        let result = rsid_re.replace_all(xml, "");
+
+        // Remove w14:paraId and w14:textId attributes
+        let para_id_re = Regex::new(r#"\s*w14:(paraId|textId)="[^"]*""#).unwrap();
+        let result = para_id_re.replace_all(&result, "");
+
+        result.to_string()
+    }
+
+    /// Hash the normalized document.xml content for comparison
+    fn hash_document_xml(docx_bytes: &[u8]) -> Option<String> {
+        use sha2::{Digest, Sha256};
+
+        let xml = extract_document_xml(docx_bytes)?;
+        let normalized = normalize_document_xml(&xml);
+        let mut hasher = Sha256::new();
+        hasher.update(normalized.as_bytes());
+        let result = hasher.finalize();
+        Some(format!("{:x}", result))
+    }
+
+    #[test]
+    fn test_docx_determinism() {
+        // Test that the same input produces identical output
+        let markdown = r#"
+# Test Document {#sec:intro}
+
+This is a test paragraph with **bold** and *italic* text.
+
+![Test Figure](test.png){#fig:test}
+
+| Column A | Column B |
+|----------|----------|
+| Value 1  | Value 2  |
+
+{#tbl:test}
+
+See @sec:intro, @fig:test, and @tbl:test for details.
+"#;
+
+        // Generate DOCX twice
+        let docx1 = markdown_to_docx(markdown).expect("First DOCX generation failed");
+        let docx2 = markdown_to_docx(markdown).expect("Second DOCX generation failed");
+
+        // Convert to bytes
+        let bytes1 = docx_to_bytes(docx1).expect("Failed to pack first DOCX");
+        let bytes2 = docx_to_bytes(docx2).expect("Failed to pack second DOCX");
+
+        // Extract and hash document.xml from both
+        let hash1 = hash_document_xml(&bytes1).expect("Failed to hash first DOCX");
+        let hash2 = hash_document_xml(&bytes2).expect("Failed to hash second DOCX");
+
+        assert_eq!(
+            hash1, hash2,
+            "DOCX output is not deterministic - document.xml differs between runs"
+        );
+    }
+
+    #[test]
+    fn test_docx_structure_valid() {
+        // Test that the generated DOCX has valid structure
+        let markdown = "# Hello World\n\nThis is a test.";
+        let docx = markdown_to_docx(markdown).expect("DOCX generation failed");
+        let bytes = docx_to_bytes(docx).expect("Failed to pack DOCX");
+
+        // Verify document.xml can be extracted
+        let xml = extract_document_xml(&bytes);
+        assert!(xml.is_some(), "Could not extract document.xml from DOCX");
+
+        let xml_content = xml.unwrap();
+
+        // Verify basic DOCX XML structure
+        assert!(
+            xml_content.contains("w:document"),
+            "Missing w:document element"
+        );
+        assert!(xml_content.contains("w:body"), "Missing w:body element");
+        assert!(
+            xml_content.contains("Hello World"),
+            "Missing heading content"
+        );
+        assert!(
+            xml_content.contains("This is a test"),
+            "Missing paragraph content"
+        );
+    }
+
+    #[test]
+    fn test_reference_document_export() {
+        // Test exporting the reference document to verify cross-references work end-to-end
+        use std::fs;
+        use std::path::Path;
+
+        // Load the reference document
+        let ref_doc_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("example")
+            .join("reference_doc.md");
+
+        // Skip test if reference doc doesn't exist
+        if !ref_doc_path.exists() {
+            eprintln!(
+                "Skipping test: reference_doc.md not found at {:?}",
+                ref_doc_path
+            );
+            return;
+        }
+
+        let markdown =
+            fs::read_to_string(&ref_doc_path).expect("Failed to read reference document");
+
+        // Generate DOCX
+        let docx = markdown_to_docx(&markdown);
+        assert!(
+            docx.is_ok(),
+            "Failed to generate DOCX from reference document: {:?}",
+            docx.err()
+        );
+
+        let docx_bytes = docx_to_bytes(docx.unwrap()).expect("Failed to pack DOCX");
+
+        // Extract plain text content from document
+        let text = extract_text_content(&docx_bytes)
+            .expect("Failed to extract text content from reference document DOCX");
+
+        // Debug: print more text to see figure section
+        eprintln!("Full text length: {}", text.len());
+        eprintln!(
+            "Extracted text (first 4000 chars): {}",
+            &text[..text.len().min(4000)]
+        );
+
+        // Check for unresolved references (would appear as [fig:label])
+        if text.contains("[fig:") {
+            eprintln!("WARNING: Found unresolved figure references [fig:...]!");
+        }
+        if text.contains("@fig:") {
+            eprintln!("WARNING: Found unreplaced @fig: references!");
+        }
+
+        // Verify cross-references are resolved
+        // The reference doc has figures 1-5, sections 1-12, tables 1-3
+        assert!(text.contains("Figure 1"), "Missing Figure 1 reference");
+        assert!(text.contains("Figure 5"), "Missing Figure 5 reference");
+        assert!(text.contains("Section 1"), "Missing Section 1 reference");
+        assert!(text.contains("Section 12"), "Missing Section 12 reference");
+        assert!(text.contains("Table 1"), "Missing Table 1 reference");
+        assert!(text.contains("Table 3"), "Missing Table 3 reference");
+
+        // Verify references (@type:label) are resolved - these should NOT appear in output
+        // Note: We don't check for {#type:label} patterns because the reference doc
+        // contains documentation examples that legitimately show these patterns
+        assert!(!text.contains("@fig:"), "Figure references not resolved");
+        assert!(!text.contains("@sec:"), "Section references not resolved");
+        assert!(!text.contains("@tbl:"), "Table references not resolved");
+    }
+
+    #[test]
+    fn test_reference_document_hash_stability() {
+        // Golden file test: verify the reference document produces consistent output
+        use std::fs;
+        use std::path::Path;
+
+        let ref_doc_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("example")
+            .join("reference_doc.md");
+
+        if !ref_doc_path.exists() {
+            eprintln!("Skipping test: reference_doc.md not found");
+            return;
+        }
+
+        let markdown =
+            fs::read_to_string(&ref_doc_path).expect("Failed to read reference document");
+
+        // Generate DOCX multiple times and verify consistency
+        let docx1 = markdown_to_docx(&markdown).expect("First generation failed");
+        let docx2 = markdown_to_docx(&markdown).expect("Second generation failed");
+
+        let bytes1 = docx_to_bytes(docx1).expect("Failed to pack first DOCX");
+        let bytes2 = docx_to_bytes(docx2).expect("Failed to pack second DOCX");
+
+        let hash1 = hash_document_xml(&bytes1).expect("Failed to hash first result");
+        let hash2 = hash_document_xml(&bytes2).expect("Failed to hash second result");
+
+        assert_eq!(
+            hash1, hash2,
+            "Reference document DOCX export is not deterministic"
+        );
+
+        // Log the hash for golden file tracking
+        eprintln!("Reference document document.xml hash: {}", hash1);
     }
 }
