@@ -1,51 +1,92 @@
 // src/milkdown-figure.js
-// Custom figure plugin for Milkdown
-// Adds support for figures with captions and labels using Pandoc-compatible syntax:
-// ![Caption text](image.png){#fig:label}
-// Cross-references: @fig:label
+// Custom cross-reference plugin for Milkdown
+// Adds support for figures, sections, and tables with labels using Pandoc-compatible syntax:
+//
+// Figures: ![Caption text](image.png){#fig:label}
+// Sections: # Heading {#sec:label}
+// Tables: | table | ... | {#tbl:label}
+//
+// Cross-references: @fig:label, @sec:label, @tbl:label
 
 import { $node, $inputRule, $command, $remark } from "@milkdown/utils";
 import { InputRule } from "@milkdown/prose/inputrules";
 import { visit } from "unist-util-visit";
 
-// Global figure registry to track labels and numbers
-// This is reset on document load and populated during parsing
+// Global registries to track labels and numbers for each type
 export const figureRegistry = new Map();
+export const sectionRegistry = new Map();
+export const tableRegistry = new Map();
+
 let figureCounter = 0;
+let sectionCounter = 0;
+let tableCounter = 0;
 
 /**
- * Reset the figure registry (call when loading a new document)
+ * Reset all registries (call when loading a new document)
  */
 export function resetFigureRegistry() {
     figureRegistry.clear();
+    sectionRegistry.clear();
+    tableRegistry.clear();
     figureCounter = 0;
+    sectionCounter = 0;
+    tableCounter = 0;
 }
 
 /**
- * Get the next figure number and register a label
- * @param {string} label - The figure label (e.g., "fig:myplot")
- * @returns {number} The figure number
+ * Register a label and return its number
+ * @param {string} label - The label (e.g., "fig:myplot", "sec:intro", "tbl:data")
+ * @returns {number} The assigned number
  */
 export function registerFigure(label) {
-    if (figureRegistry.has(label)) {
-        return figureRegistry.get(label);
+    if (label.startsWith("fig:")) {
+        if (figureRegistry.has(label)) return figureRegistry.get(label);
+        figureCounter++;
+        figureRegistry.set(label, figureCounter);
+        return figureCounter;
+    } else if (label.startsWith("sec:")) {
+        if (sectionRegistry.has(label)) return sectionRegistry.get(label);
+        sectionCounter++;
+        sectionRegistry.set(label, sectionCounter);
+        return sectionCounter;
+    } else if (label.startsWith("tbl:")) {
+        if (tableRegistry.has(label)) return tableRegistry.get(label);
+        tableCounter++;
+        tableRegistry.set(label, tableCounter);
+        return tableCounter;
     }
-    figureCounter++;
-    figureRegistry.set(label, figureCounter);
-    return figureCounter;
+    return 0;
 }
 
 /**
- * Get figure number for a label
- * @param {string} label - The figure label
- * @returns {number|null} The figure number or null if not found
+ * Get number for a label
+ * @param {string} label - The label
+ * @returns {number|null} The number or null if not found
  */
 export function getFigureNumber(label) {
-    return figureRegistry.get(label) || null;
+    if (label.startsWith("fig:")) return figureRegistry.get(label) || null;
+    if (label.startsWith("sec:")) return sectionRegistry.get(label) || null;
+    if (label.startsWith("tbl:")) return tableRegistry.get(label) || null;
+    return null;
 }
 
 /**
- * Rebuild figure registry by scanning document content
+ * Get the display text for a reference
+ * @param {string} label - The label
+ * @returns {string} The display text (e.g., "Figure 1", "Section 2", "Table 3")
+ */
+export function getReferenceText(label) {
+    const num = getFigureNumber(label);
+    if (!num) return `[${label}]`;
+
+    if (label.startsWith("fig:")) return `Figure ${num}`;
+    if (label.startsWith("sec:")) return `Section ${num}`;
+    if (label.startsWith("tbl:")) return `Table ${num}`;
+    return `[${label}]`;
+}
+
+/**
+ * Rebuild all registries by scanning document content
  * @param {string} markdown - The markdown content
  */
 export function rebuildFigureRegistry(markdown) {
@@ -54,10 +95,20 @@ export function rebuildFigureRegistry(markdown) {
     // Match figure syntax: ![caption](url){#fig:label}
     const figureRegex = /!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}/g;
     let match;
-
     while ((match = figureRegex.exec(markdown)) !== null) {
-        const label = match[3];
-        registerFigure(label);
+        registerFigure(match[3]);
+    }
+
+    // Match section syntax: # Heading {#sec:label} (supports # through ######)
+    const sectionRegex = /^#{1,6}\s+.*\{#(sec:[^}]+)\}/gm;
+    while ((match = sectionRegex.exec(markdown)) !== null) {
+        registerFigure(match[1]);
+    }
+
+    // Match table syntax: {#tbl:label} appearing after tables or on its own line after a table
+    const tableRegex = /\{#(tbl:[^}]+)\}/g;
+    while ((match = tableRegex.exec(markdown)) !== null) {
+        registerFigure(match[1]);
     }
 }
 
@@ -91,6 +142,7 @@ export const figureNode = $node("figure", () => ({
             {
                 class: "figure",
                 "data-label": node.attrs.label || "",
+                id: node.attrs.label || undefined,
             },
             ["div", { class: "figure-content" }, 0],
             [
@@ -105,7 +157,6 @@ export const figureNode = $node("figure", () => ({
         runner: (state, node, type) => {
             const { label, caption, src, alt } = node.data || {};
             state.openNode(type, { label, caption });
-            // Create image child
             const imageType = state.schema.nodes.image;
             if (imageType) {
                 state.addNode(imageType, { src, alt: alt || caption });
@@ -116,7 +167,6 @@ export const figureNode = $node("figure", () => ({
     toMarkdown: {
         match: (node) => node.type.name === "figure",
         runner: (state, node) => {
-            // Find the image child
             let imageSrc = "";
             let imageAlt = "";
             node.content.forEach((child) => {
@@ -129,7 +179,6 @@ export const figureNode = $node("figure", () => ({
             const caption = node.attrs.caption || imageAlt;
             const label = node.attrs.label;
 
-            // Output as: ![caption](src){#label}
             let output = `![${caption}](${imageSrc})`;
             if (label) {
                 output += `{#${label}}`;
@@ -141,8 +190,8 @@ export const figureNode = $node("figure", () => ({
 }));
 
 /**
- * Create the figure reference (cross-reference) node
- * Renders as "Figure N" where N is the figure number
+ * Create the cross-reference node
+ * Renders as "Figure N", "Section N", or "Table N" depending on the label type
  */
 export const figureRefNode = $node("figureRef", () => ({
     group: "inline",
@@ -153,6 +202,12 @@ export const figureRefNode = $node("figureRef", () => ({
     },
     parseDOM: [
         {
+            tag: "a.cross-ref",
+            getAttrs: (dom) => ({
+                label: dom.getAttribute("data-label") || "",
+            }),
+        },
+        {
             tag: "a.figure-ref",
             getAttrs: (dom) => ({
                 label: dom.getAttribute("data-label") || "",
@@ -161,13 +216,13 @@ export const figureRefNode = $node("figureRef", () => ({
     ],
     toDOM: (node) => {
         const label = node.attrs.label;
-        const figNum = getFigureNumber(label);
-        const text = figNum ? `Figure ${figNum}` : `[${label}]`;
+        const text = getReferenceText(label);
+        const refType = label.split(":")[0] || "ref";
 
         return [
             "a",
             {
-                class: "figure-ref",
+                class: `cross-ref ${refType}-ref`,
                 "data-label": label,
                 href: `#${label}`,
             },
@@ -175,7 +230,7 @@ export const figureRefNode = $node("figureRef", () => ({
         ];
     },
     parseMarkdown: {
-        match: (node) => node.type === "figureRef",
+        match: (node) => node.type === "figureRef" || node.type === "crossRef",
         runner: (state, node, type) => {
             state.addNode(type, { label: node.data?.label || "" });
         },
@@ -189,20 +244,21 @@ export const figureRefNode = $node("figureRef", () => ({
 }));
 
 /**
- * Remark plugin to parse figure syntax and cross-references
+ * Remark plugin to parse cross-reference syntax
  * Converts:
  * - ![caption](url){#fig:label} -> figure node
- * - @fig:label -> figureRef node
+ * - # Heading {#sec:label} -> heading with id
+ * - @fig:label, @sec:label, @tbl:label -> cross-reference nodes
  */
 export const figureRemarkPlugin = $remark("figureRemark", () => {
     return () => (tree) => {
-        // First pass: collect all figure labels
+        // First pass: collect all labels
+
+        // Collect figure labels
         visit(tree, "paragraph", (node) => {
             if (!node.children) return;
-
             node.children.forEach((child) => {
                 if (child.type === "text" && child.value) {
-                    // Look for figure definitions
                     const figureRegex = /!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}/g;
                     let match;
                     while ((match = figureRegex.exec(child.value)) !== null) {
@@ -212,11 +268,35 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
             });
         });
 
+        // Collect section labels from headings
+        visit(tree, "heading", (node) => {
+            if (!node.children) return;
+            const lastChild = node.children[node.children.length - 1];
+            if (lastChild && lastChild.type === "text" && lastChild.value) {
+                const match = lastChild.value.match(/\{#(sec:[^}]+)\}\s*$/);
+                if (match) {
+                    registerFigure(match[1]);
+                }
+            }
+        });
+
+        // Collect table labels
+        visit(tree, "paragraph", (node) => {
+            if (!node.children) return;
+            node.children.forEach((child) => {
+                if (child.type === "text" && child.value) {
+                    const tableRegex = /\{#(tbl:[^}]+)\}/g;
+                    let match;
+                    while ((match = tableRegex.exec(child.value)) !== null) {
+                        registerFigure(match[1]);
+                    }
+                }
+            });
+        });
+
         // Also check images with attributes
         visit(tree, "image", (node, index, parent) => {
             if (!parent || !parent.children) return;
-
-            // Check if there's text after the image with {#fig:label}
             const nextSibling = parent.children[index + 1];
             if (nextSibling && nextSibling.type === "text" && nextSibling.value) {
                 const attrMatch = nextSibling.value.match(/^\{#(fig:[^}]+)\}/);
@@ -226,12 +306,28 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
             }
         });
 
-        // Second pass: process paragraphs to convert figure syntax
+        // Second pass: process headings to add IDs for section labels
+        visit(tree, "heading", (node) => {
+            if (!node.children || node.children.length === 0) return;
+            const lastChild = node.children[node.children.length - 1];
+            if (lastChild && lastChild.type === "text" && lastChild.value) {
+                const match = lastChild.value.match(/^(.*?)\s*\{#(sec:[^}]+)\}\s*$/);
+                if (match) {
+                    // Remove the {#sec:label} from the text
+                    lastChild.value = match[1];
+                    // Store the label in the node's data
+                    node.data = node.data || {};
+                    node.data.hProperties = node.data.hProperties || {};
+                    node.data.hProperties.id = match[2];
+                    node.data.id = match[2];
+                }
+            }
+        });
+
+        // Process paragraphs for figures
         visit(tree, "paragraph", (node, index, parent) => {
             if (!node.children || node.children.length === 0) return;
 
-            // Check if this paragraph contains only an image with figure attributes
-            // Pattern: image followed by {#fig:label} text
             if (node.children.length >= 1) {
                 const firstChild = node.children[0];
 
@@ -240,8 +336,6 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
                     const figureMatch = firstChild.value.match(/^!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}$/);
                     if (figureMatch && node.children.length === 1) {
                         const [, caption, src, label] = figureMatch;
-
-                        // Replace paragraph with figure node
                         parent.children[index] = {
                             type: "figure",
                             data: {
@@ -265,8 +359,6 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
                             const label = attrMatch[1];
                             const caption = firstChild.alt || "";
                             const src = firstChild.url || "";
-
-                            // Replace paragraph with figure node
                             parent.children[index] = {
                                 type: "figure",
                                 data: {
@@ -289,8 +381,8 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
 
             for (const child of node.children) {
                 if (child.type === "text" && child.value) {
-                    // Match @fig:label references
-                    const refRegex = /@(fig:[a-zA-Z0-9_-]+)/g;
+                    // Match @fig:label, @sec:label, @tbl:label references
+                    const refRegex = /@((?:fig|sec|tbl):[a-zA-Z0-9_-]+)/g;
                     let lastIndex = 0;
                     let match;
                     const parts = [];
@@ -298,7 +390,6 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
                     while ((match = refRegex.exec(child.value)) !== null) {
                         modified = true;
 
-                        // Text before the reference
                         if (match.index > lastIndex) {
                             parts.push({
                                 type: "text",
@@ -306,7 +397,6 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
                             });
                         }
 
-                        // The reference
                         parts.push({
                             type: "figureRef",
                             data: { label: match[1] },
@@ -315,7 +405,6 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
                         lastIndex = match.index + match[0].length;
                     }
 
-                    // Remaining text
                     if (lastIndex < child.value.length) {
                         parts.push({
                             type: "text",
@@ -343,12 +432,12 @@ export const figureRemarkPlugin = $remark("figureRemark", () => {
 });
 
 /**
- * Input rule: typing @fig:label creates a figure reference
+ * Input rule: typing @fig:label, @sec:label, or @tbl:label creates a cross-reference
  */
 export const figureRefInputRule = $inputRule((ctx) => {
     const nodeType = figureRefNode.type(ctx);
     return new InputRule(
-        /@(fig:[a-zA-Z0-9_-]+)\s$/,
+        /@((?:fig|sec|tbl):[a-zA-Z0-9_-]+)\s$/,
         (state, match, start, end) => {
             const label = match[1];
             if (!label) return null;
@@ -374,7 +463,6 @@ export const insertFigureCommand = $command("InsertFigure", (ctx) => (src, capti
             return false;
         }
 
-        // Register the figure label
         if (label) {
             registerFigure(label);
         }
@@ -394,7 +482,7 @@ export const insertFigureCommand = $command("InsertFigure", (ctx) => (src, capti
 });
 
 /**
- * Command to insert a figure reference
+ * Command to insert a cross-reference
  */
 export const insertFigureRefCommand = $command("InsertFigureRef", (ctx) => (label) => {
     return (state, dispatch) => {
@@ -418,7 +506,7 @@ export const insertFigureRefCommand = $command("InsertFigureRef", (ctx) => (labe
 });
 
 /**
- * Complete figure plugin array - use all of these together
+ * Complete cross-reference plugin array - use all of these together
  */
 export const figurePlugin = [
     figureRemarkPlugin,

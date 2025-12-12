@@ -432,29 +432,53 @@ pub fn export_markdown(path: String, content: String) -> Result<(), String> {
     write_text_file(path, content)
 }
 
-/// Represents a parsed figure with caption and label
-#[derive(Debug, Clone)]
-struct FigureInfo {
-    caption: String,
-    src: String,
-    label: String,
-    number: u32,
+/// Cross-reference registries for figures, sections, and tables
+#[derive(Debug, Clone, Default)]
+struct CrossRefRegistry {
+    figures: HashMap<String, u32>,
+    sections: HashMap<String, u32>,
+    tables: HashMap<String, u32>,
 }
 
-/// Build a registry of figure labels to numbers by scanning the markdown
-fn build_figure_registry(markdown: &str) -> HashMap<String, u32> {
-    let mut registry = HashMap::new();
-    let mut counter = 0u32;
+/// Build registries for all cross-reference types by scanning the markdown
+fn build_crossref_registry(markdown: &str) -> CrossRefRegistry {
+    let mut registry = CrossRefRegistry::default();
+    let mut fig_counter = 0u32;
+    let mut sec_counter = 0u32;
+    let mut tbl_counter = 0u32;
 
     // Match figure syntax: ![caption](url){#fig:label}
     let figure_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}").unwrap();
-
     for caps in figure_re.captures_iter(markdown) {
         if let Some(label_match) = caps.get(3) {
             let label = label_match.as_str().to_string();
-            if !registry.contains_key(&label) {
-                counter += 1;
-                registry.insert(label, counter);
+            if !registry.figures.contains_key(&label) {
+                fig_counter += 1;
+                registry.figures.insert(label, fig_counter);
+            }
+        }
+    }
+
+    // Match section syntax: # Heading {#sec:label}
+    let section_re = Regex::new(r"(?m)^#{1,6}\s+.*\{#(sec:[^}]+)\}").unwrap();
+    for caps in section_re.captures_iter(markdown) {
+        if let Some(label_match) = caps.get(1) {
+            let label = label_match.as_str().to_string();
+            if !registry.sections.contains_key(&label) {
+                sec_counter += 1;
+                registry.sections.insert(label, sec_counter);
+            }
+        }
+    }
+
+    // Match table syntax: {#tbl:label}
+    let table_re = Regex::new(r"\{#(tbl:[^}]+)\}").unwrap();
+    for caps in table_re.captures_iter(markdown) {
+        if let Some(label_match) = caps.get(1) {
+            let label = label_match.as_str().to_string();
+            if !registry.tables.contains_key(&label) {
+                tbl_counter += 1;
+                registry.tables.insert(label, tbl_counter);
             }
         }
     }
@@ -462,26 +486,50 @@ fn build_figure_registry(markdown: &str) -> HashMap<String, u32> {
     registry
 }
 
-/// Pre-process markdown to handle figures and cross-references
-/// - Converts ![caption](url){#fig:label} to standard image + caption
+/// Get reference text for a label
+fn get_reference_text(label: &str, registry: &CrossRefRegistry) -> String {
+    if label.starts_with("fig:") {
+        if let Some(&num) = registry.figures.get(label) {
+            return format!("Figure {}", num);
+        }
+    } else if label.starts_with("sec:") {
+        if let Some(&num) = registry.sections.get(label) {
+            return format!("Section {}", num);
+        }
+    } else if label.starts_with("tbl:") {
+        if let Some(&num) = registry.tables.get(label) {
+            return format!("Table {}", num);
+        }
+    }
+    format!("[{}]", label)
+}
+
+/// Pre-process markdown to handle cross-references
 /// - Replaces @fig:label with "Figure N"
-fn preprocess_markdown_for_docx(markdown: &str, figure_registry: &HashMap<String, u32>) -> String {
+/// - Replaces @sec:label with "Section N"
+/// - Replaces @tbl:label with "Table N"
+/// - Removes {#sec:label} from headings
+/// - Removes {#tbl:label} from after tables
+fn preprocess_markdown_for_docx(markdown: &str, registry: &CrossRefRegistry) -> String {
     let mut result = markdown.to_string();
 
-    // Replace cross-references first: @fig:label -> Figure N
-    let ref_re = Regex::new(r"@(fig:[a-zA-Z0-9_-]+)").unwrap();
+    // Replace all cross-references: @fig:label, @sec:label, @tbl:label
+    let ref_re = Regex::new(r"@((?:fig|sec|tbl):[a-zA-Z0-9_-]+)").unwrap();
     result = ref_re
         .replace_all(&result, |caps: &regex::Captures| {
             let label = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            if let Some(&num) = figure_registry.get(label) {
-                format!("Figure {}", num)
-            } else {
-                format!("[{}]", label)
-            }
+            get_reference_text(label, registry)
         })
         .to_string();
 
-    // Note: We'll handle figure syntax specially during parsing
+    // Remove {#sec:label} from headings (keep the heading text)
+    let sec_label_re = Regex::new(r"(\s*)\{#sec:[^}]+\}").unwrap();
+    result = sec_label_re.replace_all(&result, "").to_string();
+
+    // Remove standalone {#tbl:label} lines or inline occurrences
+    let tbl_label_re = Regex::new(r"\s*\{#tbl:[^}]+\}").unwrap();
+    result = tbl_label_re.replace_all(&result, "").to_string();
+
     result
 }
 
@@ -501,11 +549,11 @@ fn parse_figure_syntax(text: &str) -> Option<(String, String, String)> {
 
 /// Convert markdown to DOCX format
 fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
-    // Build figure registry for cross-reference resolution
-    let figure_registry = build_figure_registry(markdown);
+    // Build cross-reference registry for all types (figures, sections, tables)
+    let crossref_registry = build_crossref_registry(markdown);
 
     // Pre-process markdown to resolve cross-references
-    let processed_markdown = preprocess_markdown_for_docx(markdown, &figure_registry);
+    let processed_markdown = preprocess_markdown_for_docx(markdown, &crossref_registry);
 
     let mut docx = Docx::new();
 
@@ -668,7 +716,7 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                             let full_text = current_text.trim().to_string();
                             if let Some((caption, _src, label)) = parse_figure_syntax(&full_text) {
                                 // This is a figure - output it as such
-                                let fig_num = figure_registry.get(&label).copied().unwrap_or(0);
+                                let fig_num = crossref_registry.figures.get(&label).copied().unwrap_or(0);
 
                                 // Create centered paragraph for the figure placeholder
                                 let figure_para = Paragraph::new()
@@ -1080,48 +1128,86 @@ mod tests {
     }
 
     #[test]
-    fn test_build_figure_registry() {
+    fn test_build_crossref_registry() {
         let markdown = r#"
-# Document with Figures
+# Introduction {#sec:intro}
 
 ![Chart showing sales data](chart.png){#fig:sales}
 
 Some text here.
 
+## Methods {#sec:methods}
+
 ![Another chart](chart2.png){#fig:revenue}
+
+| Col1 | Col2 |
+|------|------|
+| A    | B    |
+
+{#tbl:data}
 
 See @fig:sales for the sales data.
 "#;
 
-        let registry = build_figure_registry(markdown);
-        assert_eq!(registry.len(), 2);
-        assert_eq!(registry.get("fig:sales"), Some(&1));
-        assert_eq!(registry.get("fig:revenue"), Some(&2));
+        let registry = build_crossref_registry(markdown);
+        assert_eq!(registry.figures.len(), 2);
+        assert_eq!(registry.figures.get("fig:sales"), Some(&1));
+        assert_eq!(registry.figures.get("fig:revenue"), Some(&2));
+        assert_eq!(registry.sections.len(), 2);
+        assert_eq!(registry.sections.get("sec:intro"), Some(&1));
+        assert_eq!(registry.sections.get("sec:methods"), Some(&2));
+        assert_eq!(registry.tables.len(), 1);
+        assert_eq!(registry.tables.get("tbl:data"), Some(&1));
     }
 
     #[test]
     fn test_preprocess_cross_references() {
-        let markdown = "See @fig:test for details. Also check @fig:other.";
-        let mut registry = HashMap::new();
-        registry.insert("fig:test".to_string(), 1);
-        registry.insert("fig:other".to_string(), 2);
+        let markdown = "See @fig:test for details. Also check @sec:intro and @tbl:data.";
+        let mut registry = CrossRefRegistry::default();
+        registry.figures.insert("fig:test".to_string(), 1);
+        registry.sections.insert("sec:intro".to_string(), 2);
+        registry.tables.insert("tbl:data".to_string(), 3);
 
         let result = preprocess_markdown_for_docx(markdown, &registry);
 
         assert!(result.contains("Figure 1"));
-        assert!(result.contains("Figure 2"));
+        assert!(result.contains("Section 2"));
+        assert!(result.contains("Table 3"));
         assert!(!result.contains("@fig:test"));
-        assert!(!result.contains("@fig:other"));
+        assert!(!result.contains("@sec:intro"));
+        assert!(!result.contains("@tbl:data"));
     }
 
     #[test]
     fn test_preprocess_unresolved_reference() {
-        let markdown = "See @fig:missing for details.";
-        let registry = HashMap::new();
+        let markdown = "See @fig:missing and @sec:unknown for details.";
+        let registry = CrossRefRegistry::default();
 
         let result = preprocess_markdown_for_docx(markdown, &registry);
 
         assert!(result.contains("[fig:missing]"));
+        assert!(result.contains("[sec:unknown]"));
+    }
+
+    #[test]
+    fn test_preprocess_removes_section_labels() {
+        let markdown = "# Introduction {#sec:intro}\n\nSome text.";
+        let registry = CrossRefRegistry::default();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(!result.contains("{#sec:intro}"));
+        assert!(result.contains("# Introduction"));
+    }
+
+    #[test]
+    fn test_preprocess_removes_table_labels() {
+        let markdown = "| A | B |\n|---|---|\n| 1 | 2 |\n\n{#tbl:data}";
+        let registry = CrossRefRegistry::default();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(!result.contains("{#tbl:data}"));
     }
 
     #[test]
@@ -1173,6 +1259,61 @@ As shown in @fig:sales, sales are increasing.
 ![Second Chart](chart2.png){#fig:second}
 
 Compare @fig:first with @fig:second to see the trend.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_sections() {
+        let markdown = r#"
+# Introduction {#sec:intro}
+
+This is the introduction.
+
+## Methods {#sec:methods}
+
+As described in @sec:intro, we use certain methods.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_tables() {
+        let markdown = r#"
+# Data
+
+| Name | Value |
+|------|-------|
+| A    | 1     |
+| B    | 2     |
+
+{#tbl:data}
+
+See @tbl:data for the complete dataset.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_all_crossrefs() {
+        let markdown = r#"
+# Introduction {#sec:intro}
+
+![Main Figure](main.png){#fig:main}
+
+| Col1 | Col2 |
+|------|------|
+| X    | Y    |
+
+{#tbl:summary}
+
+In @sec:intro, we present @fig:main which summarizes the data in @tbl:summary.
 "#;
 
         let result = markdown_to_docx(markdown);
