@@ -22,6 +22,8 @@ use zip::ZipWriter;
 
 use docx_rs::*;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use regex::Regex;
+use std::collections::HashMap;
 
 pub const KMD_VERSION: &str = "0.1.0";
 pub const MIN_READER_VERSION: &str = "0.1.0";
@@ -430,8 +432,81 @@ pub fn export_markdown(path: String, content: String) -> Result<(), String> {
     write_text_file(path, content)
 }
 
+/// Represents a parsed figure with caption and label
+#[derive(Debug, Clone)]
+struct FigureInfo {
+    caption: String,
+    src: String,
+    label: String,
+    number: u32,
+}
+
+/// Build a registry of figure labels to numbers by scanning the markdown
+fn build_figure_registry(markdown: &str) -> HashMap<String, u32> {
+    let mut registry = HashMap::new();
+    let mut counter = 0u32;
+
+    // Match figure syntax: ![caption](url){#fig:label}
+    let figure_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}").unwrap();
+
+    for caps in figure_re.captures_iter(markdown) {
+        if let Some(label_match) = caps.get(3) {
+            let label = label_match.as_str().to_string();
+            if !registry.contains_key(&label) {
+                counter += 1;
+                registry.insert(label, counter);
+            }
+        }
+    }
+
+    registry
+}
+
+/// Pre-process markdown to handle figures and cross-references
+/// - Converts ![caption](url){#fig:label} to standard image + caption
+/// - Replaces @fig:label with "Figure N"
+fn preprocess_markdown_for_docx(markdown: &str, figure_registry: &HashMap<String, u32>) -> String {
+    let mut result = markdown.to_string();
+
+    // Replace cross-references first: @fig:label -> Figure N
+    let ref_re = Regex::new(r"@(fig:[a-zA-Z0-9_-]+)").unwrap();
+    result = ref_re
+        .replace_all(&result, |caps: &regex::Captures| {
+            let label = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            if let Some(&num) = figure_registry.get(label) {
+                format!("Figure {}", num)
+            } else {
+                format!("[{}]", label)
+            }
+        })
+        .to_string();
+
+    // Note: We'll handle figure syntax specially during parsing
+    result
+}
+
+/// Parse a figure from markdown syntax
+/// Returns (caption, src, label) if this is a figure, None otherwise
+fn parse_figure_syntax(text: &str) -> Option<(String, String, String)> {
+    let figure_re = Regex::new(r"^!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[^}]+)\}$").unwrap();
+    if let Some(caps) = figure_re.captures(text.trim()) {
+        let caption = caps.get(1).map(|m| m.as_str()).unwrap_or("").to_string();
+        let src = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
+        let label = caps.get(3).map(|m| m.as_str()).unwrap_or("").to_string();
+        Some((caption, src, label))
+    } else {
+        None
+    }
+}
+
 /// Convert markdown to DOCX format
 fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
+    // Build figure registry for cross-reference resolution
+    let figure_registry = build_figure_registry(markdown);
+
+    // Pre-process markdown to resolve cross-references
+    let processed_markdown = preprocess_markdown_for_docx(markdown, &figure_registry);
+
     let mut docx = Docx::new();
 
     let mut current_paragraph = Paragraph::new();
@@ -448,6 +523,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     let mut in_code_block = false;
     let mut code_text = String::new();
     let mut paragraph_style: Option<String> = None;
+
+    // Track if we're collecting text that might be a figure
+    let mut pending_figure_text = String::new();
 
     // Helper function to flush current text with formatting
     let flush_text = |para: Paragraph,
@@ -475,7 +553,7 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     // Enable GFM extensions (strikethrough)
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
-    let parser = Parser::new_ext(markdown, options);
+    let parser = Parser::new_ext(&processed_markdown, options);
 
     for event in parser {
         match event {
@@ -513,6 +591,7 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                     Tag::Paragraph => {
                         in_paragraph = true;
                         paragraph_style = None;
+                        pending_figure_text.clear();
                     }
                     Tag::Strong => {
                         // Flush current text before changing format
@@ -575,6 +654,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                         current_paragraph = Paragraph::new();
                         in_paragraph = true;
                     }
+                    Tag::Image { .. } => {
+                        // Images are handled at the Event::End
+                    }
                     _ => {}
                 }
             }
@@ -582,31 +664,62 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                 match tag {
                     TagEnd::Heading(_) | TagEnd::Paragraph => {
                         if in_paragraph {
-                            if !current_text.is_empty() {
-                                current_paragraph = flush_text(
-                                    current_paragraph,
-                                    &current_text,
-                                    bold_depth > 0,
-                                    italic_depth > 0,
-                                    strikethrough_depth > 0,
-                                );
+                            // Check if this paragraph is a figure
+                            let full_text = current_text.trim().to_string();
+                            if let Some((caption, _src, label)) = parse_figure_syntax(&full_text) {
+                                // This is a figure - output it as such
+                                let fig_num = figure_registry.get(&label).copied().unwrap_or(0);
+
+                                // Create centered paragraph for the figure placeholder
+                                let figure_para = Paragraph::new()
+                                    .add_run(Run::new().add_text(format!("[Image: {}]", caption)))
+                                    .align(AlignmentType::Center);
+                                docx = docx.add_paragraph(figure_para);
+
+                                // Create caption paragraph
+                                let caption_text = if fig_num > 0 {
+                                    format!("Figure {}: {}", fig_num, caption)
+                                } else {
+                                    format!("Figure: {}", caption)
+                                };
+                                let caption_para = Paragraph::new()
+                                    .add_run(Run::new().add_text(caption_text).italic())
+                                    .align(AlignmentType::Center)
+                                    .style("Caption");
+                                docx = docx.add_paragraph(caption_para);
+
                                 current_text.clear();
-                            }
-
-                            // Apply style if any
-                            if let Some(ref style) = paragraph_style {
-                                current_paragraph = current_paragraph.style(style);
-                            }
-
-                            if in_list {
-                                list_items.push(current_paragraph);
+                                current_paragraph = Paragraph::new();
+                                in_paragraph = false;
+                                paragraph_style = None;
                             } else {
-                                docx = docx.add_paragraph(current_paragraph);
-                            }
+                                // Regular paragraph
+                                if !current_text.is_empty() {
+                                    current_paragraph = flush_text(
+                                        current_paragraph,
+                                        &current_text,
+                                        bold_depth > 0,
+                                        italic_depth > 0,
+                                        strikethrough_depth > 0,
+                                    );
+                                    current_text.clear();
+                                }
 
-                            current_paragraph = Paragraph::new();
-                            in_paragraph = false;
-                            paragraph_style = None;
+                                // Apply style if any
+                                if let Some(ref style) = paragraph_style {
+                                    current_paragraph = current_paragraph.style(style);
+                                }
+
+                                if in_list {
+                                    list_items.push(current_paragraph);
+                                } else {
+                                    docx = docx.add_paragraph(current_paragraph);
+                                }
+
+                                current_paragraph = Paragraph::new();
+                                in_paragraph = false;
+                                paragraph_style = None;
+                            }
                         }
                     }
                     TagEnd::Strong => {
@@ -701,6 +814,9 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
                             in_paragraph = false;
                             paragraph_style = None;
                         }
+                    }
+                    TagEnd::Image => {
+                        // Image was already processed through the text events
                     }
                     _ => {}
                 }
@@ -961,5 +1077,105 @@ mod tests {
         // Check file is not empty
         let metadata = fs::metadata(&file_path).unwrap();
         assert!(metadata.len() > 0);
+    }
+
+    #[test]
+    fn test_build_figure_registry() {
+        let markdown = r#"
+# Document with Figures
+
+![Chart showing sales data](chart.png){#fig:sales}
+
+Some text here.
+
+![Another chart](chart2.png){#fig:revenue}
+
+See @fig:sales for the sales data.
+"#;
+
+        let registry = build_figure_registry(markdown);
+        assert_eq!(registry.len(), 2);
+        assert_eq!(registry.get("fig:sales"), Some(&1));
+        assert_eq!(registry.get("fig:revenue"), Some(&2));
+    }
+
+    #[test]
+    fn test_preprocess_cross_references() {
+        let markdown = "See @fig:test for details. Also check @fig:other.";
+        let mut registry = HashMap::new();
+        registry.insert("fig:test".to_string(), 1);
+        registry.insert("fig:other".to_string(), 2);
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(result.contains("Figure 1"));
+        assert!(result.contains("Figure 2"));
+        assert!(!result.contains("@fig:test"));
+        assert!(!result.contains("@fig:other"));
+    }
+
+    #[test]
+    fn test_preprocess_unresolved_reference() {
+        let markdown = "See @fig:missing for details.";
+        let registry = HashMap::new();
+
+        let result = preprocess_markdown_for_docx(markdown, &registry);
+
+        assert!(result.contains("[fig:missing]"));
+    }
+
+    #[test]
+    fn test_parse_figure_syntax() {
+        let text = "![My Chart](http://example.com/chart.png){#fig:chart1}";
+        let result = parse_figure_syntax(text);
+
+        assert!(result.is_some());
+        let (caption, src, label) = result.unwrap();
+        assert_eq!(caption, "My Chart");
+        assert_eq!(src, "http://example.com/chart.png");
+        assert_eq!(label, "fig:chart1");
+    }
+
+    #[test]
+    fn test_parse_figure_syntax_not_figure() {
+        // Regular image without figure label
+        let text = "![Alt text](image.png)";
+        let result = parse_figure_syntax(text);
+        assert!(result.is_none());
+
+        // Plain text
+        let text2 = "This is just text";
+        let result2 = parse_figure_syntax(text2);
+        assert!(result2.is_none());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_with_figures() {
+        let markdown = r#"
+# Document
+
+![Sales Chart](chart.png){#fig:sales}
+
+As shown in @fig:sales, sales are increasing.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_markdown_to_docx_multiple_figures() {
+        let markdown = r#"
+# Analysis
+
+![First Chart](chart1.png){#fig:first}
+
+![Second Chart](chart2.png){#fig:second}
+
+Compare @fig:first with @fig:second to see the trend.
+"#;
+
+        let result = markdown_to_docx(markdown);
+        assert!(result.is_ok());
     }
 }

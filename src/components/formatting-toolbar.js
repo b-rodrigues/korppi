@@ -5,6 +5,7 @@ import { editorViewCtx } from "@milkdown/core";
 import { toggleMark } from "@milkdown/prose/commands";
 import { setBlockType, wrapIn, lift } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
+import { registerFigure, figureRegistry } from "../milkdown-figure.js";
 
 let editorInstance = null;
 
@@ -46,6 +47,8 @@ export function initFormattingToolbar(editor) {
         // Insert elements
         { id: 'link', icon: '🔗', title: 'Insert Link', action: 'link' },
         { id: 'image', icon: '🖼️', title: 'Insert Image', action: 'image' },
+        { id: 'figure', icon: '📊', title: 'Insert Figure (with caption)', action: 'figure' },
+        { id: 'figref', icon: '§', title: 'Insert Figure Reference', action: 'figref' },
         { id: 'table', icon: '⊞', title: 'Insert Table', action: 'table' },
         { id: 'break', icon: '↵', title: 'Hard Break', action: 'hardbreak' },
     ];
@@ -80,6 +83,10 @@ export function initFormattingToolbar(editor) {
                     insertLinkCommand();
                 } else if (btn.action === 'image') {
                     insertImageCommand();
+                } else if (btn.action === 'figure') {
+                    insertFigureCommand();
+                } else if (btn.action === 'figref') {
+                    insertFigureRefCommand();
                 } else if (btn.action === 'table') {
                     insertTableCommand();
                 } else if (btn.action === 'hardbreak') {
@@ -437,6 +444,237 @@ function showTableDialog(callback) {
     });
 }
 
+/**
+ * Insert a figure with caption and label
+ */
+function insertFigureCommand() {
+    if (!editorInstance) return;
+
+    showFigureDialog((url, caption, label) => {
+        editorInstance.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from } = state.selection;
+
+            // Register the figure and get its number
+            const figNum = registerFigure(label);
+
+            // Create the figure markdown syntax
+            const figureMarkdown = `![${caption}](${url}){#${label}}`;
+
+            // Insert as text - the figure plugin will parse it
+            const tr = state.tr.insertText(figureMarkdown, from);
+            dispatch(tr);
+            view.focus();
+        });
+    });
+}
+
+/**
+ * Show dialog for inserting a figure
+ */
+function showFigureDialog(callback) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+
+    // Get next available figure number for suggestion
+    const nextNum = figureRegistry.size + 1;
+    const suggestedLabel = `fig:figure${nextNum}`;
+
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Insert Figure</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="figure-url">Image URL:</label>
+                    <input type="text" id="figure-url" placeholder="https://example.com/image.png" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="figure-caption">Caption:</label>
+                    <input type="text" id="figure-caption" placeholder="Description of the figure" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="figure-label">Label (for cross-references):</label>
+                    <input type="text" id="figure-label" value="${suggestedLabel}" style="width: 100%;">
+                    <small style="color: var(--text-muted);">Use @${suggestedLabel} to reference this figure</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="figure-cancel" class="btn-secondary">Cancel</button>
+                <button id="figure-insert" class="btn-primary">Insert</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const urlInput = overlay.querySelector('#figure-url');
+    const captionInput = overlay.querySelector('#figure-caption');
+    const labelInput = overlay.querySelector('#figure-label');
+    const insertBtn = overlay.querySelector('#figure-insert');
+    const cancelBtn = overlay.querySelector('#figure-cancel');
+
+    urlInput.focus();
+
+    const cleanup = () => {
+        document.body.removeChild(overlay);
+    };
+
+    insertBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        const caption = captionInput.value.trim() || 'Figure';
+        let label = labelInput.value.trim();
+
+        if (!url) {
+            urlInput.focus();
+            return;
+        }
+
+        // Ensure label has fig: prefix
+        if (!label.startsWith('fig:')) {
+            label = 'fig:' + label;
+        }
+
+        cleanup();
+        callback(url, caption, label);
+    });
+
+    cancelBtn.addEventListener('click', cleanup);
+
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            insertBtn.click();
+        } else if (e.key === 'Escape') {
+            cleanup();
+        }
+    };
+
+    urlInput.addEventListener('keydown', handleKeydown);
+    captionInput.addEventListener('keydown', handleKeydown);
+    labelInput.addEventListener('keydown', handleKeydown);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup();
+    });
+}
+
+/**
+ * Insert a cross-reference to a figure
+ */
+function insertFigureRefCommand() {
+    if (!editorInstance) return;
+
+    // Get available figures
+    const figures = Array.from(figureRegistry.entries());
+
+    if (figures.length === 0) {
+        alert('No figures found in the document. Insert a figure first.');
+        return;
+    }
+
+    showFigureRefDialog(figures, (label) => {
+        editorInstance.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const { state, dispatch } = view;
+            const { from } = state.selection;
+
+            // Insert the reference syntax
+            const refText = `@${label}`;
+            const tr = state.tr.insertText(refText, from);
+            dispatch(tr);
+            view.focus();
+        });
+    });
+}
+
+/**
+ * Show dialog for selecting a figure reference
+ */
+function showFigureRefDialog(figures, callback) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+
+    const figureOptions = figures
+        .map(([label, num]) => `<option value="${label}">Figure ${num} (${label})</option>`)
+        .join('');
+
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 350px;">
+            <div class="modal-header">
+                <h2>Insert Figure Reference</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="figref-select">Select figure:</label>
+                    <select id="figref-select" style="width: 100%;">
+                        ${figureOptions}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <small style="color: var(--text-muted);">Or type a label manually:</small>
+                    <input type="text" id="figref-manual" placeholder="fig:custom-label" style="width: 100%; margin-top: 4px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="figref-cancel" class="btn-secondary">Cancel</button>
+                <button id="figref-insert" class="btn-primary">Insert</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const selectEl = overlay.querySelector('#figref-select');
+    const manualInput = overlay.querySelector('#figref-manual');
+    const insertBtn = overlay.querySelector('#figref-insert');
+    const cancelBtn = overlay.querySelector('#figref-cancel');
+
+    selectEl.focus();
+
+    const cleanup = () => {
+        document.body.removeChild(overlay);
+    };
+
+    insertBtn.addEventListener('click', () => {
+        let label = manualInput.value.trim() || selectEl.value;
+
+        if (!label) {
+            selectEl.focus();
+            return;
+        }
+
+        // Ensure label has fig: prefix
+        if (!label.startsWith('fig:')) {
+            label = 'fig:' + label;
+        }
+
+        cleanup();
+        callback(label);
+    });
+
+    cancelBtn.addEventListener('click', cleanup);
+
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            insertBtn.click();
+        } else if (e.key === 'Escape') {
+            cleanup();
+        }
+    };
+
+    selectEl.addEventListener('keydown', handleKeydown);
+    manualInput.addEventListener('keydown', handleKeydown);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup();
+    });
+}
 
 /**
  * Insert hard break (line break within paragraph)
