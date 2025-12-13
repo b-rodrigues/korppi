@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
     detectPatchConflicts,
+    detectPatchConflictsAsync,
     isInConflict,
     getConflictGroup,
     formatConflictInfo
@@ -331,6 +332,49 @@ describe('formatConflictInfo', () => {
 
     it('returns empty string when only conflict is self', () => {
         expect(formatConflictInfo(1, [1])).toBe('');
+    });
+});
+
+describe('async conflict detection', () => {
+    it('detectPatchConflictsAsync returns same results as sync version', async () => {
+        const patches = [];
+        for (let i = 0; i < 50; i++) {
+            const author = `Author${i % 5}`;
+            const content = `Version ${i}: ${'x'.repeat(50)}`;
+            patches.push(makePatch(i, author, content));
+        }
+
+        const syncResult = detectPatchConflicts(patches);
+        const asyncResult = await detectPatchConflictsAsync(patches, { useWorkers: false });
+
+        expect(asyncResult.conflictGroups.length).toBe(syncResult.conflictGroups.length);
+        expect(asyncResult.patchConflicts.size).toBe(syncResult.patchConflicts.size);
+    });
+
+    it('async version handles empty patches', async () => {
+        const result = await detectPatchConflictsAsync([]);
+        expect(result.conflictGroups).toEqual([]);
+        expect(result.patchConflicts.size).toBe(0);
+    });
+
+    it('async version handles single patch', async () => {
+        const patches = [makePatch(1, 'Alice', 'Hello')];
+        const result = await detectPatchConflictsAsync(patches);
+        expect(result.conflictGroups).toEqual([]);
+    });
+
+    it('async chunked version yields to event loop', async () => {
+        const patches = [];
+        for (let i = 0; i < 100; i++) {
+            patches.push(makePatch(i, `Author${i % 10}`, `Content ${i}`));
+        }
+
+        // Should complete without blocking
+        const result = await detectPatchConflictsAsync(patches, {
+            chunkSize: 10,
+            useWorkers: false
+        });
+        expect(result).toBeDefined();
     });
 });
 

@@ -1,8 +1,61 @@
 // src/conflict-detection.js
 // Frontend conflict detection logic for identifying overlapping patches
-// Optimized with sweep line algorithm and early exit heuristics
+// Optimized with sweep line algorithm, early exit heuristics, and parallel processing
 
 import { calculateCharDiff } from './diff-highlighter.js';
+
+// Worker pool for parallel diff calculations
+let workerPool = null;
+let workerPoolSize = 0;
+
+/**
+ * Initialize the worker pool for parallel processing
+ * @param {number} numWorkers - Number of workers (default: navigator.hardwareConcurrency or 4)
+ */
+export function initWorkerPool(numWorkers = null) {
+    if (typeof Worker === 'undefined') return; // Not in browser/worker context
+
+    const poolSize = numWorkers || (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 4) || 4;
+
+    if (workerPool && workerPoolSize === poolSize) return; // Already initialized
+
+    // Clean up existing pool
+    if (workerPool) {
+        workerPool.forEach(w => w.terminate());
+    }
+
+    workerPool = [];
+    workerPoolSize = poolSize;
+
+    for (let i = 0; i < poolSize; i++) {
+        try {
+            const worker = new Worker(
+                new URL('./conflict-detection-worker.js', import.meta.url),
+                { type: 'module' }
+            );
+            workerPool.push({
+                worker,
+                busy: false,
+                pending: null
+            });
+        } catch {
+            // Worker creation failed (e.g., in Node.js test environment)
+            workerPool = null;
+            break;
+        }
+    }
+}
+
+/**
+ * Terminate the worker pool
+ */
+export function terminateWorkerPool() {
+    if (workerPool) {
+        workerPool.forEach(w => w.worker.terminate());
+        workerPool = null;
+        workerPoolSize = 0;
+    }
+}
 
 /**
  * Detect conflicts between patches based on overlapping edit locations.
@@ -19,7 +72,78 @@ export function detectPatchConflicts(patches) {
     }
 
     // Calculate edit ranges for each patch with bounding box
+    const patchEditRanges = calculateEditRangesSequential(patchesWithContent);
+
+    // Find overlapping patches using optimized algorithm
+    const conflicts = findConflictsOptimized(patchEditRanges);
+
+    // Convert sets to arrays for easier use
+    const patchConflicts = new Map();
+    for (const [patchId, conflictSet] of conflicts.entries()) {
+        patchConflicts.set(patchId, Array.from(conflictSet));
+    }
+
+    // Group conflicts into separate conflict groups
+    const conflictGroups = groupConflicts(patchConflicts);
+
+    return { conflictGroups, patchConflicts };
+}
+
+/**
+ * Async parallel version of conflict detection.
+ * Uses Web Workers for diff calculations when available and beneficial.
+ * Falls back to chunked async processing to avoid blocking the main thread.
+ * @param {Array} patches - Array of patches with snapshot data
+ * @param {Object} options - { chunkSize: number, useWorkers: boolean }
+ * @returns {Promise<Object>} - { conflictGroups, patchConflicts }
+ */
+export async function detectPatchConflictsAsync(patches, options = {}) {
+    const {
+        chunkSize = 20,
+        useWorkers = true
+    } = options;
+
+    // Only analyze patches with snapshot content
+    const patchesWithContent = patches.filter(p => p.data?.snapshot);
+
+    if (patchesWithContent.length < 2) {
+        return { conflictGroups: [], patchConflicts: new Map() };
+    }
+
+    // For small workloads, use synchronous version
+    if (patchesWithContent.length < 30) {
+        return detectPatchConflicts(patches);
+    }
+
+    // Calculate edit ranges - parallel if workers available, chunked async otherwise
+    let patchEditRanges;
+    if (useWorkers && workerPool && workerPool.length > 0) {
+        patchEditRanges = await calculateEditRangesParallel(patchesWithContent);
+    } else {
+        patchEditRanges = await calculateEditRangesChunked(patchesWithContent, chunkSize);
+    }
+
+    // Find overlapping patches using optimized algorithm
+    const conflicts = findConflictsOptimized(patchEditRanges);
+
+    // Convert sets to arrays for easier use
+    const patchConflicts = new Map();
+    for (const [patchId, conflictSet] of conflicts.entries()) {
+        patchConflicts.set(patchId, Array.from(conflictSet));
+    }
+
+    // Group conflicts into separate conflict groups
+    const conflictGroups = groupConflicts(patchConflicts);
+
+    return { conflictGroups, patchConflicts };
+}
+
+/**
+ * Calculate edit ranges sequentially (original implementation)
+ */
+function calculateEditRangesSequential(patchesWithContent) {
     const patchEditRanges = [];
+
     for (let i = 0; i < patchesWithContent.length; i++) {
         const patch = patchesWithContent[i];
         const prevPatch = i > 0 ? patchesWithContent[i - 1] : null;
@@ -44,19 +168,125 @@ export function detectPatchConflicts(patches) {
         }
     }
 
-    // Find overlapping patches using optimized algorithm
-    const conflicts = findConflictsOptimized(patchEditRanges);
+    return patchEditRanges;
+}
 
-    // Convert sets to arrays for easier use
-    const patchConflicts = new Map();
-    for (const [patchId, conflictSet] of conflicts.entries()) {
-        patchConflicts.set(patchId, Array.from(conflictSet));
+/**
+ * Calculate edit ranges in chunks, yielding to event loop between chunks
+ */
+async function calculateEditRangesChunked(patchesWithContent, chunkSize) {
+    const patchEditRanges = [];
+
+    for (let start = 0; start < patchesWithContent.length; start += chunkSize) {
+        const end = Math.min(start + chunkSize, patchesWithContent.length);
+
+        for (let i = start; i < end; i++) {
+            const patch = patchesWithContent[i];
+            const prevPatch = i > 0 ? patchesWithContent[i - 1] : null;
+            const prevContent = prevPatch?.data?.snapshot || '';
+            const currentContent = patch.data.snapshot;
+
+            const ranges = extractEditRanges(prevContent, currentContent);
+            if (ranges.length > 0) {
+                let minStart = Infinity, maxEnd = -Infinity;
+                for (const r of ranges) {
+                    if (r.start < minStart) minStart = r.start;
+                    if (r.end > maxEnd) maxEnd = r.end;
+                }
+                patchEditRanges.push({
+                    patchId: patch.id,
+                    author: patch.author,
+                    ranges: ranges,
+                    minStart,
+                    maxEnd
+                });
+            }
+        }
+
+        // Yield to event loop between chunks
+        if (end < patchesWithContent.length) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
     }
 
-    // Group conflicts into separate conflict groups
-    const conflictGroups = groupConflicts(patchConflicts);
+    return patchEditRanges;
+}
 
-    return { conflictGroups, patchConflicts };
+/**
+ * Calculate edit ranges using Web Workers in parallel
+ */
+async function calculateEditRangesParallel(patchesWithContent) {
+    const numWorkers = workerPool.length;
+    const tasks = [];
+
+    // Prepare tasks
+    for (let i = 0; i < patchesWithContent.length; i++) {
+        const patch = patchesWithContent[i];
+        const prevPatch = i > 0 ? patchesWithContent[i - 1] : null;
+        tasks.push({
+            index: i,
+            patchId: patch.id,
+            author: patch.author,
+            prevContent: prevPatch?.data?.snapshot || '',
+            currentContent: patch.data.snapshot
+        });
+    }
+
+    // Distribute tasks across workers
+    const chunkSize = Math.ceil(tasks.length / numWorkers);
+    const promises = [];
+
+    for (let i = 0; i < numWorkers; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, tasks.length);
+        if (start >= tasks.length) break;
+
+        const batch = tasks.slice(start, end);
+        const workerEntry = workerPool[i];
+
+        promises.push(new Promise((resolve, reject) => {
+            const id = Math.random().toString(36);
+
+            const handler = (e) => {
+                if (e.data.id === id) {
+                    workerEntry.worker.removeEventListener('message', handler);
+                    workerEntry.busy = false;
+                    resolve(e.data.results);
+                }
+            };
+
+            workerEntry.worker.addEventListener('message', handler);
+            workerEntry.busy = true;
+            workerEntry.worker.postMessage({ type: 'processBatch', tasks: batch, id });
+        }));
+    }
+
+    // Wait for all workers to complete
+    const results = await Promise.all(promises);
+
+    // Flatten and sort by original index
+    const flatResults = results.flat().sort((a, b) => a.index - b.index);
+
+    // Convert to patchEditRanges format with bounding boxes
+    const patchEditRanges = [];
+    for (const result of flatResults) {
+        if (result.ranges.length > 0) {
+            let minStart = Infinity, maxEnd = -Infinity;
+            for (const r of result.ranges) {
+                if (r.start < minStart) minStart = r.start;
+                if (r.end > maxEnd) maxEnd = r.end;
+            }
+            patchEditRanges.push({
+                patchId: result.patchId,
+                author: result.author,
+                ranges: result.ranges,
+                minStart,
+                maxEnd
+            });
+        }
+    }
+
+    return patchEditRanges;
 }
 
 /**
