@@ -45,7 +45,7 @@ body {
 .raw-editor {
     width: 100%;
     min-height: 500px;
-    height: 100%;
+    height: auto;
     border: none;
     outline: none;
     resize: none;
@@ -55,6 +55,8 @@ body {
     font-size: 14px;
     line-height: 1.7;
     padding: 0;
+    padding-bottom: 50vh;
+    /* Extra space at bottom to click below content */
     margin: 0;
 }
 

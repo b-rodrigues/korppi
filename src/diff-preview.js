@@ -13,7 +13,7 @@ import { getConflictGroup } from './conflict-detection.js';
 
 let previewState = {
     active: false,
-    mode: 'highlight', // 'highlight' or 'diff'
+    mode: 'diff', // 'diff' or 'highlight'
     patchId: null,
     oldText: '',
     newText: '',
@@ -33,7 +33,7 @@ export function enterPreview(patchId, oldText, newText) {
 
     previewState = {
         active: true,
-        mode: 'highlight',
+        mode: 'diff',
         patchId,
         oldText,
         newText,
@@ -50,7 +50,7 @@ export function enterPreview(patchId, oldText, newText) {
 export function exitPreview() {
     previewState = {
         active: false,
-        mode: 'highlight',
+        mode: 'diff',
         patchId: null,
         oldText: '',
         newText: '',
@@ -95,8 +95,8 @@ function showPreviewBanner() {
                 <div id="conflict-tabs" class="conflict-tabs"></div>
             </div>
             <div class="preview-controls">
-                <button class="mode-btn active" data-mode="highlight">🎨 Highlight</button>
-                <button class="mode-btn" data-mode="diff">📝 Diff</button>
+                <button class="mode-btn" data-mode="highlight">🎨 Highlight</button>
+                <button class="mode-btn active" data-mode="diff">📝 Diff</button>
                 <button class="accept-patch-btn" style="background:#4caf50;color:white;margin-left:20px;">✓ Accept</button>
                 <button class="reject-patch-btn" style="background:#f44336;color:white;">✗ Reject</button>
                 <button class="exit-btn">✕ Exit Preview</button>
