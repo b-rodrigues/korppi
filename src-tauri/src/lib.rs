@@ -29,6 +29,7 @@ use document_manager::{
     save_document_snapshot, restore_document_to_patch,
     record_document_patch_review, get_document_patch_reviews,
     get_document_patches_needing_review, check_parent_patch_status,
+    delete_document_reviews_after,
     import_document, check_pandoc_available, open_url,
     DocumentManager,
 };
@@ -92,6 +93,7 @@ pub fn run() {
             get_document_patch_reviews,
             get_document_patches_needing_review,
             check_parent_patch_status,
+            delete_document_reviews_after,
             import_document,
             check_pandoc_available,
             open_url,

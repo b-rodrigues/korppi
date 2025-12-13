@@ -485,6 +485,51 @@ window.addEventListener("DOMContentLoaded", async () => {
         initEditorContextMenu();
         // Initialize editor mode toggle (raw/rendered)
         initEditorModeToggle();
+
+        // Add a click-catcher element below the editor content to allow clicking below content
+        const editorDiv = document.getElementById('editor');
+        if (editorDiv && !editorDiv.querySelector('.editor-click-catcher')) {
+            const clickCatcher = document.createElement('div');
+            clickCatcher.className = 'editor-click-catcher';
+            clickCatcher.style.cssText = `
+                min-height: 50vh;
+                cursor: text;
+            `;
+            editorDiv.appendChild(clickCatcher);
+
+            // Handle clicks on the catcher to position cursor at end
+            clickCatcher.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const { editorViewCtx } = await import('./editor.js');
+                editor.action((ctx) => {
+                    const view = ctx.get(editorViewCtx);
+                    const doc = view.state.doc;
+                    const endPos = doc.content.size;
+
+                    const lastChild = doc.lastChild;
+                    let tr = view.state.tr;
+
+                    // If last element is a code block, insert a new paragraph
+                    if (!lastChild || lastChild.type.name === 'code_block' || lastChild.type.name === 'fence') {
+                        const paragraphType = view.state.schema.nodes.paragraph;
+                        if (paragraphType) {
+                            tr = tr.insert(endPos, paragraphType.create());
+                        }
+                    }
+
+                    // Set selection to end
+                    const newEndPos = tr.doc.content.size;
+                    tr = tr.setSelection(
+                        view.state.selection.constructor.near(tr.doc.resolve(newEndPos))
+                    );
+
+                    view.dispatch(tr);
+                    view.focus();
+                });
+            });
+        }
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }

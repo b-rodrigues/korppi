@@ -62,6 +62,7 @@ commands.allow = [
     "get_document_patch_reviews",
     "get_document_patches_needing_review",
     "check_parent_patch_status",
+    "delete_document_reviews_after",
     "record_patch_review",
     "get_patch_reviews",
     "get_patches_needing_review",

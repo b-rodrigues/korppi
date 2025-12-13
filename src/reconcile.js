@@ -18,6 +18,10 @@ export async function startReconciliation() {
     const currentContent = getMarkdown();
     localStorage.setItem('reconciliation-snapshot', currentContent);
 
+    // Save the timestamp when reconciliation started (for resetting reviews)
+    const reconciliationStartTime = Date.now();
+    localStorage.setItem('reconciliation-start-time', reconciliationStartTime.toString());
+
     // Let user pick one or more .kmd files
     const selectedPaths = await open({
         title: "Select Korppi Document(s) to Reconcile",
