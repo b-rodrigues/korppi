@@ -656,13 +656,14 @@ export function renderPatchDetails(patch) {
  */
 async function resetToOriginal() {
     const snapshot = localStorage.getItem('reconciliation-snapshot');
+    const reconciliationStartTime = localStorage.getItem('reconciliation-start-time');
 
     if (!snapshot) {
         alert("No reconciliation snapshot found. This only works after importing patches.");
         return;
     }
 
-    let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted imported patches.");
+    let userConfirmed = window.confirm("Reset to state before reconciliation? This will undo all accepted/rejected imported patches and reset their review status.");
 
     // Tauri's confirm returns a Promise, handle both cases
     if (userConfirmed instanceof Promise) {
@@ -683,13 +684,36 @@ async function resetToOriginal() {
             return;
         }
 
-        // Note: In the new review system, reviews are permanent records and not reset
-        // Users can re-review patches if needed by recording new reviews
+        // Delete reviews made after reconciliation started
+        if (docId && reconciliationStartTime) {
+            const currentUser = getCachedProfile();
+            const reviewerId = currentUser?.id || 'local';
 
-        // DON'T clear the snapshot - keep it for future resets
-        // localStorage.removeItem('reconciliation-snapshot');
+            console.log('[DEBUG] Reset: docId=', docId);
+            console.log('[DEBUG] Reset: reconciliationStartTime=', reconciliationStartTime);
+            console.log('[DEBUG] Reset: reviewerId=', reviewerId);
 
-        alert("Document restored to state before reconciliation.");
+            try {
+                const deleted = await invoke("delete_document_reviews_after", {
+                    docId,
+                    afterTimestamp: parseInt(reconciliationStartTime),
+                    reviewerId
+                });
+
+                console.log('[DEBUG] Reset: deleted reviews count=', deleted);
+
+                if (deleted > 0) {
+                    console.log(`Reset ${deleted} patch review(s) made during reconciliation`);
+                }
+            } catch (err) {
+                console.error("[DEBUG] Reset: Failed to reset reviews:", err);
+                // Continue even if review reset fails - document is already restored
+            }
+        } else {
+            console.log('[DEBUG] Reset: Skipping review reset - docId=', docId, 'reconciliationStartTime=', reconciliationStartTime);
+        }
+
+        alert("Document restored to state before reconciliation. Patch reviews have been reset.");
         await refreshTimeline();
 
     } catch (err) {

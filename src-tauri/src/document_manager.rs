@@ -752,6 +752,55 @@ pub fn get_document_patch_reviews(
     Ok(reviews)
 }
 
+/// Delete patch reviews made after a certain timestamp (for reset functionality)
+#[tauri::command]
+pub fn delete_document_reviews_after(
+    manager: State<'_, Mutex<DocumentManager>>,
+    doc_id: String,
+    after_timestamp: i64,
+    reviewer_id: String,
+) -> Result<u32, String> {
+    eprintln!("[DEBUG] delete_document_reviews_after: doc_id={}, after_timestamp={}, reviewer_id={}", 
+              doc_id, after_timestamp, reviewer_id);
+    
+    let manager = manager.lock().map_err(|e| e.to_string())?;
+    
+    let doc = manager.documents.get(&doc_id)
+        .ok_or_else(|| format!("Document not found: {}", doc_id))?;
+    
+    let conn = Connection::open(&doc.history_path).map_err(|e| e.to_string())?;
+    
+    // Ensure schema exists
+    ensure_schema(&conn)?;
+    
+    // First, let's see what reviews exist for this reviewer
+    let mut stmt = conn.prepare("SELECT patch_uuid, reviewed_at FROM patch_reviews WHERE reviewer_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let reviews: Vec<(String, i64)> = stmt.query_map([&reviewer_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+    })
+    .map_err(|e| e.to_string())?
+    .filter_map(|r| r.ok())
+    .collect();
+    
+    eprintln!("[DEBUG] Found {} reviews by this reviewer", reviews.len());
+    for (uuid, timestamp) in &reviews {
+        eprintln!("[DEBUG]   - patch_uuid={}, reviewed_at={} (after_timestamp={})", 
+                  uuid, timestamp, after_timestamp);
+    }
+    
+    // Delete reviews by this reviewer that were made after the given timestamp
+    let deleted = conn.execute(
+        "DELETE FROM patch_reviews WHERE reviewer_id = ?1 AND reviewed_at > ?2",
+        params![reviewer_id, after_timestamp],
+    )
+    .map_err(|e| e.to_string())?;
+    
+    eprintln!("[DEBUG] Deleted {} reviews", deleted);
+    
+    Ok(deleted as u32)
+}
+
 /// Get patches that need review by a user in a document
 #[tauri::command]
 pub fn get_document_patches_needing_review(

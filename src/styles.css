@@ -44,8 +44,7 @@ body {
 /* Raw markdown editor (textarea) */
 .raw-editor {
     width: 100%;
-    min-height: 500px;
-    height: auto;
+    min-height: calc(100vh - 100px);
     border: none;
     outline: none;
     resize: none;
@@ -56,8 +55,8 @@ body {
     line-height: 1.7;
     padding: 0;
     padding-bottom: 50vh;
-    /* Extra space at bottom to click below content */
     margin: 0;
+    overflow-y: auto;
 }
 
 .raw-editor:focus {
