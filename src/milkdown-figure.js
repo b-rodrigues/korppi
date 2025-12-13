@@ -167,24 +167,20 @@ export const figureNode = $node("figure", () => ({
     toMarkdown: {
         match: (node) => node.type.name === "figure",
         runner: (state, node) => {
-            let imageSrc = "";
-            let imageAlt = "";
-            node.content.forEach((child) => {
-                if (child.type.name === "image") {
-                    imageSrc = child.attrs.src || "";
-                    imageAlt = child.attrs.alt || "";
-                }
-            });
-
-            const caption = node.attrs.caption || imageAlt;
             const label = node.attrs.label;
 
-            let output = `![${caption}](${imageSrc})`;
+            // Open a paragraph to contain the figure markdown
+            state.openNode("paragraph");
+
+            // Serialize the child image node using state.next()
+            state.next(node.content);
+
+            // Add the label as raw text if present
             if (label) {
-                output += `{#${label}}`;
+                state.addNode("html", undefined, `{#${label}}`);
             }
 
-            state.addNode("paragraph", undefined, output);
+            state.closeNode();
         },
     },
 }));

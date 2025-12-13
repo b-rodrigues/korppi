@@ -7,8 +7,24 @@ export function stepToSemanticPatch(step, oldState, newState) {
         const from = step.from;
         const to = step.to;
 
-        const deletedText = oldState.doc.textBetween(from, to, "\n", "\n");
-        const insertedText = step.slice.content.textBetween(0, step.slice.size, "\n", "\n");
+        let deletedText = "";
+        let insertedText = "";
+
+        try {
+            deletedText = oldState.doc.textBetween(from, to, "\n", "\n");
+        } catch (e) {
+            // Complex node structure, can't extract text
+        }
+
+        try {
+            insertedText = step.slice.content.textBetween(0, step.slice.size, "\n", "\n");
+        } catch (e) {
+            // Complex node structure (e.g., table), can't extract text
+            // Try to get a description of what was inserted
+            if (step.slice.content.firstChild) {
+                insertedText = `[${step.slice.content.firstChild.type.name}]`;
+            }
+        }
 
         if (deletedText && !insertedText) {
             return {

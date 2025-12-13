@@ -151,14 +151,11 @@ async function handleKeyDown(e) {
         case "b":
             // Ctrl/Cmd + B: Bold
             // Let Milkdown's built-in strongKeymap handle this
-            // Our custom toggleMark doesn't work properly with Yjs sync
-            console.log('[DEBUG] Ctrl+B pressed - not intercepting, letting Milkdown handle');
             break;
 
         case "i":
             // Ctrl/Cmd + I: Italic
             // Let Milkdown's built-in emphasisKeymap handle this
-            console.log('[DEBUG] Ctrl+I pressed - not intercepting, letting Milkdown handle');
             break;
 
         case "u":

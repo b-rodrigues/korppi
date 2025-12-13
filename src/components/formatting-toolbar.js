@@ -46,11 +46,9 @@ export function initFormattingToolbar(editor) {
         { type: 'separator' },
         // Insert elements
         { id: 'link', icon: '🔗', title: 'Insert Link', action: 'link' },
-        { id: 'image', icon: '🖼️', title: 'Insert Image', action: 'image' },
-        { id: 'figure', icon: '📊', title: 'Insert Figure (with caption)', action: 'figure' },
+        { id: 'figure', icon: '🖼️', title: 'Insert Image', action: 'figure' },
         { id: 'crossref', icon: '§', title: 'Insert Cross-Reference', action: 'crossref' },
         { id: 'table', icon: '⊞', title: 'Insert Table', action: 'table' },
-        { id: 'tablelabel', icon: '#T', title: 'Add Table Label', action: 'tablelabel' },
         { id: 'break', icon: '↵', title: 'Hard Break', action: 'hardbreak' },
     ];
 
@@ -82,16 +80,12 @@ export function initFormattingToolbar(editor) {
                     wrapInCommand(btn.wrapType);
                 } else if (btn.action === 'link') {
                     insertLinkCommand();
-                } else if (btn.action === 'image') {
-                    insertImageCommand();
                 } else if (btn.action === 'figure') {
                     insertFigureCommand();
                 } else if (btn.action === 'crossref') {
                     insertCrossRefCommand();
                 } else if (btn.action === 'table') {
                     insertTableCommand();
-                } else if (btn.action === 'tablelabel') {
-                    insertTableLabelCommand();
                 } else if (btn.action === 'hardbreak') {
                     insertHardBreakCommand();
                 } else if (btn.action === 'insertHr') {
@@ -114,15 +108,11 @@ export function initFormattingToolbar(editor) {
  * Toggle a mark (bold, italic, etc.)
  */
 function toggleMarkCommand(markName) {
-    console.log('[DEBUG] toggleMarkCommand called for:', markName, 'editorInstance:', !!editorInstance);
     if (!editorInstance) return;
 
     editorInstance.action((ctx) => {
         const view = ctx.get(editorViewCtx);
         const { state, dispatch } = view;
-
-        console.log('[DEBUG] Schema marks:', Object.keys(state.schema.marks));
-        console.log('[DEBUG] Selection:', state.selection.from, '-', state.selection.to, 'empty:', state.selection.empty);
 
         const markType = state.schema.marks[markName];
         if (!markType) {
@@ -130,24 +120,7 @@ function toggleMarkCommand(markName) {
             return;
         }
 
-        console.log('[DEBUG] Toggling mark:', markName);
-        const result = toggleMark(markType)(state, dispatch);
-        console.log('[DEBUG] toggleMark result:', result);
-
-        // Check if mark was applied in the new state
-        setTimeout(() => {
-            const newState = view.state;
-            const { from, to } = newState.selection;
-            const hasMark = newState.doc.rangeHasMark(from, to, markType);
-            console.log('[DEBUG] After toggle, hasMark:', hasMark);
-
-            // Log DOM content
-            const editorEl = document.querySelector('#editor .ProseMirror');
-            if (editorEl) {
-                console.log('[DEBUG] Editor innerHTML:', editorEl.innerHTML);
-            }
-        }, 100);
-
+        toggleMark(markType)(state, dispatch);
         view.focus();
     });
 }
@@ -325,13 +298,13 @@ function insertImageCommand() {
 }
 
 /**
- * Insert a table - shows dialog for rows/columns
+ * Insert a table - shows dialog for rows/columns/caption/label
  */
 function insertTableCommand() {
     if (!editorInstance) return;
 
     // Show table dialog
-    showTableDialog((numRows, numCols) => {
+    showTableDialog((numRows, numCols, caption, label) => {
         editorInstance.action((ctx) => {
             const view = ctx.get(editorViewCtx);
             const { state, dispatch } = view;
@@ -386,8 +359,40 @@ function insertTableCommand() {
             // Create table node
             const tableNode = tableType.create(null, rows);
 
-            // Insert the table
-            const tr = state.tr.insert(from, tableNode);
+            let tr = state.tr;
+            let insertPos = from;
+
+            // Add caption and label BEFORE the table if provided
+            if (caption || label) {
+                // Build caption text: "Caption text {#tbl:label}"
+                let captionParts = [];
+
+                if (caption) {
+                    captionParts.push(caption);
+                }
+
+                if (label) {
+                    // Add label syntax
+                    if (caption) {
+                        captionParts.push(` {#${label}}`);
+                    } else {
+                        captionParts.push(`{#${label}}`);
+                    }
+                    // Register the table for cross-referencing
+                    registerFigure(label);
+                }
+
+                const captionText = captionParts.join('');
+                if (captionText && paragraphType) {
+                    const captionParagraph = paragraphType.create(null, schema.text(captionText));
+                    tr = tr.insert(insertPos, captionParagraph);
+                    insertPos += captionParagraph.nodeSize;
+                }
+            }
+
+            // Insert the table after the caption
+            tr = tr.insert(insertPos, tableNode);
+
             dispatch(tr);
             view.focus();
         });
@@ -395,16 +400,20 @@ function insertTableCommand() {
 }
 
 /**
- * Show table dialog for rows/columns
+ * Show table dialog for rows/columns/caption/label
  */
 function showTableDialog(callback) {
+    // Get next available table number for suggestion
+    const nextNum = tableRegistry.size + 1;
+    const suggestedLabel = `tbl:table${nextNum}`;
+
     // Create modal overlay
     const overlay = document.createElement('div');
     overlay.className = 'modal';
     overlay.style.display = 'flex';
 
     overlay.innerHTML = `
-        <div class="modal-content" style="max-width: 280px;">
+        <div class="modal-content" style="max-width: 350px;">
             <div class="modal-header">
                 <h2>Insert Table</h2>
             </div>
@@ -416,6 +425,16 @@ function showTableDialog(callback) {
                 <div class="form-group">
                     <label for="table-cols">Columns:</label>
                     <input type="number" id="table-cols" min="1" max="10" value="3" style="width: 100%;">
+                </div>
+                <hr style="margin: 12px 0; border: none; border-top: 1px solid var(--border-color);">
+                <div class="form-group">
+                    <label for="table-caption">Caption (optional):</label>
+                    <input type="text" id="table-caption" placeholder="e.g., Sales data for Q4" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="table-label">Label for cross-references (optional):</label>
+                    <input type="text" id="table-label" value="${suggestedLabel}" style="width: 100%;">
+                    <small style="color: var(--text-muted);">Use @${suggestedLabel} to reference this table</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -429,6 +448,8 @@ function showTableDialog(callback) {
 
     const rowsInput = overlay.querySelector('#table-rows');
     const colsInput = overlay.querySelector('#table-cols');
+    const captionInput = overlay.querySelector('#table-caption');
+    const labelInput = overlay.querySelector('#table-label');
     const insertBtn = overlay.querySelector('#table-insert');
     const cancelBtn = overlay.querySelector('#table-cancel');
 
@@ -443,8 +464,21 @@ function showTableDialog(callback) {
     insertBtn.addEventListener('click', () => {
         const rows = parseInt(rowsInput.value) || 3;
         const cols = parseInt(colsInput.value) || 3;
+        const caption = captionInput.value.trim();
+        let label = labelInput.value.trim();
+
+        // Ensure label has tbl: prefix if provided
+        if (label && !label.startsWith('tbl:')) {
+            label = 'tbl:' + label;
+        }
+
         cleanup();
-        callback(Math.max(2, Math.min(20, rows)), Math.max(1, Math.min(10, cols)));
+        callback(
+            Math.max(2, Math.min(20, rows)),
+            Math.max(1, Math.min(10, cols)),
+            caption,
+            label
+        );
     });
 
     cancelBtn.addEventListener('click', cleanup);
@@ -461,6 +495,8 @@ function showTableDialog(callback) {
 
     rowsInput.addEventListener('keydown', handleKeydown);
     colsInput.addEventListener('keydown', handleKeydown);
+    captionInput.addEventListener('keydown', handleKeydown);
+    labelInput.addEventListener('keydown', handleKeydown);
 
     // Close on overlay click
     overlay.addEventListener('click', (e) => {
@@ -469,7 +505,7 @@ function showTableDialog(callback) {
 }
 
 /**
- * Insert a figure with caption and label
+ * Insert an image/figure with optional caption and label
  */
 function insertFigureCommand() {
     if (!editorInstance) return;
@@ -479,15 +515,49 @@ function insertFigureCommand() {
             const view = ctx.get(editorViewCtx);
             const { state, dispatch } = view;
             const { from } = state.selection;
+            const schema = state.schema;
 
-            // Register the figure and get its number
-            const figNum = registerFigure(label);
+            // Get the image node type from schema
+            const imageType = schema.nodes.image;
+            const figureType = schema.nodes.figure;
+            const paragraphType = schema.nodes.paragraph;
 
-            // Create the figure markdown syntax
-            const figureMarkdown = `![${caption}](${url}){#${label}}`;
+            if (!imageType) {
+                console.warn("Image node type not found in schema");
+                view.focus();
+                return;
+            }
 
-            // Insert as text - the figure plugin will parse it
-            const tr = state.tr.insertText(figureMarkdown, from);
+            let tr = state.tr;
+
+            if (label && figureType) {
+                // Insert as a figure with label for cross-referencing
+                registerFigure(label);
+                const imageNode = imageType.create({
+                    src: url,
+                    alt: caption || 'Figure'
+                });
+                const figureNode = figureType.create(
+                    { label, caption: caption || '' },
+                    imageNode
+                );
+                tr = tr.insert(from, figureNode);
+            } else {
+                // Insert as a simple image (optionally with alt text as caption)
+                const imageNode = imageType.create({
+                    src: url,
+                    alt: caption || ''
+                });
+
+                // Images need to be inside a paragraph in most schemas
+                if (paragraphType) {
+                    const para = paragraphType.create(null, imageNode);
+                    tr = tr.insert(from, para);
+                } else {
+                    tr = tr.insert(from, imageNode);
+                }
+            }
+
             dispatch(tr);
             view.focus();
         });
@@ -495,7 +565,7 @@ function insertFigureCommand() {
 }
 
 /**
- * Show dialog for inserting a figure
+ * Show dialog for inserting a figure/image
  */
 function showFigureDialog(callback) {
     const overlay = document.createElement('div');
@@ -507,23 +577,27 @@ function showFigureDialog(callback) {
     const suggestedLabel = `fig:figure${nextNum}`;
 
     overlay.innerHTML = `
-        <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header">
-                <h2>Insert Figure</h2>
+                <h2>Insert Image</h2>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="figure-url">Image URL:</label>
-                    <input type="text" id="figure-url" placeholder="https://example.com/image.png" style="width: 100%;">
+                    <label for="figure-url">Image source:</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="figure-url" placeholder="URL or file path" style="flex: 1;">
+                        <button type="button" id="figure-browse" class="btn-secondary" style="white-space: nowrap;">Browse...</button>
+                    </div>
+                </div>
+                <hr style="margin: 12px 0; border: none; border-top: 1px solid var(--border-color);">
+                <div class="form-group">
+                    <label for="figure-caption">Caption (optional):</label>
+                    <input type="text" id="figure-caption" placeholder="Description of the image" style="width: 100%;">
                 </div>
                 <div class="form-group">
-                    <label for="figure-caption">Caption:</label>
-                    <input type="text" id="figure-caption" placeholder="Description of the figure" style="width: 100%;">
-                </div>
-                <div class="form-group">
-                    <label for="figure-label">Label (for cross-references):</label>
+                    <label for="figure-label">Label for cross-references (optional):</label>
                     <input type="text" id="figure-label" value="${suggestedLabel}" style="width: 100%;">
-                    <small style="color: var(--text-muted);">Use @${suggestedLabel} to reference this figure</small>
+                    <small style="color: var(--text-muted);">Use @${suggestedLabel} to reference this image</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -536,6 +610,7 @@ function showFigureDialog(callback) {
     document.body.appendChild(overlay);
 
     const urlInput = overlay.querySelector('#figure-url');
+    const browseBtn = overlay.querySelector('#figure-browse');
     const captionInput = overlay.querySelector('#figure-caption');
     const labelInput = overlay.querySelector('#figure-label');
     const insertBtn = overlay.querySelector('#figure-insert');
@@ -547,9 +622,32 @@ function showFigureDialog(callback) {
         document.body.removeChild(overlay);
     };
 
+    // File browser using Tauri's dialog
+    browseBtn.addEventListener('click', async () => {
+        try {
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const selected = await open({
+                multiple: false,
+                filters: [{
+                    name: 'Images',
+                    extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']
+                }]
+            });
+
+            if (selected) {
+                // Convert the file path to an asset URL that Tauri can serve
+                const { convertFileSrc } = await import('@tauri-apps/api/core');
+                const assetUrl = convertFileSrc(selected);
+                urlInput.value = assetUrl;
+            }
+        } catch (err) {
+            console.error('File browser error:', err);
+        }
+    });
+
     insertBtn.addEventListener('click', () => {
         const url = urlInput.value.trim();
-        const caption = captionInput.value.trim() || 'Figure';
+        const caption = captionInput.value.trim();
         let label = labelInput.value.trim();
 
         if (!url) {
@@ -557,8 +655,8 @@ function showFigureDialog(callback) {
             return;
         }
 
-        // Ensure label has fig: prefix
-        if (!label.startsWith('fig:')) {
+        // Ensure label has fig: prefix if provided
+        if (label && !label.startsWith('fig:')) {
             label = 'fig:' + label;
         }
 

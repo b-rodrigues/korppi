@@ -60,6 +60,18 @@ body {
     text-decoration: line-through;
 }
 
+/* Add clickable gap below tables and code blocks */
+#editor .ProseMirror table,
+#editor .ProseMirror pre,
+#editor .ProseMirror .code-block {
+    margin-bottom: 1em;
+}
+
+/* Add extra padding at the bottom of the ProseMirror editor for easier clicking */
+#editor .ProseMirror {
+    padding-bottom: 100px;
+}
+
 /* Raw markdown editor (textarea) */
 .raw-editor {
     width: 100%;

@@ -511,8 +511,52 @@ window.addEventListener("DOMContentLoaded", async () => {
                     const lastChild = doc.lastChild;
                     let tr = view.state.tr;
 
-                    // If last element is a code block, insert a new paragraph
-                    if (!lastChild || lastChild.type.name === 'code_block' || lastChild.type.name === 'fence') {
+                    // If last element is a code block, table, image, or if there's no content, insert a new paragraph
+                    if (!lastChild ||
+                        lastChild.type.name === 'code_block' ||
+                        lastChild.type.name === 'fence' ||
+                        lastChild.type.name === 'table' ||
+                        lastChild.type.name === 'image') {
+                        const paragraphType = view.state.schema.nodes.paragraph;
+                        if (paragraphType) {
+                            tr = tr.insert(endPos, paragraphType.create());
+                        }
+                    }
+
+                    // Set selection to end
+                    const newEndPos = tr.doc.content.size;
+                    tr = tr.setSelection(
+                        view.state.selection.constructor.near(tr.doc.resolve(newEndPos))
+                    );
+
+                    view.dispatch(tr);
+                    view.focus();
+                });
+            });
+        }
+
+        // Also handle clicks on the ProseMirror padding (below content but inside the editor)
+        const proseMirrorEl = editorDiv.querySelector('.ProseMirror');
+        if (proseMirrorEl) {
+            proseMirrorEl.addEventListener('click', async (e) => {
+                // Only handle clicks directly on the ProseMirror container (not on child content)
+                if (e.target !== proseMirrorEl) return;
+
+                const { editorViewCtx } = await import('./editor.js');
+                editor.action((ctx) => {
+                    const view = ctx.get(editorViewCtx);
+                    const doc = view.state.doc;
+                    const endPos = doc.content.size;
+
+                    const lastChild = doc.lastChild;
+                    let tr = view.state.tr;
+
+                    // If last element is a code block, table, image, or if there's no content, insert a paragraph
+                    if (!lastChild ||
+                        lastChild.type.name === 'code_block' ||
+                        lastChild.type.name === 'fence' ||
+                        lastChild.type.name === 'table' ||
+                        lastChild.type.name === 'image') {
                         const paragraphType = view.state.schema.nodes.paragraph;
                         if (paragraphType) {
                             tr = tr.insert(endPos, paragraphType.create());
