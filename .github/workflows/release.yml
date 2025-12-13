@@ -74,7 +74,7 @@ jobs:
             runner: macos-latest
           - arch: x86_64
             target: x86_64-apple-darwin
-            runner: macos-16
+            runner: macos-15
 
     runs-on: ${{ matrix.runner }}
 
