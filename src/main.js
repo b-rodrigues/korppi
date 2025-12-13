@@ -574,6 +574,120 @@ window.addEventListener("DOMContentLoaded", async () => {
                 });
             });
         }
+
+        // Figure double-click handler - edit caption and label
+        const proseMirrorForFigures = editorDiv.querySelector('.ProseMirror');
+        if (proseMirrorForFigures) {
+            proseMirrorForFigures.addEventListener('dblclick', async (e) => {
+                // Find if we clicked on a figure or its children
+                let figureEl = e.target.closest('figure.figure');
+                if (!figureEl) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const currentLabel = figureEl.getAttribute('data-label') || '';
+                const figcaption = figureEl.querySelector('figcaption');
+                // Extract caption without the "Figure N: " prefix
+                let currentCaption = '';
+                if (figcaption) {
+                    const captionText = figcaption.textContent || '';
+                    const prefixMatch = captionText.match(/^Figure \d+:\s*/);
+                    currentCaption = prefixMatch ? captionText.slice(prefixMatch[0].length) : captionText;
+                }
+
+                // Show edit dialog
+                const overlay = document.createElement('div');
+                overlay.className = 'modal';
+                overlay.style.display = 'flex';
+                overlay.innerHTML = `
+                    <div class="modal-content" style="max-width: 400px;">
+                        <div class="modal-header">
+                            <h2>Edit Figure</h2>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="edit-figure-caption">Caption:</label>
+                                <input type="text" id="edit-figure-caption" value="${currentCaption.replace(/"/g, '&quot;')}" style="width: 100%;">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-figure-label">Label (for cross-references):</label>
+                                <input type="text" id="edit-figure-label" value="${currentLabel.replace(/"/g, '&quot;')}" style="width: 100%;">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="edit-figure-cancel" class="btn-secondary">Cancel</button>
+                            <button id="edit-figure-save" class="btn-primary">Save</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const captionInput = overlay.querySelector('#edit-figure-caption');
+                const labelInput = overlay.querySelector('#edit-figure-label');
+                const saveBtn = overlay.querySelector('#edit-figure-save');
+                const cancelBtn = overlay.querySelector('#edit-figure-cancel');
+
+                captionInput.focus();
+                captionInput.select();
+
+                const cleanup = () => document.body.removeChild(overlay);
+
+                saveBtn.addEventListener('click', async () => {
+                    const newCaption = captionInput.value.trim();
+                    let newLabel = labelInput.value.trim();
+
+                    // Ensure label has fig: prefix if provided
+                    if (newLabel && !newLabel.startsWith('fig:')) {
+                        newLabel = 'fig:' + newLabel;
+                    }
+
+                    // Update the figure node attrs
+                    const { editorViewCtx } = await import('./editor.js');
+                    editor.action((ctx) => {
+                        const view = ctx.get(editorViewCtx);
+                        const { state, dispatch } = view;
+
+                        // Find the figure node by position
+                        let figPos = null;
+                        state.doc.descendants((node, pos) => {
+                            if (node.type.name === 'figure' &&
+                                node.attrs.label === currentLabel) {
+                                figPos = pos;
+                                return false;
+                            }
+                        });
+
+                        if (figPos !== null) {
+                            const tr = state.tr.setNodeMarkup(figPos, null, {
+                                ...state.doc.nodeAt(figPos).attrs,
+                                caption: newCaption,
+                                label: newLabel || null
+                            });
+                            dispatch(tr);
+                        }
+                        view.focus();
+                    });
+
+                    cleanup();
+                });
+
+                cancelBtn.addEventListener('click', cleanup);
+
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) cleanup();
+                });
+
+                overlay.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveBtn.click();
+                    } else if (e.key === 'Escape') {
+                        cleanup();
+                    }
+                });
+            });
+        }
     } catch (err) {
         console.error("Failed to initialize editor:", err);
     }

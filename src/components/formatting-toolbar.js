@@ -101,7 +101,7 @@ export function initFormattingToolbar(editor) {
 
     // Listen for insert requests from context menu
     window.addEventListener('insert-table-request', () => insertTableCommand());
-    window.addEventListener('insert-image-request', () => insertImageCommand());
+    window.addEventListener('insert-image-request', () => insertFigureCommand());
 }
 
 /**
@@ -259,39 +259,6 @@ function insertLinkCommand() {
         }
 
         const tr = state.tr.addMark(from, to, linkType.create({ href: url }));
-        dispatch(tr);
-        view.focus();
-    });
-}
-
-/**
- * Insert image - prompts for URL and alt text
- */
-function insertImageCommand() {
-    if (!editorInstance) return;
-
-    editorInstance.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { state, dispatch } = view;
-
-        const url = prompt("Enter image URL:");
-        if (!url) {
-            view.focus();
-            return;
-        }
-
-        const alt = prompt("Enter alt text (optional):", "") || "";
-
-        const imageType = state.schema.nodes.image;
-        if (!imageType) {
-            console.warn("Image node type not found in schema");
-            view.focus();
-            return;
-        }
-
-        const { from } = state.selection;
-        const imageNode = imageType.create({ src: url, alt: alt });
-        const tr = state.tr.insert(from, imageNode);
         dispatch(tr);
         view.focus();
     });
@@ -828,39 +795,6 @@ function showCrossRefDialog(refs, callback) {
     });
 }
 
-/**
- * Insert a table label
- */
-function insertTableLabelCommand() {
-    if (!editorInstance) return;
-
-    const nextNum = tableRegistry.size + 1;
-    const suggestedLabel = `tbl:table${nextNum}`;
-
-    const label = prompt(`Enter table label (for cross-references):\n\nSuggested: ${suggestedLabel}\n\nUsage: Place {#tbl:label} on a new line after your table`, suggestedLabel);
-
-    if (!label) return;
-
-    let finalLabel = label.trim();
-    if (!finalLabel.startsWith('tbl:')) {
-        finalLabel = 'tbl:' + finalLabel;
-    }
-
-    editorInstance.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { state, dispatch } = view;
-        const { from } = state.selection;
-
-        // Insert the table label syntax
-        const labelText = `\n\n{#${finalLabel}}`;
-        const tr = state.tr.insertText(labelText, from);
-        dispatch(tr);
-        view.focus();
-
-        // Register the table
-        registerFigure(finalLabel);
-    });
-}
 
 /**
  * Insert hard break (line break within paragraph)

@@ -55,9 +55,7 @@ export function getMarkdown() {
             editor.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
                 const serializer = ctx.get(serializerCtx);
-                console.log("[DEBUG] getMarkdown - doc:", JSON.stringify(view.state.doc.toJSON(), null, 2));
                 markdown = serializer(view.state.doc);
-                console.log("[DEBUG] getMarkdown - result:", markdown);
             });
         } catch (err) {
             console.error("[ERROR] getMarkdown serialization failed:", err);

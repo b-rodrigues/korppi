@@ -241,10 +241,6 @@ export async function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
-    // DEBUG: Log incoming patches
-    console.log("[DEBUG] renderPatchList called with", patches.length, "patches");
-    console.log("[DEBUG] Save patches:", patches.filter(p => p.kind === "Save").map(p => "#" + p.id).join(", "));
-
     // Detect conflicts in patches
     conflictState = detectPatchConflicts(patches);
 

@@ -517,6 +517,7 @@ fn get_reference_text(label: &str, registry: &CrossRefRegistry) -> String {
 /// - Replaces @tbl:label with "Table N"
 /// - Removes {#sec:label} from headings
 /// - Removes {#tbl:label} from after tables
+/// - Converts ![caption](url){#fig:label} to standard ![caption](url)
 fn preprocess_markdown_for_docx(markdown: &str, registry: &CrossRefRegistry) -> String {
     let mut result = markdown.to_string();
 
@@ -528,6 +529,11 @@ fn preprocess_markdown_for_docx(markdown: &str, registry: &CrossRefRegistry) -> 
             get_reference_text(label, registry)
         })
         .to_string();
+
+    // Convert figure syntax: ![caption](url){#fig:label} -> ![caption](url)
+    // This allows pandoc to properly embed the image
+    let fig_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)\{#fig:[^}]+\}").unwrap();
+    result = fig_re.replace_all(&result, "![$1]($2)").to_string();
 
     // Remove {#sec:label} from headings (keep the heading text)
     let sec_label_re = Regex::new(r"(\s*)\{#sec:[^}]+\}").unwrap();
@@ -934,9 +940,85 @@ fn markdown_to_docx(markdown: &str) -> Result<Docx, String> {
     Ok(docx)
 }
 
+/// Check if pandoc is available on the system
+fn is_pandoc_available() -> bool {
+    use std::process::Command;
+    Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Export markdown to DOCX using pandoc
+fn export_with_pandoc(path: &str, content: &str) -> Result<(), String> {
+    use std::process::{Command, Stdio};
+    use std::io::Write;
+    
+    // Preprocess the markdown to convert custom syntax to standard markdown
+    let crossref_registry = build_crossref_registry(content);
+    let mut processed_content = preprocess_markdown_for_docx(content, &crossref_registry);
+    
+    // Convert Tauri asset:// URLs back to absolute paths for pandoc
+    // asset://localhost/%2Fpath%2Fto%2Ffile -> /path/to/file
+    let asset_url_re = Regex::new(r"asset://localhost/(%[0-9A-Fa-f]{2}[^)\s]*)").unwrap();
+    processed_content = asset_url_re.replace_all(&processed_content, |caps: &regex::Captures| {
+        let encoded_path = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        // Simple percent-decoding
+        let mut decoded = String::new();
+        let mut chars = encoded_path.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '%' {
+                let hex: String = chars.by_ref().take(2).collect();
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    decoded.push(byte as char);
+                } else {
+                    decoded.push('%');
+                    decoded.push_str(&hex);
+                }
+            } else {
+                decoded.push(c);
+            }
+        }
+        decoded
+    }).to_string();
+    
+    let mut child = Command::new("pandoc")
+        .arg("-f")
+        .arg("markdown")
+        .arg("-t")
+        .arg("docx")
+        .arg("-o")
+        .arg(path)
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start pandoc: {}", e))?;
+    
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(processed_content.as_bytes())
+            .map_err(|e| format!("Failed to write to pandoc stdin: {}", e))?;
+    }
+    
+    let status = child.wait()
+        .map_err(|e| format!("Failed to wait for pandoc: {}", e))?;
+    
+    if !status.success() {
+        return Err("Pandoc conversion failed".to_string());
+    }
+    
+    Ok(())
+}
+
 /// Export markdown content as a DOCX file
+/// Uses pandoc if available for better quality output, falls back to docx_rs library
 #[tauri::command]
 pub fn export_docx(path: String, content: String) -> Result<(), String> {
+    // Try pandoc first for better quality output
+    if is_pandoc_available() {
+        return export_with_pandoc(&path, &content);
+    }
+    
+    // Fallback to Rust docx_rs library
     let docx = markdown_to_docx(&content)?;
 
     let file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
