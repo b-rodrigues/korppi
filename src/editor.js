@@ -51,11 +51,15 @@ export function getEditorContent() {
 export function getMarkdown() {
     let markdown = "";
     if (editor) {
-        editor.action((ctx) => {
-            const view = ctx.get(editorViewCtx);
-            const serializer = ctx.get(serializerCtx);
-            markdown = serializer(view.state.doc);
-        });
+        try {
+            editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const serializer = ctx.get(serializerCtx);
+                markdown = serializer(view.state.doc);
+            });
+        } catch (err) {
+            console.error("[ERROR] getMarkdown serialization failed:", err);
+        }
     }
     return markdown;
 }

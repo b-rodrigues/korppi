@@ -10,6 +10,7 @@ import { visit } from "unist-util-visit";
 /**
  * Create the underline mark
  * Interprets <ins> and <u> HTML tags as underlined text
+ * Serializes to <u>text</u> in markdown
  */
 export const underlineMark = $mark("underline", () => ({
     attrs: {},
@@ -18,25 +19,36 @@ export const underlineMark = $mark("underline", () => ({
         { tag: "u" },
         { style: "text-decoration=underline" },
     ],
-    toDOM: () => ["ins", { class: "underline" }, 0],
+    toDOM: () => ["u", 0],
     parseMarkdown: {
-        match: (node) => node.type === "ins",
+        match: (node) => node.type === "html" && node.value && /^<u>/.test(node.value),
         runner: (state, node, markType) => {
-            state.openMark(markType);
-            state.next(node.children);
-            state.closeMark(markType);
+            // HTML nodes with <u> tags - extract content
+            const match = node.value.match(/^<u>([\s\S]*)<\/u>$/);
+            if (match) {
+                state.openMark(markType);
+                state.addText(match[1]);
+                state.closeMark(markType);
+            }
         },
     },
     toMarkdown: {
         match: (mark) => mark.type.name === "underline",
-        runner: (state, mark) => {
-            state.withMark(mark, "ins");
+        runner: (state, mark, node) => {
+            // Output as HTML <u> tag - this is universally supported in markdown
+            // We need to handle the mark by wrapping the node's text content
+            if (node && node.isText && node.text) {
+                state.addNode("html", undefined, undefined, `<u>${node.text}</u>`);
+                return false; // Signal that we've handled the node entirely
+            }
         },
     },
 }));
 
 /**
- * Remark plugin to parse ++text++ and [text]{.underline} syntax
+ * Remark plugin to:
+ * - Parse ++text++ and [text]{.underline} into <u>text</u> HTML nodes (not 'ins')
+ * - The HTML nodes will be parsed back by the mark's parseMarkdown
  */
 export const underlineRemarkPlugin = $remark("underlineRemark", () => {
     return () => (tree) => {
@@ -63,11 +75,10 @@ export const underlineRemarkPlugin = $remark("underlineRemark", () => {
                 // Get the underlined text (either from ++text++ or [text]{.underline})
                 const underlineText = match[2] || match[3];
 
-                // The underlined text as ins node
+                // The underlined text as HTML node (not 'ins' which causes errors)
                 parts.push({
-                    type: "ins",
-                    data: { hName: "ins" },
-                    children: [{ type: "text", value: underlineText }],
+                    type: "html",
+                    value: `<u>${underlineText}</u>`,
                 });
 
                 lastIndex = match.index + match[0].length;

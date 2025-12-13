@@ -114,11 +114,15 @@ export function initFormattingToolbar(editor) {
  * Toggle a mark (bold, italic, etc.)
  */
 function toggleMarkCommand(markName) {
+    console.log('[DEBUG] toggleMarkCommand called for:', markName, 'editorInstance:', !!editorInstance);
     if (!editorInstance) return;
 
     editorInstance.action((ctx) => {
         const view = ctx.get(editorViewCtx);
         const { state, dispatch } = view;
+
+        console.log('[DEBUG] Schema marks:', Object.keys(state.schema.marks));
+        console.log('[DEBUG] Selection:', state.selection.from, '-', state.selection.to, 'empty:', state.selection.empty);
 
         const markType = state.schema.marks[markName];
         if (!markType) {
@@ -126,7 +130,24 @@ function toggleMarkCommand(markName) {
             return;
         }
 
-        toggleMark(markType)(state, dispatch);
+        console.log('[DEBUG] Toggling mark:', markName);
+        const result = toggleMark(markType)(state, dispatch);
+        console.log('[DEBUG] toggleMark result:', result);
+
+        // Check if mark was applied in the new state
+        setTimeout(() => {
+            const newState = view.state;
+            const { from, to } = newState.selection;
+            const hasMark = newState.doc.rangeHasMark(from, to, markType);
+            console.log('[DEBUG] After toggle, hasMark:', hasMark);
+
+            // Log DOM content
+            const editorEl = document.querySelector('#editor .ProseMirror');
+            if (editorEl) {
+                console.log('[DEBUG] Editor innerHTML:', editorEl.innerHTML);
+            }
+        }, 100);
+
         view.focus();
     });
 }

@@ -689,10 +689,6 @@ async function resetToOriginal() {
             const currentUser = getCachedProfile();
             const reviewerId = currentUser?.id || 'local';
 
-            console.log('[DEBUG] Reset: docId=', docId);
-            console.log('[DEBUG] Reset: reconciliationStartTime=', reconciliationStartTime);
-            console.log('[DEBUG] Reset: reviewerId=', reviewerId);
-
             try {
                 const deleted = await invoke("delete_document_reviews_after", {
                     docId,
@@ -700,17 +696,13 @@ async function resetToOriginal() {
                     reviewerId
                 });
 
-                console.log('[DEBUG] Reset: deleted reviews count=', deleted);
-
                 if (deleted > 0) {
                     console.log(`Reset ${deleted} patch review(s) made during reconciliation`);
                 }
             } catch (err) {
-                console.error("[DEBUG] Reset: Failed to reset reviews:", err);
+                console.warn("Failed to reset reviews:", err);
                 // Continue even if review reset fails - document is already restored
             }
-        } else {
-            console.log('[DEBUG] Reset: Skipping review reset - docId=', docId, 'reconciliationStartTime=', reconciliationStartTime);
         }
 
         alert("Document restored to state before reconciliation. Patch reviews have been reset.");

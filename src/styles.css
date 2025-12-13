@@ -41,6 +41,25 @@ body {
     min-height: 100%;
 }
 
+/* Formatting marks in the editor */
+#editor .ProseMirror strong {
+    font-weight: bold;
+}
+
+#editor .ProseMirror em {
+    font-style: italic;
+}
+
+#editor .ProseMirror u,
+#editor .ProseMirror ins {
+    text-decoration: underline;
+}
+
+#editor .ProseMirror s,
+#editor .ProseMirror del {
+    text-decoration: line-through;
+}
+
 /* Raw markdown editor (textarea) */
 .raw-editor {
     width: 100%;
