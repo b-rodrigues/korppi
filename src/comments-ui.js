@@ -396,96 +396,29 @@ function hideCommentModal() {
  * Initialize the comments panel in the sidebar.
  */
 export function initCommentsPanel() {
-    // Add tab switcher to timeline header
-    const timelineHeader = document.querySelector(".timeline-header h3");
-    if (timelineHeader) {
-        const tabContainer = document.createElement("div");
-        tabContainer.className = "sidebar-tabs";
-        tabContainer.innerHTML = `
-            <button class="sidebar-tab active" data-tab="timeline">Timeline</button>
-            <button class="sidebar-tab" data-tab="comments">Comments</button>
-        `;
-        timelineHeader.replaceWith(tabContainer);
-
-        // Tab click handlers
-        tabContainer.querySelectorAll(".sidebar-tab").forEach(btn => {
-            btn.addEventListener("click", () => {
-                switchToTab(btn.dataset.tab);
-            });
-        });
-    }
-
-    // Create comments panel (hidden initially)
-    const rightSidebar = document.querySelector(".right-sidebar");
-    if (rightSidebar) {
-        const commentsPanel = document.createElement("div");
-        commentsPanel.id = "comments-panel";
-        commentsPanel.className = "comments-panel";
-        commentsPanel.style.display = "none";
-        commentsPanel.innerHTML = `
-            <div class="comments-filter">
-                <select id="comments-status-filter" class="compact-select">
-                    <option value="">All Comments</option>
-                    <option value="unresolved" selected>Unresolved</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="deleted">Deleted</option>
-                </select>
-            </div>
-            <div class="comments-list" id="comments-list">
-                <p class="empty-message">No comments yet</p>
-            </div>
-        `;
-
-        // Insert before timeline-actions
-        const timelineActions = rightSidebar.querySelector(".timeline-actions");
-        if (timelineActions) {
-            rightSidebar.insertBefore(commentsPanel, timelineActions);
-        } else {
-            rightSidebar.appendChild(commentsPanel);
-        }
-
-        // Status filter handler
-        commentsPanel.querySelector("#comments-status-filter").addEventListener("change", (e) => {
+    // Comments panel is now in HTML, just wire up the filter
+    const statusFilter = document.getElementById("comments-status-filter");
+    if (statusFilter) {
+        statusFilter.addEventListener("change", (e) => {
             currentStatusFilter = e.target.value || null;
             refreshComments();
         });
-
         // Set initial filter
         currentStatusFilter = "unresolved";
     }
 
     // Listen for document changes to refresh comments
     window.addEventListener("document-changed", refreshComments);
-}
 
-/**
- * Switch between timeline and comments tabs.
- * @param {string} tab - 'timeline' or 'comments'
- */
-function switchToTab(tab) {
-    activeTab = tab;
-
-    // Update tab buttons
-    document.querySelectorAll(".sidebar-tab").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.tab === tab);
+    // Listen for sidebar tab changes
+    window.addEventListener("sidebar-tab-changed", (e) => {
+        if (e.detail.tab === "comments") {
+            refreshComments();
+        }
     });
-
-    // Toggle panels
-    const timelineList = document.getElementById("timeline-list");
-    const timelineControls = document.querySelector(".timeline-header .timeline-controls");
-    const commentsPanel = document.getElementById("comments-panel");
-
-    if (tab === "timeline") {
-        if (timelineList) timelineList.style.display = "block";
-        if (timelineControls) timelineControls.style.display = "flex";
-        if (commentsPanel) commentsPanel.style.display = "none";
-    } else {
-        if (timelineList) timelineList.style.display = "none";
-        if (timelineControls) timelineControls.style.display = "none";
-        if (commentsPanel) commentsPanel.style.display = "flex";
-        refreshComments();
-    }
 }
+
+
 
 /**
  * Refresh the comments list.

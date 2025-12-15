@@ -9,6 +9,7 @@ pub mod kmd;
 pub mod document_manager;
 pub mod comments;
 pub mod db_utils;
+pub mod hunk_calculator;
 
 use std::sync::Mutex;
 use patch_log::{
@@ -36,6 +37,7 @@ use document_manager::{
 use comments::{
     add_comment, list_comments, add_reply, resolve_comment, delete_comment, mark_comment_deleted, restore_comment,
 };
+use hunk_calculator::calculate_hunks_for_patches;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -109,6 +111,8 @@ pub fn run() {
             delete_comment,
             mark_comment_deleted,
             restore_comment,
+            // Hunk calculator
+            calculate_hunks_for_patches,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

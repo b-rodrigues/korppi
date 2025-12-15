@@ -167,7 +167,8 @@
                 <div class="editor-scroll">
                     <div class="editor-page">
                         <div id="editor"></div>
-                        <textarea id="raw-editor" class="raw-editor" style="display: none;" spellcheck="false"></textarea>
+                        <textarea id="raw-editor" class="raw-editor" style="display: none;"
+                            spellcheck="false"></textarea>
                     </div>
                 </div>
 
@@ -186,40 +187,77 @@
                 </div>
             </main>
 
-            <!-- Right Sidebar (Timeline) -->
+            <!-- Right Sidebar (Timeline & Track Changes) -->
             <aside class="right-sidebar">
-                <div class="timeline-header">
-                    <h3>Timeline</h3>
-                    <div class="timeline-controls">
-                        <select id="timeline-sort" class="compact-select" title="Sort order">
-                            <option value="time-desc">Newest</option>
-                            <option value="time-asc">Oldest</option>
-                            <option value="author">By Author</option>
-                            <option value="line-order">By Line</option>
-                        </select>
-                        <select id="filter-author" class="compact-select" title="Filter by author">
-                            <option value="all">All Authors</option>
-                        </select>
-                        <select id="filter-status" class="compact-select" title="Filter by status">
-                            <option value="all">All</option>
-                            <option value="pending" selected>Pending</option>
-                            <option value="accepted">Accepted</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+                <!-- Tab Navigation -->
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-tab="timeline">📋 Timeline</button>
+                    <button class="sidebar-tab" data-tab="comments">💬 Comments</button>
+                    <button class="sidebar-tab" data-tab="track-changes">✏️ Changes</button>
+                </div>
+
+                <!-- Timeline Tab Content -->
+                <div id="timeline-tab" class="sidebar-tab-content active" style="display: flex;">
+                    <div class="timeline-header">
+                        <div class="timeline-controls">
+                            <select id="timeline-sort" class="compact-select" title="Sort order">
+                                <option value="time-desc">Newest</option>
+                                <option value="time-asc">Oldest</option>
+                                <option value="author">By Author</option>
+                                <option value="line-order">By Line</option>
+                            </select>
+                            <select id="filter-author" class="compact-select" title="Filter by author">
+                                <option value="all">All Authors</option>
+                            </select>
+                        </div>
                     </div>
 
+                    <div id="timeline-list" class="timeline-list">
+                        <!-- Patches dynamically inserted -->
+                    </div>
+
+                    <div class="timeline-actions">
+                        <button id="reset-to-original-btn" class="action-btn"
+                            style="background: var(--danger); color: white; border-color: var(--danger);">
+                            <span class="icon">↺</span>
+                            <span class="label">Reset to Original</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div id="timeline-list" class="timeline-list">
-                    <!-- Patches dynamically inserted -->
+                <!-- Comments Tab Content -->
+                <div id="comments-tab" class="sidebar-tab-content" style="display: none;">
+                    <div class="comments-filter">
+                        <select id="comments-status-filter" class="compact-select">
+                            <option value="">All Comments</option>
+                            <option value="unresolved" selected>Unresolved</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="deleted">Deleted</option>
+                        </select>
+                    </div>
+                    <div class="comments-list" id="comments-list">
+                        <p class="empty-message">No comments yet</p>
+                    </div>
                 </div>
 
-                <div class="timeline-actions">
-                    <button id="reset-to-original-btn" class="action-btn"
-                        style="background: var(--danger); color: white; border-color: var(--danger);">
-                        <span class="icon">↺</span>
-                        <span class="label">Reset to Original</span>
-                    </button>
+                <!-- Track Changes Tab Content -->
+                <div id="track-changes-tab" class="sidebar-tab-content" style="display: none;">
+                    <div class="track-changes-header">
+                        <div class="track-changes-stats" id="track-changes-stats">
+                            No changes to review
+                        </div>
+                        <div class="track-changes-actions">
+                            <button id="track-accept-all-btn" class="action-btn accept-btn" disabled>✓ Accept
+                                All</button>
+                            <button id="track-reject-all-btn" class="action-btn reject-btn" disabled>✗ Reject
+                                All</button>
+                        </div>
+                    </div>
+                    <div id="track-changes-list" class="track-changes-list">
+                        <div class="empty-state">
+                            <p>Import document versions to review changes</p>
+                        </div>
+                    </div>
                 </div>
             </aside>
         </div>

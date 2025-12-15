@@ -2042,3 +2042,448 @@ textarea {
     background-color: rgba(244, 67, 54, 0.2);
     color: var(--danger);
 }
+
+/* ===== HUNK REVIEW PANEL ===== */
+.hunk-review-panel {
+    position: fixed;
+    top: 40px;
+    /* Below header */
+    right: 0;
+    width: 420px;
+    height: calc(100vh - 40px);
+    background: var(--bg-page);
+    border-left: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    display: none;
+    flex-direction: column;
+    z-index: 900;
+    overflow: hidden;
+}
+
+.hunk-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.hunk-panel-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.hunk-panel-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.hunk-panel-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.hunk-panel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.hunk-panel-btn.accept {
+    background: rgba(76, 175, 80, 0.8);
+}
+
+.hunk-panel-btn.reject {
+    background: rgba(244, 67, 54, 0.8);
+}
+
+.hunk-panel-stats {
+    padding: 8px 16px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.hunk-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.hunk-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.hunk-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.hunk-author {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+}
+
+.hunk-type {
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.hunk-lines {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.hunk-diff {
+    padding: 8px 12px;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    background: var(--bg-page);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.hunk-line {
+    padding: 1px 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.hunk-line-delete {
+    background: rgba(244, 67, 54, 0.15);
+    color: var(--danger);
+    text-decoration: line-through;
+}
+
+.hunk-line-add {
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--success);
+}
+
+.hunk-card-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+}
+
+.hunk-btn {
+    flex: 1;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.hunk-btn.accept {
+    background: var(--success);
+    color: white;
+}
+
+.hunk-btn.accept:hover {
+    opacity: 0.9;
+}
+
+.hunk-btn.reject {
+    background: var(--danger);
+    color: white;
+}
+
+.hunk-btn.reject:hover {
+    opacity: 0.9;
+}
+
+.hunk-complete {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.hunk-complete-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.hunk-complete p {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* ===== SIDEBAR TABS ===== */
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-sidebar);
+}
+
+.sidebar-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.sidebar-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--bg-page);
+}
+
+.right-sidebar .sidebar-tab-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.right-sidebar .sidebar-tab-content.active {
+    display: flex;
+}
+
+/* ===== TRACK CHANGES TAB ===== */
+.track-changes-header {
+    padding: 10px 12px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.track-changes-stats {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.track-changes-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.track-changes-actions .action-btn {
+    flex: 1;
+    padding: 5px 10px;
+    font-size: 10px;
+}
+
+.track-changes-actions .accept-btn {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+}
+
+.track-changes-actions .reject-btn {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+.track-changes-actions .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.track-changes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.track-changes-list .empty-state {
+    text-align: center;
+    padding: 30px 15px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+/* Hunk cards in track changes */
+.track-change-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+.track-change-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.track-change-author {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    color: white;
+}
+
+.track-change-type {
+    font-size: 9px;
+    color: var(--text-secondary);
+}
+
+.track-change-lines {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.track-change-diff {
+    padding: 6px 10px;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 10px;
+    background: var(--bg-page);
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.track-change-line {
+    padding: 1px 3px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.track-change-line.delete {
+    background: rgba(244, 67, 54, 0.15);
+    color: var(--danger);
+    text-decoration: line-through;
+}
+
+.track-change-line.add {
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--success);
+}
+
+.track-change-actions {
+    display: flex;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+}
+
+.track-change-btn {
+    flex: 1;
+    padding: 4px 8px;
+    border: none;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.track-change-btn.accept {
+    background: var(--success);
+    color: white;
+}
+
+.track-change-btn.reject {
+    background: var(--danger);
+    color: white;
+}
+
+.track-change-btn:hover {
+    opacity: 0.85;
+}
+
+.track-changes-complete {
+    text-align: center;
+    padding: 30px 15px;
+}
+
+.track-changes-complete .check-icon {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.track-changes-complete p {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+/* Conflict Styles */
+.track-change-card.conflict {
+    border-color: var(--danger);
+    background: rgba(244, 67, 54, 0.05);
+}
+
+.conflict-banner {
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 4px 6px;
+    text-align: center;
+    font-weight: 600;
+    border-bottom: 1px solid var(--danger);
+}
+
+/* Hunk Hover Highlight in Editor */
+.hunk-hover-highlight {
+    background-color: rgba(255, 255, 50, 0.2);
+    /* outline: 1px solid rgba(255, 255, 0, 0.4); */
+    border-bottom: 2px solid rgba(255, 215, 0, 0.6);
+    cursor: crosshair;
+}
+
+/* Ghost Preview Styles */
+.ghost-insert {
+    background-color: rgba(76, 175, 80, 0.2);
+    /* Green tint */
+    color: #2e7d32;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-style: italic;
+    outline: 1px dashed rgba(76, 175, 80, 0.5);
+    transition: all 0.2s ease;
+}
+
+.ghost-delete {
+    text-decoration: line-through;
+    opacity: 0.6;
+    background-color: rgba(244, 67, 54, 0.15);
+    /* Red tint */
+    color: #c62828;
+    text-decoration-color: #c62828;
+    transition: all 0.2s ease;
+}

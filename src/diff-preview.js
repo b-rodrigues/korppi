@@ -8,7 +8,7 @@ import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { hexToRgba, escapeHtml } from './utils.js';
 import { getEditorContent, getMarkdown } from './editor.js';
-import { getConflictState } from './timeline.js';
+import { getConflictState, restoreToPatch } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
 
 let previewState = {
@@ -92,13 +92,11 @@ function showPreviewBanner() {
         banner.innerHTML = `
             <div class="preview-info">
                 <span class="preview-label">📋 Preview Mode: Patch #<span id="preview-patch-id"></span></span>
-                <div id="conflict-tabs" class="conflict-tabs"></div>
             </div>
             <div class="preview-controls">
                 <button class="mode-btn" data-mode="highlight">🎨 Highlight</button>
                 <button class="mode-btn active" data-mode="diff">📝 Diff</button>
-                <button class="accept-patch-btn" style="background:#4caf50;color:white;margin-left:20px;">✓ Accept</button>
-                <button class="reject-patch-btn" style="background:#f44336;color:white;">✗ Reject</button>
+                <button class="restore-btn" style="background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; margin-right: 10px;">↺ Restore this Version</button>
                 <button class="exit-btn">✕ Exit Preview</button>
             </div>
         `;
@@ -119,20 +117,14 @@ function showPreviewBanner() {
             exitPreview();
         });
 
-        const acceptBtn = banner.querySelector('.accept-patch-btn');
-        const rejectBtn = banner.querySelector('.reject-patch-btn');
-
-        if (acceptBtn) {
-            acceptBtn.addEventListener('click', async () => {
-                await acceptCurrentPatch();
-            });
-        }
-
-        if (rejectBtn) {
-            rejectBtn.addEventListener('click', async () => {
-                await rejectCurrentPatch();
-            });
-        }
+        banner.querySelector('.restore-btn').addEventListener('click', async () => {
+            if (previewState.patchId) {
+                const success = await restoreToPatch(previewState.patchId);
+                if (success) {
+                    exitPreview();
+                }
+            }
+        });
     }
 
     // Update patch ID
@@ -140,9 +132,6 @@ function showPreviewBanner() {
     if (patchIdEl) {
         patchIdEl.textContent = previewState.patchId;
     }
-
-    // Update conflict tabs if this patch is in a conflict group
-    updateConflictTabs();
 
     banner.style.display = 'flex';
 }

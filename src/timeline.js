@@ -7,6 +7,7 @@ import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGroup } from "./conflict-detection.js";
 import { getEditorContent, getMarkdown, setMarkdownContent } from "./editor.js";
 import { getCachedProfile } from "./profile-service.js";
+import { recalculateReconcileState } from './reconcile.js';
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -63,7 +64,7 @@ export async function restoreToPatch(patchId) {
     }
 
     const ts = new Date(patch.timestamp).toLocaleString();
-    const confirmMsg = `This will revert to version #${patchId} from ${ts}.\n\nYour current changes will be saved first.\n\nContinue?`;
+    const confirmMsg = `This is a Time Travel operation.\n\nIt will:\n1. Revert the document to version #${patchId}.\n2. Set this version as the new Reconciliation Base.\n3. Re-calculate all other patches relative to this version.\n\nContinue?`;
 
     if (!confirm(confirmMsg)) {
         return false;
@@ -81,6 +82,10 @@ export async function restoreToPatch(patchId) {
             const success = setMarkdownContent(patch.data.snapshot);
             if (success) {
                 restoredPatchId = patchId;
+
+                // Trigger Full Re-calculation (Perspective Switch)
+                await recalculateReconcileState(patch.data.snapshot, patchId);
+
                 // Refresh the timeline to show the restored state
                 await refreshTimeline();
                 return true;
@@ -95,6 +100,10 @@ export async function restoreToPatch(patchId) {
                 const success = setMarkdownContent(result.snapshot_content);
                 if (success) {
                     restoredPatchId = patchId;
+
+                    // Trigger Full Re-calculation (Perspective Switch)
+                    await recalculateReconcileState(result.snapshot_content, patchId);
+
                     await refreshTimeline();
                     return true;
                 }
@@ -107,6 +116,10 @@ export async function restoreToPatch(patchId) {
             const success = setMarkdownContent(result.snapshot_content);
             if (success) {
                 restoredPatchId = patchId;
+
+                // Trigger Full Re-calculation (Perspective Switch)
+                await recalculateReconcileState(result.snapshot_content, patchId);
+
                 await refreshTimeline();
                 return true;
             }
@@ -181,7 +194,6 @@ export function initTimeline() {
     const sortSelect = document.getElementById("timeline-sort");
 
     const filterAuthor = document.getElementById("filter-author");
-    const filterStatus = document.getElementById("filter-status");
     const resetBtn = document.getElementById("reset-to-original-btn");
 
 
@@ -195,12 +207,6 @@ export function initTimeline() {
     // Wire up filter dropdowns
     if (filterAuthor) {
         filterAuthor.addEventListener("change", () => {
-            refreshTimeline();
-        });
-    }
-
-    if (filterStatus) {
-        filterStatus.addEventListener("change", () => {
             refreshTimeline();
         });
     }
@@ -248,7 +254,6 @@ export async function renderPatchList(patches) {
 
     // Get filter values
     const authorFilter = document.getElementById("filter-author")?.value || "all";
-    const statusFilter = document.getElementById("filter-status")?.value || "all";
     const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
 
 
@@ -331,27 +336,15 @@ export async function renderPatchList(patches) {
             return false;
         }
 
-        // Filter by status
-        if (statusFilter !== "all") {
-            const effectiveStatus = getEffectiveStatus(p);
-            if (effectiveStatus !== statusFilter) {
-                return false;
-            }
-        }
-
         return true;
     });
 
-    // For "pending" status filter ONLY: hide patches that match current editor content
-    // These are "base" patches that don't represent changes to review
-    // We do NOT apply this filter for "accepted" or "all" views
-    if (statusFilter === "pending") {
-        const currentEditorContent = getEditorContent() || '';
-        filteredPatches = filteredPatches.filter(patch => {
-            const snapshot = patch.data?.snapshot || '';
-            return snapshot !== currentEditorContent;
-        });
-    }
+    // Hide patches that match current editor content (no changes to show)
+    const currentEditorContent = getEditorContent() || '';
+    filteredPatches = filteredPatches.filter(patch => {
+        const snapshot = patch.data?.snapshot || '';
+        return snapshot !== currentEditorContent;
+    });
 
     // Sort patches BEFORE rendering (determines display order)
     if (sortOrder === "time-asc") {
@@ -540,31 +533,63 @@ async function previewPatch(patchId) {
     // Import dependencies
     const { mergeText } = await import('./three-way-merge.js');
 
+    // Immutable Preview Logic:
+    // Always diff "Original Base" vs "Patch Snapshot"
+    // This allows seeing what the patch actually did, regardless of current edits.
+
     // Get current editor content as markdown (the "old" state)
     const currentContent = getMarkdown();
-
-    // Calculate what the merged result would be (3-way merge simulation)
-    // base: first patch snapshot
-    // local: current editor content
-    // canonical: patch being previewed
-
-    const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches
-        .filter(p => p.kind === "Save" && hasSnapshotContent(p))
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-    const baseSnapshot = savePatchesOnly.length > 0
-        ? savePatchesOnly[0].data.snapshot
-        : '';
-
     const patchContent = patch.data?.snapshot || '';
 
-    // Simulate what the merge would produce
-    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+    let oldText = currentContent; // Default fallback
+    let newText = patchContent;   // Default fallback
 
-    // Show diff from current content to merged result
-    // This shows "what will change if you accept this patch"
-    enterPreview(patchId, currentContent, mergedResult);
+    const docId = getActiveDocumentId();
+    const reconciliationBase = docId ? localStorage.getItem(`reconciliation-snapshot-${docId}`) : null;
+
+    if (reconciliationBase !== null) {
+        // We are in a reconciliation session
+        console.log("Preview: Using Immutable Reconciliation Base");
+        oldText = reconciliationBase;
+        // newText is just the patch content (snapshot)
+        newText = patchContent;
+    } else {
+        // Fallback for non-reconciliation mode (legacy behavior: diff vs current)
+        // Actually, even in legacy, showing "Patch vs Current" is weird if we want to see "what this patch did".
+        // Ideally we'd show "Patch Parent vs Patch". 
+        // But for now, let's keep the user's request: "Original Diff".
+
+        // If we don't have a reconciliation base, maybe we should try to find the "Base Snapshot" 
+        // (the common ancestor) like the old code did?
+        // Old code: mergeText(baseSnapshot, currentContent, patchContent) -> mergedResult
+        // displaying: currentContent vs mergedResult.
+        // This showed "What happens if I merge this now".
+
+        // The user specifically asked: "show the original diff... restoring a full patch should start from the original base".
+        // So if reconciliationBase exists, use it.
+        // If not, keep old behavior? Or try to use patch parent? 
+        // Let's stick to the requested logic:
+
+        // If NO reconciliation base, we fall back to the recursive 3-way merge preview (Current vs Result)
+        // because that's still useful for "What will happen NOW?".
+        // But since we are IN the reconciliation flow usually, the localstorage should be there.
+
+        const allPatches = await fetchPatchList();
+        const savePatchesOnly = allPatches
+            .filter(p => p.kind === "Save" && hasSnapshotContent(p))
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+        const baseSnapshot = savePatchesOnly.length > 0
+            ? savePatchesOnly[0].data.snapshot
+            : '';
+
+        // Current vs Merged (Simulation)
+        newText = mergeText(baseSnapshot, currentContent, patchContent);
+        oldText = currentContent;
+    }
+
+    // Show diff
+    enterPreview(patchId, oldText, newText);
 }
 
 /**
