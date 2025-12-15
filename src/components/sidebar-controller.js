@@ -13,6 +13,46 @@ export function initSidebarController() {
     if (rightSidebar) {
         rightSidebar.classList.add('hidden');
     }
+
+    // Initialize tab switching
+    initSidebarTabs();
+}
+
+/**
+ * Initialize sidebar tab switching
+ */
+function initSidebarTabs() {
+    const tabs = document.querySelectorAll('.sidebar-tab');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabId = tab.dataset.tab;
+            switchSidebarTab(tabId);
+        });
+    });
+}
+
+/**
+ * Switch the active sidebar tab
+ * @param {string} tabId - The tab ID to switch to
+ */
+export function switchSidebarTab(tabId) {
+    // Update tab buttons
+    document.querySelectorAll('.sidebar-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabId);
+    });
+
+    // Update tab content
+    document.querySelectorAll('.sidebar-tab-content').forEach(content => {
+        const isActive = content.id === `${tabId}-tab`;
+        content.classList.toggle('active', isActive);
+        content.style.display = isActive ? 'flex' : 'none';
+    });
+
+    // Notify other components (using custom event)
+    window.dispatchEvent(new CustomEvent('sidebar-tab-changed', {
+        detail: { tab: tabId }
+    }));
 }
 
 /**
@@ -29,11 +69,7 @@ export function showRightSidebar(tab = null) {
 
         // Switch to requested tab if specified
         if (tab) {
-            // Use switchToTab function if available, otherwise click the tab button
-            const tabBtn = document.querySelector(`.sidebar-tab[data-tab="${tab}"]`);
-            if (tabBtn) {
-                tabBtn.click();
-            }
+            switchSidebarTab(tab);
         }
     }
 }

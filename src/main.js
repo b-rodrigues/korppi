@@ -35,6 +35,7 @@ import { initAutosave } from "./autosave.js";
 import { initWordCount } from "./word-count.js";
 import { initSidebarController } from "./components/sidebar-controller.js";
 import { initPatchMergeWizard, openPatchMergeWizard } from "./patch-merge-wizard.js";
+import { initHunkReviewPanel } from "./hunk-review-panel.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -377,6 +378,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initAutosave();
     initWordCount();
     initPatchMergeWizard();
+    initHunkReviewPanel();
 
     // Wire up Merge Patches button
     const mergePatchesBtn = document.getElementById("merge-patches-btn");
