@@ -279,6 +279,15 @@ window.hunkReview_enter = (index) => {
             relativePos = hunk.base_start / content.length;
         }
 
+        console.log(`[PreviewDebug] Hover Hunk #${index}:`, {
+            id: hunk.internal_id,
+            start: hunk.base_start,
+            end: hunk.base_end,
+            relativePos: relativePos,
+            contentLen: content.length,
+            textSnippet: content.substring(hunk.base_start, hunk.base_start + 20) + "..."
+        });
+
         // Logic to determine type and arguments for Ghost Preview
         // Note: 'hunk.type' roughly tells us, but checking text lengths is safer
 

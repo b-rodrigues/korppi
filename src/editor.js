@@ -174,39 +174,119 @@ export function scrollToEditorRange(from, to) {
 }
 
 /**
- * Helper: Find best relative match for text in editor
+ * Helper: Find best relative match for text in editor.
+ * Uses Head/Tail anchoring and Gap detection to handle node boundaries robustly.
  */
 function findBestMatch(view, text, relativePos) {
-    const doc = view.state.doc;
-    const cleanText = text.replace(/[*_#`\[\]()]/g, ''); // Heuristic cleanup
-    if (!cleanText) return null;
+    if (!text) return null;
 
-    const matches = [];
-    let currentTextOffset = 0;
+    // 1. Prepare Text
+    let cleanText = text.replace(/\s+/g, ' ').trim();
+    // Strip MD links/images [Text](Url) -> Text
+    cleanText = cleanText.replace(/!?(?:\[([^\]]*)\])\([^)]+\)/g, '$1');
+    // Strip formatting markers
+    cleanText = cleanText.replace(/[*_#`]/g, '').trim();
+
+    if (cleanText.length === 0) return null;
+
+    const SnippetLen = 40;
+    const searchHead = cleanText.substring(0, SnippetLen);
+    const searchTail = cleanText.slice(-SnippetLen);
+
+    const doc = view.state.doc;
+
+    // 2. Build Virtual Text Stream & Candidate Map
+    // We walk text nodes. If Gap > 0, we insert space.
+    // We store candidates for Head.
+
+    let virtualText = "";
+    let lastEndPos = 0; // End of last text node
+
+    // Map: virtualIndex -> { pos (node start), offsetInNode, gapCorrection }
+    // Actually, we just need to resolve back.
+    // Let's store "Checkpoints". 
+    // Optimization: Just Search!
+
+    // We can't build the whole string and map if doc is huge.
+    // But for typical docs (100k chars) it's fine.
+
+    const nodeMap = []; // { vStart, vEnd, pmStart }
 
     doc.descendants((node, pos) => {
         if (node.isText) {
-            const nodeText = node.text;
-            let localIdx = nodeText.indexOf(cleanText);
-            while (localIdx !== -1) {
-                matches.push({
-                    pos: pos + localIdx,
-                    textOffset: currentTextOffset + localIdx
-                });
-                localIdx = nodeText.indexOf(cleanText, localIdx + 1);
+            // Check Gap
+            if (lastEndPos > 0 && pos - lastEndPos >= 2) {
+                virtualText += " "; // Block boundary
             }
-            currentTextOffset += nodeText.length;
-        } else if (node.isBlock) {
-            currentTextOffset += 1;
+
+            const vStart = virtualText.length;
+            virtualText += node.text;
+            const vEnd = virtualText.length;
+
+            nodeMap.push({ vStart, vEnd, pmStart: pos });
+            lastEndPos = pos + node.nodeSize;
         }
     });
 
-    if (matches.length === 0) return null;
+    // 3. Find Matches in Virtual Text
+    const headMatches = [];
+    let idx = virtualText.indexOf(searchHead);
+    while (idx !== -1) {
+        headMatches.push(idx);
+        idx = virtualText.indexOf(searchHead, idx + 1);
+    }
 
-    const estimatedTargetOffset = Math.floor(currentTextOffset * relativePos);
-    matches.sort((a, b) => Math.abs(a.textOffset - estimatedTargetOffset) - Math.abs(b.textOffset - estimatedTargetOffset));
+    if (headMatches.length === 0) {
+        console.warn(`[PreviewDebug] Head not found: "${searchHead}"`);
+        return null;
+    }
 
-    return matches[0]; // { pos, textOffset }
+    // 4. Select Best Head
+    const estimatedIndex = Math.floor(virtualText.length * relativePos);
+    headMatches.sort((a, b) => Math.abs(a - estimatedIndex) - Math.abs(b - estimatedIndex));
+    const bestHeadIndex = headMatches[0];
+
+    // 5. Find Tail
+    let bestTailIndex = -1;
+    if (cleanText.length <= SnippetLen) {
+        bestTailIndex = bestHeadIndex + cleanText.length;
+    } else {
+        // Search for tail after head
+        const searchStart = bestHeadIndex + cleanText.length - SnippetLen - 20;
+        const tailIdx = virtualText.indexOf(searchTail, Math.max(bestHeadIndex, searchStart));
+
+        if (tailIdx !== -1 && (tailIdx - bestHeadIndex) < cleanText.length * 1.5) {
+            bestTailIndex = tailIdx + searchTail.length;
+        } else {
+            bestTailIndex = bestHeadIndex + cleanText.length;
+        }
+    }
+
+    // 6. Map Virtual Indices -> PM Positions
+    const mapToPM = (vIndex) => {
+        // Find node containing vIndex
+        const node = nodeMap.find(n => vIndex >= n.vStart && vIndex <= n.vEnd);
+        if (node) {
+            // Exact match inside a node
+            const offset = vIndex - node.vStart;
+            return node.pmStart + offset;
+        }
+
+        // If index is in a "Gap" (space we inserted)?
+        // e.g. vEnd of Node A = 10. vStart of Node B = 11. vIndex = 10 (the space).
+        // Map to end of Node A? Or start of Node B?
+        // Start of Node B is safer.
+        const nextNode = nodeMap.find(n => n.vStart > vIndex);
+        if (nextNode) return nextNode.pmStart;
+
+        // EOF
+        return doc.content.size;
+    };
+
+    const fromPos = mapToPM(bestHeadIndex);
+    const toPos = mapToPM(bestTailIndex);
+
+    return { from: fromPos, to: toPos };
 }
 
 /**
@@ -224,8 +304,8 @@ export function highlightByText(text, type, relativePos) {
             return;
         }
 
-        let from = match.pos;
-        let to = from + text.replace(/[*_#`\[\]()]/g, '').length;
+        let from = match.from;
+        let to = match.to;
 
         if (type === 'point') {
             from = to;
@@ -241,8 +321,8 @@ export function highlightByText(text, type, relativePos) {
 
 /**
  * Show Ghost Preview for a Hunk
- * @param {string} text - The text to insert (for insert/replace), or delete (for delete)
- * @param {string} kind - 'insert', 'delete', or 'replace'
+ * @param {string} text - The text to insert, or the text being deleted.
+ * @param {string} kind - 'insert' or 'delete'
  * @param {number} relativePos - Position heuristic
  * @param {string} [contextOrDeleteText] - For insert: context. For replace: text to delete.
  */
@@ -262,7 +342,8 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
             } else {
                 const match = findBestMatch(view, context, relativePos);
                 if (match) {
-                    from = match.pos + context.replace(/[*_#`\[\]()]/g, '').length;
+                    // Insert AFTER the context
+                    from = match.to; // User precise end of context
                 } else {
                     from = Math.floor(relativePos * view.state.doc.content.size);
                 }
@@ -271,8 +352,8 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
         } else if (kind === 'delete') {
             const match = findBestMatch(view, text, relativePos);
             if (match) {
-                from = match.pos;
-                to = from + text.replace(/[*_#`\[\]()]/g, '').length;
+                from = match.from;
+                to = match.to;
             } else {
                 return;
             }
@@ -283,11 +364,9 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
             if (deleteText) {
                 const match = findBestMatch(view, deleteText, relativePos);
                 if (match) {
-                    deleteFrom = match.pos;
-                    deleteTo = deleteFrom + deleteText.replace(/[*_#`\[\]()]/g, '').length;
+                    deleteFrom = match.from;
+                    deleteTo = match.to;
                 } else {
-                    // Fallback? If can't find delete text, maybe treating as insert?
-                    // Safe to just return/fail for now.
                     return;
                 }
             }
