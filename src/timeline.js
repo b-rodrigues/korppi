@@ -520,31 +520,63 @@ async function previewPatch(patchId) {
     // Import dependencies
     const { mergeText } = await import('./three-way-merge.js');
 
+    // Immutable Preview Logic:
+    // Always diff "Original Base" vs "Patch Snapshot"
+    // This allows seeing what the patch actually did, regardless of current edits.
+
     // Get current editor content as markdown (the "old" state)
     const currentContent = getMarkdown();
-
-    // Calculate what the merged result would be (3-way merge simulation)
-    // base: first patch snapshot
-    // local: current editor content
-    // canonical: patch being previewed
-
-    const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches
-        .filter(p => p.kind === "Save" && hasSnapshotContent(p))
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-    const baseSnapshot = savePatchesOnly.length > 0
-        ? savePatchesOnly[0].data.snapshot
-        : '';
-
     const patchContent = patch.data?.snapshot || '';
 
-    // Simulate what the merge would produce
-    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
+    let oldText = currentContent; // Default fallback
+    let newText = patchContent;   // Default fallback
 
-    // Show diff from current content to merged result
-    // This shows "what will change if you accept this patch"
-    enterPreview(patchId, currentContent, mergedResult);
+    const docId = getActiveDocumentId();
+    const reconciliationBase = docId ? localStorage.getItem(`reconciliation-snapshot-${docId}`) : null;
+
+    if (reconciliationBase !== null) {
+        // We are in a reconciliation session
+        console.log("Preview: Using Immutable Reconciliation Base");
+        oldText = reconciliationBase;
+        // newText is just the patch content (snapshot)
+        newText = patchContent;
+    } else {
+        // Fallback for non-reconciliation mode (legacy behavior: diff vs current)
+        // Actually, even in legacy, showing "Patch vs Current" is weird if we want to see "what this patch did".
+        // Ideally we'd show "Patch Parent vs Patch". 
+        // But for now, let's keep the user's request: "Original Diff".
+
+        // If we don't have a reconciliation base, maybe we should try to find the "Base Snapshot" 
+        // (the common ancestor) like the old code did?
+        // Old code: mergeText(baseSnapshot, currentContent, patchContent) -> mergedResult
+        // displaying: currentContent vs mergedResult.
+        // This showed "What happens if I merge this now".
+
+        // The user specifically asked: "show the original diff... restoring a full patch should start from the original base".
+        // So if reconciliationBase exists, use it.
+        // If not, keep old behavior? Or try to use patch parent? 
+        // Let's stick to the requested logic:
+
+        // If NO reconciliation base, we fall back to the recursive 3-way merge preview (Current vs Result)
+        // because that's still useful for "What will happen NOW?".
+        // But since we are IN the reconciliation flow usually, the localstorage should be there.
+
+        const allPatches = await fetchPatchList();
+        const savePatchesOnly = allPatches
+            .filter(p => p.kind === "Save" && hasSnapshotContent(p))
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+        const baseSnapshot = savePatchesOnly.length > 0
+            ? savePatchesOnly[0].data.snapshot
+            : '';
+
+        // Current vs Merged (Simulation)
+        newText = mergeText(baseSnapshot, currentContent, patchContent);
+        oldText = currentContent;
+    }
+
+    // Show diff
+    enterPreview(patchId, oldText, newText);
 }
 
 /**

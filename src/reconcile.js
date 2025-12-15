@@ -34,7 +34,7 @@ export async function startReconciliation() {
 
     // Save current state before importing (for reset functionality)
     const baseContent = getMarkdown();
-    localStorage.setItem('reconciliation-snapshot', baseContent);
+    localStorage.setItem(`reconciliation-snapshot-${docId}`, baseContent);
 
     // Save the timestamp when reconciliation started (for resetting reviews)
     const reconciliationStartTime = Date.now();
