@@ -2457,3 +2457,33 @@ textarea {
     font-weight: 600;
     border-bottom: 1px solid var(--danger);
 }
+
+/* Hunk Hover Highlight in Editor */
+.hunk-hover-highlight {
+    background-color: rgba(255, 255, 50, 0.2);
+    /* outline: 1px solid rgba(255, 255, 0, 0.4); */
+    border-bottom: 2px solid rgba(255, 215, 0, 0.6);
+    cursor: crosshair;
+}
+
+/* Ghost Preview Styles */
+.ghost-insert {
+    background-color: rgba(76, 175, 80, 0.2);
+    /* Green tint */
+    color: #2e7d32;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-style: italic;
+    outline: 1px dashed rgba(76, 175, 80, 0.5);
+    transition: all 0.2s ease;
+}
+
+.ghost-delete {
+    text-decoration: line-through;
+    opacity: 0.6;
+    background-color: rgba(244, 67, 54, 0.15);
+    /* Red tint */
+    color: #c62828;
+    text-decoration-color: #c62828;
+    transition: all 0.2s ease;
+}

@@ -3,7 +3,7 @@
 // Updates character offsets locally and detects overlaps.
 
 import { getReconciliationHunks, clearReconciliationHunks } from './reconcile.js';
-import { getMarkdown, setMarkdownContent } from './editor.js';
+import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewGhostHunk } from './editor.js';
 import { showRightSidebar } from './components/sidebar-controller.js';
 import { getProfile } from './profile-service.js';
 
@@ -79,8 +79,87 @@ async function startHunkReview(hunks) {
     // Switch to track changes tab and show sidebar
     showRightSidebar('track-changes');
 
+    // Align hunks to current editor content (fix drift from backend vs editor serialization)
+    const currentMarkdown = getMarkdown();
+    if (currentMarkdown) {
+        alignHunksToContent(reviewState.hunks, currentMarkdown);
+    }
+
     // Render the hunks
     renderHunks();
+}
+
+/**
+ * Align hunks to the actual text content in the editor.
+ * Backend offsets might differ slightly from Editor's serialized markdown
+ * (e.g. bold markers, whitespace). This snaps them to the real text.
+ */
+function alignHunksToContent(hunks, content) {
+    let offsetAdjustment = 0; // Cumulative drift
+
+    // Sort hunks by start pos to handle sequentially? 
+    // Actually backend usually sends sorted.
+
+    // We can't trust the order if we have massive drifts, but let's assume
+    // relative order is preserved.
+
+    hunks.forEach((h, i) => {
+        // 1. Expected position from backend
+        const expectedStart = h.base_start;
+        const textAndOffsets = [];
+
+        // We look for the text around the expected position.
+        // What text? 
+        // If Delete/Mod: 'base_text' should exist.
+        // If Add: We don't have base_text to find (it's empty).
+        //    For Add, we need CONTEXT. 
+        //    We can look for the text *before* the add?
+        //    Or we rely on the gap between previous and next hunk?
+
+        // Let's rely on 'base_text' if it exists (Delete/Mod)
+        let searchText = h.base_text;
+
+        // If it's an ADD, 'base_text' is empty. We can't search for empty string.
+        // We have to rely on the fact that an ADD is usually between two known points.
+        // Or we search for the surrounding context.
+        // Ideally the backend provided context. It didn't. 
+
+        // Simplification: 
+        // If we can't find the text, we might just trust the offset + cumulative adjustment?
+
+        if (h.type !== 'add' && searchText && searchText.length > 0) {
+            // Search range: expectedStart +/- tolerance
+            const tolerance = 200; // Look around
+            const searchZoneStart = Math.max(0, expectedStart - tolerance);
+
+            // We search for the first occurrence of searchText starting from searchZoneStart
+            // Ideally closest to expectedStart.
+            const idx = content.indexOf(searchText, searchZoneStart);
+
+            if (idx !== -1) {
+                // How far off are we?
+                const diff = idx - expectedStart;
+
+                // If the diff is huge, maybe we found the wrong instance?
+                // Check distance
+                if (Math.abs(diff) < tolerance * 2) {
+                    // Update the hunk to real positions
+                    h.base_start = idx;
+                    h.base_end = idx + searchText.length;
+
+                    // console.log(`[Align] Hunk ${i} aligned. Shift: ${diff}`);
+                    // offsetAdjustment = diff; // Should we propagate? Maybe not. Local drift.
+                }
+            }
+        } else {
+            // For ADDs, we are flying blind without context.
+            // Best guess: apply the average drift of nearby hunks?
+            // Or just trust the backend offset (which is all we have).
+            // If the user hovers, 'previewGhostHunk' uses fuzzy search on *context*.
+            // Maybe we should accept that ADDs might be slightly off until we simply implement "Search by Context" completely.
+            // But for Accept/Reject, we assume offsets are right.
+        }
+    });
 }
 
 /**
@@ -167,7 +246,7 @@ function renderHunks() {
         const conflictMsg = isConflict ? '<div class="conflict-banner">⚠️ Overlap with accepted change</div>' : '';
 
         return `
-            <div class="${cardClass}" style="${isConflict ? 'opacity: 0.6; pointer-events:none;' : ''}">
+            <div class="${cardClass}" style="${isConflict ? 'opacity: 0.6; pointer-events:none;' : ''}" onmouseenter="window.hunkReview_enter(${originalIndex})" onmouseleave="window.hunkReview_leave()">
                 ${conflictMsg}
                 <div class="track-change-header" style="border-left: 3px solid ${hunk.author_color}">
                     <span class="track-change-author" style="background-color: ${hunk.author_color}">${hunk.author_name}</span>
@@ -189,6 +268,44 @@ function renderHunks() {
 // Global handlers
 window.hunkReview_accept = acceptHunk;
 window.hunkReview_reject = rejectHunk;
+
+// Hover handlers
+window.hunkReview_enter = (index) => {
+    const hunk = reviewState.hunks[index];
+    if (hunk && hunk.status === 'pending') {
+        const content = getMarkdown();
+        let relativePos = 0.5;
+        if (content.length > 0) {
+            relativePos = hunk.base_start / content.length;
+        }
+
+        // Logic to determine type and arguments for Ghost Preview
+        // Note: 'hunk.type' roughly tells us, but checking text lengths is safer
+
+        if (hunk.type === 'add') {
+            // Insert: need modified_text and context (preceding text)
+            // Context: grab 20 chars before base_start
+            const contextStart = Math.max(0, hunk.base_start - 20);
+            const contextText = content.substring(contextStart, hunk.base_start);
+            previewGhostHunk(hunk.modified_text, 'insert', relativePos, contextText);
+
+        } else if (hunk.type === 'delete') {
+            // Delete: need base_text (the text currently in editor)
+            // We can extract it from range to be sure, or use hunk.base_text
+            const targetText = content.substring(hunk.base_start, hunk.base_end);
+            previewGhostHunk(targetText, 'delete', relativePos);
+
+        } else {
+            // Mod/Replace: need modified_text (to insert) and base_text (to delete)
+            const deleteText = content.substring(hunk.base_start, hunk.base_end);
+            previewGhostHunk(hunk.modified_text, 'replace', relativePos, deleteText);
+        }
+    }
+};
+
+window.hunkReview_leave = () => {
+    clearEditorHighlight();
+};
 
 /**
  * Accept a hunk

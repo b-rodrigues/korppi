@@ -12,7 +12,8 @@ export { editorViewCtx };
 // Re-export figure registry functions for use by other modules
 export { rebuildFigureRegistry, resetFigureRegistry };
 
-import { Plugin } from "@milkdown/prose/state";
+import { Plugin, PluginKey, TextSelection } from "@milkdown/prose/state";
+import { Decoration, DecorationSet } from "@milkdown/prose/view";
 import { ySyncPlugin, yUndoPlugin, undo, redo } from "y-prosemirror";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -24,6 +25,298 @@ import {
 } from "./patch-grouper.js";
 import { initProfile } from "./profile-service.js";
 import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
+
+// Create a unique key for the highlight plugin
+const highlightKey = new PluginKey("hunk-highlight");
+
+/**
+ * Plugin to render transient highlights for hunk hovering.
+ * Now supports "Ghost Preview" (widgets for inserts, inline for deletes).
+ */
+const hunkHighlightPlugin = new Plugin({
+    key: highlightKey,
+    state: {
+        init() {
+            return DecorationSet ? DecorationSet.empty : null;
+        },
+        apply(tr, set) {
+            try {
+                if (!DecorationSet || !Decoration) return set;
+
+                // map existing decorations
+                set = set.map(tr.mapping, tr.doc);
+
+                // Check for our meta action
+                const action = tr.getMeta(highlightKey);
+                if (action) {
+                    if (action.type === 'set') {
+                        // Standard Highlight (Yellow Background)
+                        let to = action.to;
+                        if (to > tr.doc.content.size) to = tr.doc.content.size;
+
+                        let from = action.from;
+                        if (from >= to) {
+                            to = Math.min(from + 1, tr.doc.content.size);
+                            if (from === to && from > 0) from = from - 1;
+                        }
+
+                        return DecorationSet.create(tr.doc, [
+                            Decoration.inline(from, to, { class: 'hunk-hover-highlight' })
+                        ]);
+                    } else if (action.type === 'preview') {
+                        // Ghost Preview
+                        const decorations = [];
+
+                        // Helper to create insert widget
+                        const createInsert = (text, pos) => {
+                            return Decoration.widget(pos, (view) => {
+                                const span = document.createElement('span');
+                                span.className = 'ghost-insert';
+                                span.textContent = text;
+                                return span;
+                            }, { side: 1 });
+                        };
+
+                        // Helper to create delete inline
+                        const createDelete = (from, to) => {
+                            if (to > tr.doc.content.size) to = tr.doc.content.size;
+                            return Decoration.inline(from, to, { class: 'ghost-delete' });
+                        };
+
+                        if (action.kind === 'insert') {
+                            decorations.push(createInsert(action.text, action.from));
+                        } else if (action.kind === 'delete') {
+                            decorations.push(createDelete(action.from, action.to));
+                        } else if (action.kind === 'replace') {
+                            // Replace = Delete Range + Insert Widget at end of range
+                            if (action.deleteFrom !== undefined && action.deleteTo !== undefined) {
+                                decorations.push(createDelete(action.deleteFrom, action.deleteTo));
+                                // Insert after the deletion
+                                decorations.push(createInsert(action.text, action.deleteTo));
+                            }
+                        }
+
+                        return DecorationSet.create(tr.doc, decorations);
+
+                    } else if (action.type === 'clear') {
+                        return DecorationSet.empty;
+                    }
+                }
+                return set;
+            } catch (err) {
+                console.error("Hunk Highlight Plugin Check Failed:", err);
+                return set;
+            }
+        }
+    },
+    props: {
+        decorations(state) {
+            return this.getState(state);
+        }
+    }
+});
+
+/**
+ * Highlight a range in the editor (transient)
+ */
+export function highlightEditorRange(from, to) {
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const tr = view.state.tr.setMeta(highlightKey, { type: 'set', from, to });
+            view.dispatch(tr);
+        });
+    }
+}
+
+/**
+ * Clear the current highlight/preview
+ */
+export function clearEditorHighlight() {
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const tr = view.state.tr.setMeta(highlightKey, { type: 'clear' });
+            view.dispatch(tr);
+        });
+    }
+}
+
+/**
+ * Scroll the editor to make the range visible
+ */
+export function scrollToEditorRange(from, to) {
+    if (editor) {
+        editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            try {
+                // Safeguard against out of bounds
+                const safeFrom = Math.min(from, view.state.doc.content.size);
+                // const resolved = view.state.doc.resolve(safeFrom);
+                const tr = view.state.tr;
+
+                // We want to scroll to 'safeFrom'. 
+                // Creating a selection is one way, but strictly scrolling to a point 
+                // can be done by ensure that point is in view.
+                // We'll trust ScrollIntoView with the transaction.
+                // To help it, we might need a selection change, but let's try just the flag if possible?
+                // ProseMirror usually scrolls to selection.
+                // Let's create a temporary selection at the target.
+                const resolved = view.state.doc.resolve(safeFrom);
+                tr.setSelection(TextSelection.near(resolved));
+                tr.scrollIntoView();
+                view.dispatch(tr);
+            } catch (e) {
+                console.warn("Autoscroll failed:", e);
+            }
+        });
+    }
+}
+
+/**
+ * Helper: Find best relative match for text in editor
+ */
+function findBestMatch(view, text, relativePos) {
+    const doc = view.state.doc;
+    const cleanText = text.replace(/[*_#`\[\]()]/g, ''); // Heuristic cleanup
+    if (!cleanText) return null;
+
+    const matches = [];
+    let currentTextOffset = 0;
+
+    doc.descendants((node, pos) => {
+        if (node.isText) {
+            const nodeText = node.text;
+            let localIdx = nodeText.indexOf(cleanText);
+            while (localIdx !== -1) {
+                matches.push({
+                    pos: pos + localIdx,
+                    textOffset: currentTextOffset + localIdx
+                });
+                localIdx = nodeText.indexOf(cleanText, localIdx + 1);
+            }
+            currentTextOffset += nodeText.length;
+        } else if (node.isBlock) {
+            currentTextOffset += 1;
+        }
+    });
+
+    if (matches.length === 0) return null;
+
+    const estimatedTargetOffset = Math.floor(currentTextOffset * relativePos);
+    matches.sort((a, b) => Math.abs(a.textOffset - estimatedTargetOffset) - Math.abs(b.textOffset - estimatedTargetOffset));
+
+    return matches[0]; // { pos, textOffset }
+}
+
+/**
+ * Robust Text Finder for Highlighting.
+ */
+export function highlightByText(text, type, relativePos) {
+    if (!editor || !text) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const match = findBestMatch(view, text, relativePos);
+
+        if (!match) {
+            console.warn("Could not find text for highlight:", text);
+            return;
+        }
+
+        let from = match.pos;
+        let to = from + text.replace(/[*_#`\[\]()]/g, '').length;
+
+        if (type === 'point') {
+            from = to;
+            to = Math.min(from + 1, view.state.doc.content.size);
+            if (from === to && from > 0) from = from - 1;
+        }
+
+        const tr = view.state.tr.setMeta(highlightKey, { type: 'set', from, to });
+        view.dispatch(tr);
+        setTimeout(() => scrollToEditorRange(from, to), 0);
+    });
+}
+
+/**
+ * Show Ghost Preview for a Hunk
+ * @param {string} text - The text to insert (for insert/replace), or delete (for delete)
+ * @param {string} kind - 'insert', 'delete', or 'replace'
+ * @param {number} relativePos - Position heuristic
+ * @param {string} [contextOrDeleteText] - For insert: context. For replace: text to delete.
+ */
+export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+
+        let from, to;
+        let deleteFrom, deleteTo;
+
+        if (kind === 'insert') {
+            const context = contextOrDeleteText;
+            if (!context) {
+                from = 0;
+            } else {
+                const match = findBestMatch(view, context, relativePos);
+                if (match) {
+                    from = match.pos + context.replace(/[*_#`\[\]()]/g, '').length;
+                } else {
+                    from = Math.floor(relativePos * view.state.doc.content.size);
+                }
+            }
+            to = from;
+        } else if (kind === 'delete') {
+            const match = findBestMatch(view, text, relativePos);
+            if (match) {
+                from = match.pos;
+                to = from + text.replace(/[*_#`\[\]()]/g, '').length;
+            } else {
+                return;
+            }
+        } else if (kind === 'replace') {
+            // Text to insert = text
+            // Text to delete = contextOrDeleteText
+            const deleteText = contextOrDeleteText;
+            if (deleteText) {
+                const match = findBestMatch(view, deleteText, relativePos);
+                if (match) {
+                    deleteFrom = match.pos;
+                    deleteTo = deleteFrom + deleteText.replace(/[*_#`\[\]()]/g, '').length;
+                } else {
+                    // Fallback? If can't find delete text, maybe treating as insert?
+                    // Safe to just return/fail for now.
+                    return;
+                }
+            }
+        }
+
+        const tr = view.state.tr.setMeta(highlightKey, {
+            type: 'preview',
+            kind,
+            from,
+            to,
+            deleteFrom,
+            deleteTo,
+            text // text to insert
+        });
+        view.dispatch(tr);
+
+        // Scroll target
+        const scrollTarget = (kind === 'replace') ? deleteFrom : from;
+        if (scrollTarget !== undefined) {
+            setTimeout(() => scrollToEditorRange(scrollTarget, scrollTarget), 0);
+        }
+    });
+}
+
+// ... (other exports)
+
+// ...
+
+
 
 // ---------------------------------------------------------------------------
 //  Initialize profile and Yjs document state before creating the editor.
@@ -255,6 +548,7 @@ export async function initEditor() {
                 ySyncPlugin(yXmlFragment),
                 yUndoPlugin(),
                 patchLoggerPlugin,
+                hunkHighlightPlugin,
             ],
         });
 
@@ -275,9 +569,11 @@ window.addEventListener('yjs-doc-replaced', () => {
 
         // Filter out existing Yjs plugins to avoid duplication/stale references
         // ySyncPlugin has key "y-sync$", yUndoPlugin has key "y-undo$"
+        // hunkHighlightPlugin has key "hunk-highlight$"
         const cleanPlugins = state.plugins.filter(p =>
             !p.key.startsWith("y-sync$") &&
-            !p.key.startsWith("y-undo$")
+            !p.key.startsWith("y-undo$") &&
+            !p.key.startsWith("hunk-highlight$")
         );
 
         // Re-inject plugins with the NEW yXmlFragment
@@ -287,6 +583,7 @@ window.addEventListener('yjs-doc-replaced', () => {
                 ...cleanPlugins,
                 ySyncPlugin(yXmlFragment),
                 yUndoPlugin(),
+                hunkHighlightPlugin,
             ],
         });
 
