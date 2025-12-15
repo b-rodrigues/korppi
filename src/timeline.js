@@ -181,7 +181,6 @@ export function initTimeline() {
     const sortSelect = document.getElementById("timeline-sort");
 
     const filterAuthor = document.getElementById("filter-author");
-    const filterStatus = document.getElementById("filter-status");
     const resetBtn = document.getElementById("reset-to-original-btn");
 
 
@@ -195,12 +194,6 @@ export function initTimeline() {
     // Wire up filter dropdowns
     if (filterAuthor) {
         filterAuthor.addEventListener("change", () => {
-            refreshTimeline();
-        });
-    }
-
-    if (filterStatus) {
-        filterStatus.addEventListener("change", () => {
             refreshTimeline();
         });
     }
@@ -248,7 +241,6 @@ export async function renderPatchList(patches) {
 
     // Get filter values
     const authorFilter = document.getElementById("filter-author")?.value || "all";
-    const statusFilter = document.getElementById("filter-status")?.value || "all";
     const sortOrder = document.getElementById("timeline-sort")?.value || "time-desc";
 
 
@@ -331,27 +323,15 @@ export async function renderPatchList(patches) {
             return false;
         }
 
-        // Filter by status
-        if (statusFilter !== "all") {
-            const effectiveStatus = getEffectiveStatus(p);
-            if (effectiveStatus !== statusFilter) {
-                return false;
-            }
-        }
-
         return true;
     });
 
-    // For "pending" status filter ONLY: hide patches that match current editor content
-    // These are "base" patches that don't represent changes to review
-    // We do NOT apply this filter for "accepted" or "all" views
-    if (statusFilter === "pending") {
-        const currentEditorContent = getEditorContent() || '';
-        filteredPatches = filteredPatches.filter(patch => {
-            const snapshot = patch.data?.snapshot || '';
-            return snapshot !== currentEditorContent;
-        });
-    }
+    // Hide patches that match current editor content (no changes to show)
+    const currentEditorContent = getEditorContent() || '';
+    filteredPatches = filteredPatches.filter(patch => {
+        const snapshot = patch.data?.snapshot || '';
+        return snapshot !== currentEditorContent;
+    });
 
     // Sort patches BEFORE rendering (determines display order)
     if (sortOrder === "time-asc") {
