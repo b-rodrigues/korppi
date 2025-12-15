@@ -182,10 +182,24 @@ function findBestMatch(view, text, relativePos) {
 
     // 1. Prepare Text
     let cleanText = text.replace(/\s+/g, ' ').trim();
-    // Strip MD links/images [Text](Url) -> Text
-    cleanText = cleanText.replace(/!?(?:\[([^\]]*)\])\([^)]+\)/g, '$1');
-    // Strip formatting markers
-    cleanText = cleanText.replace(/[*_#`]/g, '').trim();
+    // Strip MD links/images [Text](Url) - handle empty url too
+    cleanText = cleanText.replace(/!?(?:\[([^\]]*)\])\([^\)]*\)/g, '$1');
+    // Strip simple formatting: * _ # ` ~ (also strikethrough)
+    cleanText = cleanText.replace(/[*_#`~]/g, '');
+    // Strip list markers at start of string? No, hunk text might be middle.
+    // Strip remaining brackets/parens if they look like syntax?
+    // Let's just strip []() if they are not part of text logic?
+    // Actually, VirtualText has no brackets. So if SearchHead has brackets, it fails.
+    // Logic: VirtualText is raw node text. Raw node text does NOT contain * _ [ ] (usually).
+    // Wait, in ProseMirror header node, text is "Title". In MD it is "# Title".
+    // So stripping '#' is correct.
+    // In Link node, text is "Label". In MD it is "[Label](url)".
+    // So stripping around Label is correct.
+
+    // Safety Force: Remove all []() characters?
+    cleanText = cleanText.replace(/[\[\]\(\)]/g, '');
+
+    cleanText = cleanText.trim();
 
     if (cleanText.length === 0) return null;
 
@@ -237,7 +251,9 @@ function findBestMatch(view, text, relativePos) {
     }
 
     if (headMatches.length === 0) {
-        console.warn(`[PreviewDebug] Head not found: "${searchHead}"`);
+        console.warn(`[PreviewDebug] Head NOT found. SearchHead: "${searchHead}"`);
+        console.log(`[PreviewDebug] VirtualText Snippet (around relativePos):`,
+            virtualText.substring(Math.floor(virtualText.length * relativePos) - 50, Math.floor(virtualText.length * relativePos) + 50));
         return null;
     }
 
@@ -245,6 +261,8 @@ function findBestMatch(view, text, relativePos) {
     const estimatedIndex = Math.floor(virtualText.length * relativePos);
     headMatches.sort((a, b) => Math.abs(a - estimatedIndex) - Math.abs(b - estimatedIndex));
     const bestHeadIndex = headMatches[0];
+
+    console.log(`[PreviewDebug] Matches: ${headMatches.length}. BestHeadIdx: ${bestHeadIndex}. Est: ${estimatedIndex}. Diff: ${Math.abs(bestHeadIndex - estimatedIndex)}`);
 
     // 5. Find Tail
     let bestTailIndex = -1;
@@ -285,6 +303,8 @@ function findBestMatch(view, text, relativePos) {
 
     const fromPos = mapToPM(bestHeadIndex);
     const toPos = mapToPM(bestTailIndex);
+
+    console.log(`[PreviewDebug] Result: [${fromPos}, ${toPos}] for "${cleanText.substring(0, 20)}..."`);
 
     return { from: fromPos, to: toPos };
 }
