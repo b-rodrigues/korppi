@@ -7,6 +7,7 @@ import { detectLineRange, formatLineRange } from "./line-range-detector.js";
 import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGroup } from "./conflict-detection.js";
 import { getEditorContent, getMarkdown, setMarkdownContent } from "./editor.js";
 import { getCachedProfile } from "./profile-service.js";
+import { recalculateReconcileState } from './reconcile.js';
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -63,7 +64,7 @@ export async function restoreToPatch(patchId) {
     }
 
     const ts = new Date(patch.timestamp).toLocaleString();
-    const confirmMsg = `This will revert to version #${patchId} from ${ts}.\n\nYour current changes will be saved first.\n\nContinue?`;
+    const confirmMsg = `This is a Time Travel operation.\n\nIt will:\n1. Revert the document to version #${patchId}.\n2. Set this version as the new Reconciliation Base.\n3. Re-calculate all other patches relative to this version.\n\nContinue?`;
 
     if (!confirm(confirmMsg)) {
         return false;
@@ -81,6 +82,10 @@ export async function restoreToPatch(patchId) {
             const success = setMarkdownContent(patch.data.snapshot);
             if (success) {
                 restoredPatchId = patchId;
+
+                // Trigger Full Re-calculation (Perspective Switch)
+                await recalculateReconcileState(patch.data.snapshot, patchId);
+
                 // Refresh the timeline to show the restored state
                 await refreshTimeline();
                 return true;
@@ -95,6 +100,10 @@ export async function restoreToPatch(patchId) {
                 const success = setMarkdownContent(result.snapshot_content);
                 if (success) {
                     restoredPatchId = patchId;
+
+                    // Trigger Full Re-calculation (Perspective Switch)
+                    await recalculateReconcileState(result.snapshot_content, patchId);
+
                     await refreshTimeline();
                     return true;
                 }
@@ -107,6 +116,10 @@ export async function restoreToPatch(patchId) {
             const success = setMarkdownContent(result.snapshot_content);
             if (success) {
                 restoredPatchId = patchId;
+
+                // Trigger Full Re-calculation (Perspective Switch)
+                await recalculateReconcileState(result.snapshot_content, patchId);
+
                 await refreshTimeline();
                 return true;
             }

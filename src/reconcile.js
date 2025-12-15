@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getActiveDocumentId } from "./document-manager.js";
 import { getMarkdown } from "./editor.js";
 import { showRightSidebar } from "./components/sidebar-controller.js";
+import { getCachedProfile } from "./profile-service.js";
 
 // In-memory storage for computed hunks during reconciliation
 let reconciliationHunks = [];
@@ -32,9 +33,18 @@ export async function startReconciliation() {
         return;
     }
 
-    // Save current state before importing (for reset functionality)
+    // Save current state (base content)
     const baseContent = getMarkdown();
-    localStorage.setItem(`reconciliation-snapshot-${docId}`, baseContent);
+
+    // Save current user metadata for the base snapshot
+    const currentUser = getCachedProfile();
+    const baseInfo = {
+        author: currentUser?.id || 'local',
+        authorName: currentUser?.name || 'Original',
+        authorColor: currentUser?.color || '#333333',
+        timestamp: Date.now()
+    };
+    localStorage.setItem(`reconciliation-base-info-${docId}`, JSON.stringify(baseInfo));
 
     // Save the timestamp when reconciliation started (for resetting reviews)
     const reconciliationStartTime = Date.now();
@@ -64,55 +74,123 @@ export async function startReconciliation() {
             });
         }
 
-        // Fetch all patches for this document
-        const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
+        // Reuse the logic for calculating hunks
+        await recalculateReconcileState(baseContent, null); // null patchId means no swap, just pure calc
 
-        // Filter to only Save patches with snapshots
-        const savePatchesWithSnapshots = patches.filter(p =>
-            p.kind === "Save" && p.data?.snapshot
-        );
-
-        console.log(`Reconciliation: ${savePatchesWithSnapshots.length} patches with snapshots`);
-
-        // Prepare patch data for Rust hunk calculator
-        const patchInputs = savePatchesWithSnapshots.map(p => ({
-            id: p.id,
-            uuid: p.uuid || null,
-            author: p.author,
-            author_name: p.data?.authorName || p.author,
-            author_color: p.data?.authorColor || '#3498db',
-            timestamp: p.timestamp,
-            snapshot: p.data.snapshot
-        }));
-
-        // Calculate hunks: BASE vs each PATCH
-        // This is done in Rust for performance
-        reconciliationHunks = await invoke("calculate_hunks_for_patches", {
-            baseContent: baseContent,
-            patches: patchInputs
-        });
-
-        console.log(`Reconciliation: Computed ${reconciliationHunks.length} hunks`);
-
-        // Detailed debug output for each hunk
-
-
-        // Refresh the timeline to show imported patches
-        window.dispatchEvent(new CustomEvent('reconciliation-imported'));
-
-        // Auto-show the right sidebar with timeline tab
+        // Show UI only after first success
         showRightSidebar('timeline');
-
-        // Dispatch event that hunks are ready
-        window.dispatchEvent(new CustomEvent('reconciliation-hunks-ready', {
-            detail: {
-                hunks: reconciliationHunks,
-                patches: patchInputs
-            }
-        }));
+        window.dispatchEvent(new CustomEvent('reconciliation-imported'));
 
     } catch (err) {
         console.error("Reconciliation failed:", err);
         alert(`Failed to import patches: ${err}`);
     }
+}
+
+/**
+ * Re-calculate all hunks based on a new Base Content.
+ * optionally swapping the previous base into a synthetic patch.
+ * 
+ * @param {string} newBaseContent - The full markdown text of the new base.
+ * @param {number|null} newBasePatchId - If restoring a patch, this is its ID. We filter it OUT of the patch list.
+ */
+export async function recalculateReconcileState(newBaseContent, newBasePatchId = null) {
+    const docId = getActiveDocumentId();
+    if (!docId) return;
+
+    console.log(`Re-calculating reconciliation state. New Base Length: ${newBaseContent.length}, Swapped Patch ID: ${newBasePatchId}`);
+
+    // 1. Get previous base info (if we are swapping)
+    let previousBaseContent = localStorage.getItem(`reconciliation-snapshot-${docId}`);
+    let previousBaseInfo = null;
+    try {
+        previousBaseInfo = JSON.parse(localStorage.getItem(`reconciliation-base-info-${docId}`));
+    } catch (e) { /* ignore */ }
+
+    // 2. Fetch all patches
+    const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
+
+    // 3. Filter Patch List
+    // - Keep 'Save' patches with snapshots
+    // - EXCLUDE the patch that is becoming the new base (if any)
+    let validPatches = patches.filter(p => p.kind === "Save" && p.data?.snapshot);
+
+    if (newBasePatchId !== null) {
+        validPatches = validPatches.filter(p => p.id !== newBasePatchId);
+    }
+
+    // 4. Construct Synthetic Patch from Old Base (if swapping)
+    // Only do this if we are swapping (newBasePatchId is NOT null) AND we have previous base data
+    if (newBasePatchId !== null && previousBaseContent && previousBaseContent !== newBaseContent) {
+        // Check if this Previous Base already exists as a real patch in our valid list
+        // (e.g., if we are swapping AWAY from "Alice's Patch", Alice's patch is now back in validPatches)
+        const existingPatch = validPatches.find(p => p.data?.snapshot === previousBaseContent);
+
+        if (!existingPatch) {
+            // It's a truly strict "Original" (or manual edit) that isn't in DB. Create Synthetic Patch.
+            // We use a fake negative ID to avoid collision.
+            const syntheticPatch = {
+                id: -999, // Magic ID for "Previous Original"
+                uuid: "synthetic-original-base",
+                author: previousBaseInfo?.author || "original-base",
+                data: {
+                    authorName: previousBaseInfo?.authorName || "Original Base",
+                    authorColor: previousBaseInfo?.authorColor || "#7f8c8d",
+                    snapshot: previousBaseContent
+                },
+                timestamp: previousBaseInfo?.timestamp || Date.now()
+            };
+
+            // Add to list
+            validPatches.push(syntheticPatch);
+            console.log("Injected Synthetic Patch for Old Base");
+        } else {
+            console.log("Previous Base matches existing patch. Skipping synthetic creation to avoid duplication.");
+        }
+    }
+
+    // 5. Prepare inputs for Rust
+    const patchInputs = validPatches.map(p => ({
+        id: p.id,
+        uuid: p.uuid || null,
+        author: p.author,
+        author_name: p.data?.authorName || p.author,
+        author_color: p.data?.authorColor || '#3498db',
+        timestamp: p.timestamp,
+        snapshot: p.data.snapshot
+    }));
+
+    // 6. Calculate Hunks
+    reconciliationHunks = await invoke("calculate_hunks_for_patches", {
+        baseContent: newBaseContent,
+        patches: patchInputs
+    });
+
+    console.log(`Computed ${reconciliationHunks.length} hunks against New Base`);
+
+    // 7. Update LocalStorage with NEW Base Info
+    localStorage.setItem(`reconciliation-snapshot-${docId}`, newBaseContent);
+
+    // If we swapped, we need to update the base info to match the New Patch's author info
+    if (newBasePatchId !== null) {
+        // Find the original patch object to get metadata
+        const originalPatch = patches.find(p => p.id === newBasePatchId);
+        if (originalPatch) {
+            const newBaseInfo = {
+                author: originalPatch.author,
+                authorName: originalPatch.data?.authorName || originalPatch.author,
+                authorColor: originalPatch.data?.authorColor || '#3498db',
+                timestamp: originalPatch.timestamp
+            };
+            localStorage.setItem(`reconciliation-base-info-${docId}`, JSON.stringify(newBaseInfo));
+        }
+    }
+
+    // 8. Dispatch Events
+    window.dispatchEvent(new CustomEvent('reconciliation-hunks-ready', {
+        detail: {
+            hunks: reconciliationHunks,
+            patches: patchInputs
+        }
+    }));
 }
