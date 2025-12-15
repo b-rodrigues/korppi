@@ -32,6 +32,9 @@ tempfile = "3"
 # Content hashing
 sha2 = "0.10"
 
+# Text diffing for hunks
+similar = { version = "2.7", features = ["text"] }
+
 # DOCX export
 docx-rs = "0.4.18"
 pulldown-cmark = "0.13.0"
