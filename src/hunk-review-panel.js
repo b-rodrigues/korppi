@@ -1,23 +1,25 @@
 // src/hunk-review-panel.js
-// Track Changes tab in right sidebar - reviews hunks with Accept/Reject buttons
+// Track Changes tab in right sidebar - reviews hunks with Position Shifting
+// Updates line numbers locally and detects overlaps.
 
 import { getReconciliationHunks, clearReconciliationHunks } from './reconcile.js';
 import { getMarkdown, setMarkdownContent } from './editor.js';
 import { showRightSidebar } from './components/sidebar-controller.js';
+import { getProfile } from './profile-service.js';
 
 // State for the hunk review
 let reviewState = {
     active: false,
-    hunks: [],           // Copy of hunks with pending status
-    baseContent: '',     // Original content before any changes
+    hunks: [],           // All hurks (mutable state for positions)
+    acceptedHunkIds: new Set(),
+    rejectedHunkIds: new Set(),
+    conflictHunkIds: new Set(),
 };
 
 /**
  * Initialize the hunk review panel
  */
 export function initHunkReviewPanel() {
-
-
     // Listen for hunks ready event
     window.addEventListener('reconciliation-hunks-ready', (e) => {
         const { hunks } = e.detail;
@@ -38,20 +40,45 @@ export function initHunkReviewPanel() {
     }
 }
 
-
 /**
  * Start the hunk review process
  */
-function startHunkReview(hunks) {
-    // Save base content
-    reviewState.baseContent = getMarkdown();
-
-    // Copy hunks with pending status
-    reviewState.hunks = hunks.map(h => ({
+async function startHunkReview(hunks) {
+    // Clone hunks to allow mutation of line numbers
+    // Ensure each hunk has a unique ID if not present
+    // FIX: Rust/Backend seems to return base_end_line=0 for 'add' hunks.
+    // This breaks overlap/shift logic checking hEnd <= appliedStart.
+    // We normalize 'add' hunks to have end_line = start_line.
+    reviewState.hunks = hunks.map((h, i) => ({
         ...h,
-        status: 'pending' // pending | accepted | rejected
+        base_end_line: (h.type === 'add' && h.base_end_line === 0) ? h.base_start_line : h.base_end_line,
+        internal_id: h.hunk_id || `hunk-${i}-${Date.now()}`,
+        status: 'pending' // pending, accepted, rejected, conflict
     }));
+
+    reviewState.acceptedHunkIds = new Set();
+    reviewState.rejectedHunkIds = new Set();
+    reviewState.conflictHunkIds = new Set();
     reviewState.active = true;
+
+    // Filter self-authored hunks (reversions)
+    try {
+        const profile = await getProfile();
+        const profileName = profile?.name;
+        if (profileName) {
+            // Mark self-authored hunks as rejected (hidden) by default?
+            // Or just exclude them from the list?
+            // In the "Static" model, we can just mark them as 'rejected' initially so they don't show up.
+            reviewState.hunks.forEach(h => {
+                if (h.author_name === profileName) {
+                    h.status = 'rejected';
+                    reviewState.rejectedHunkIds.add(h.internal_id);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Could not get profile:", e);
+    }
 
     console.log(`Starting hunk review with ${hunks.length} hunks`);
 
@@ -63,7 +90,7 @@ function startHunkReview(hunks) {
 }
 
 /**
- * Render all hunks in the panel
+ * Render hunks
  */
 function renderHunks() {
     const listEl = document.getElementById('track-changes-list');
@@ -73,53 +100,43 @@ function renderHunks() {
 
     if (!listEl) return;
 
-    const pendingCount = reviewState.hunks.filter(h => h.status === 'pending').length;
-    const totalCount = reviewState.hunks.length;
+    // Filter: Show Pending and Conflict. Hide Accepted/Rejected.
+    const visibleHunks = reviewState.hunks.filter(h =>
+        h.status === 'pending' || h.status === 'conflict'
+    );
+
+    const count = visibleHunks.filter(h => h.status === 'pending').length;
 
     // Update stats
     if (statsEl) {
-        if (totalCount === 0) {
-            statsEl.textContent = 'No changes to review';
-        } else {
-            statsEl.textContent = `${pendingCount} of ${totalCount} changes pending`;
-        }
+        statsEl.textContent = count === 0 ? 'No changes to review' : `${count} changes pending`;
     }
 
-    // Enable/disable buttons
-    if (acceptAllBtn) acceptAllBtn.disabled = pendingCount === 0;
-    if (rejectAllBtn) rejectAllBtn.disabled = pendingCount === 0;
+    // Enable buttons if there are actionable items
+    if (acceptAllBtn) acceptAllBtn.disabled = count === 0;
+    if (rejectAllBtn) rejectAllBtn.disabled = count === 0;
 
-    // If no pending, show completion message
-    if (pendingCount === 0 && totalCount > 0) {
+    // Empty state
+    if (visibleHunks.length === 0) {
         listEl.innerHTML = `
             <div class="track-changes-complete">
                 <span class="check-icon">✅</span>
-                <p>All changes reviewed!</p>
+                <p>All changes handled!</p>
             </div>
         `;
         return;
     }
 
-    // If no hunks at all, show empty state
-    if (totalCount === 0) {
-        listEl.innerHTML = `
-            <div class="empty-state">
-                <p>Import document versions to review changes</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Render each pending hunk
-    listEl.innerHTML = reviewState.hunks.map((hunk, index) => {
-        if (hunk.status !== 'pending') {
-            return ''; // Don't show non-pending hunks
-        }
+    // Render hunks
+    listEl.innerHTML = visibleHunks.map((hunk, displayIndex) => {
+        // Find actual index in state for handlers
+        const originalIndex = reviewState.hunks.findIndex(h => h.internal_id === hunk.internal_id);
 
         const typeLabel = hunk.type === 'add' ? '➕ Add'
             : hunk.type === 'delete' ? '➖ Del'
                 : '✏️ Mod';
 
+        // Display updated line numbers
         const lineInfo = hunk.type === 'add'
             ? `Line ${hunk.base_start_line + 1}`
             : `L${hunk.base_start_line + 1}-${hunk.base_end_line}`;
@@ -137,8 +154,13 @@ function renderHunks() {
             ).join('');
         }
 
+        const isConflict = hunk.status === 'conflict';
+        const cardClass = isConflict ? 'track-change-card conflict' : 'track-change-card';
+        const conflictMsg = isConflict ? '<div class="conflict-banner">⚠️ Overlap with accepted change</div>' : '';
+
         return `
-            <div class="track-change-card" data-hunk-index="${index}">
+            <div class="${cardClass}" style="${isConflict ? 'opacity: 0.6; pointer-events:none;' : ''}">
+                ${conflictMsg}
                 <div class="track-change-header" style="border-left: 3px solid ${hunk.author_color}">
                     <span class="track-change-author" style="background-color: ${hunk.author_color}">${hunk.author_name}</span>
                     <span class="track-change-type">${typeLabel}</span>
@@ -148,96 +170,108 @@ function renderHunks() {
                     ${diffHtml}
                 </div>
                 <div class="track-change-actions">
-                    <button class="track-change-btn accept" data-action="accept" data-index="${index}">✓ Accept</button>
-                    <button class="track-change-btn reject" data-action="reject" data-index="${index}">✗ Reject</button>
+                    <button class="track-change-btn accept" onclick="window.hunkReview_accept(${originalIndex})" ${isConflict ? 'disabled' : ''}>✓ Accept</button>
+                    <button class="track-change-btn reject" onclick="window.hunkReview_reject(${originalIndex})" ${isConflict ? 'disabled' : ''}>✗ Reject</button>
                 </div>
             </div>
         `;
     }).join('');
-
-    // Wire up individual buttons
-    listEl.querySelectorAll('.track-change-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const action = e.target.dataset.action;
-            const index = parseInt(e.target.dataset.index);
-            if (action === 'accept') {
-                acceptHunk(index);
-            } else {
-                rejectHunk(index);
-            }
-        });
-    });
 }
 
+// Global handlers
+window.hunkReview_accept = acceptHunk;
+window.hunkReview_reject = rejectHunk;
+
 /**
- * Accept a single hunk
+ * Accept a hunk
  */
 function acceptHunk(index) {
     const hunk = reviewState.hunks[index];
     if (!hunk || hunk.status !== 'pending') return;
 
-    console.log(`Accepting hunk ${index}: ${hunk.type} by ${hunk.author_name}`);
+    console.log(`Accepting hunk: ${hunk.type} at ${hunk.base_start_line}`);
 
-    // Apply the change to the document
-    applyHunk(hunk);
+    // 1. Apply to editor
+    const applied = applyHunkToEditor(hunk);
+    if (!applied) {
+        console.error("Failed to apply hunk");
+        return;
+    }
 
+    // 2. Mark as accepted
     hunk.status = 'accepted';
+    reviewState.acceptedHunkIds.add(hunk.internal_id);
+
+    // 3. Adjust positions of subsequent hunks
+    adjustHunkPositions(hunk);
+
+    // 4. Render
     renderHunks();
 }
 
 /**
- * Reject a single hunk
+ * Reject a hunk
  */
 function rejectHunk(index) {
     const hunk = reviewState.hunks[index];
-    if (!hunk || hunk.status !== 'pending') return;
+    if (!hunk) return;
 
-    console.log(`Rejecting hunk ${index}: ${hunk.type} by ${hunk.author_name}`);
-
-    // Just mark as rejected, don't apply
     hunk.status = 'rejected';
+    reviewState.rejectedHunkIds.add(hunk.internal_id);
     renderHunks();
 }
 
 /**
- * Apply a hunk's changes to the document
+ * Apply hunk to editor
  */
-function applyHunk(hunk) {
+function applyHunkToEditor(hunk) {
     const content = getMarkdown();
+    // Use split logic consistent with how we count lines
     const lines = content.split('\n');
 
+    // console.log(`[Apply] Attempting to apply hunk ID ${hunk.internal_id}`);
+    // console.log(`[Apply] Type: ${hunk.type}, Start: ${hunk.base_start_line}, Length: ${hunk.base_lines?.length}, ModLength: ${hunk.modified_lines?.length}`);
+    // console.log(`[Apply] Document lines: ${lines.length}`);
+
+    if (hunk.base_start_line > lines.length) {
+        // Safe clamping for "Add" at EOF (handling trailing newline discrepancies)
+        if (hunk.type === 'add' && hunk.base_start_line <= lines.length + 2) {
+            console.warn(`[Apply] Hunk start ${hunk.base_start_line} slightly past EOF ${lines.length}. Clamping to EOF.`);
+            hunk.base_start_line = lines.length;
+        } else {
+            console.error(`[Error] Hunk out of bounds: L${hunk.base_start_line} > ${lines.length}`);
+            return false;
+        }
+    }
+
+    // Note: hunk.base_start_line is 0-indexed
     if (hunk.type === 'add') {
-        // Insert the new lines at the position
-        const insertAt = Math.min(hunk.base_start_line, lines.length);
-        lines.splice(insertAt, 0, ...hunk.modified_lines);
-
+        lines.splice(hunk.base_start_line, 0, ...hunk.modified_lines);
     } else if (hunk.type === 'delete') {
-        // Remove the lines
-        const deleteStart = Math.min(hunk.base_start_line, lines.length);
-        const deleteCount = hunk.base_lines.length;
-        lines.splice(deleteStart, deleteCount);
-
+        const delCount = hunk.base_lines.length;
+        // Verify we aren't deleting past end
+        if (hunk.base_start_line + delCount > lines.length) {
+            console.warn(`[Apply] Deletion extends past EOF. Clamping.`);
+        }
+        lines.splice(hunk.base_start_line, delCount);
     } else if (hunk.type === 'modify') {
-        // Replace the lines
-        const replaceStart = Math.min(hunk.base_start_line, lines.length);
-        const replaceCount = hunk.base_lines.length;
-        lines.splice(replaceStart, replaceCount, ...hunk.modified_lines);
+        const modCount = hunk.base_lines.length;
+        lines.splice(hunk.base_start_line, modCount, ...hunk.modified_lines);
     }
 
     const newContent = lines.join('\n');
     setMarkdownContent(newContent);
 
-    // Update line positions for remaining hunks
-    adjustHunkPositions(hunk);
+    // console.log(`[Apply] Success. New line count: ${newContent.split('\n').length}`);
+    return true;
 }
 
 /**
- * Adjust line positions for hunks after applying a change
+ * Update positions of remaining hunks
  */
 function adjustHunkPositions(appliedHunk) {
-    // Calculate the shift in line numbers
+    // Calculate shift
     let shift = 0;
-
     if (appliedHunk.type === 'add') {
         shift = appliedHunk.modified_lines.length;
     } else if (appliedHunk.type === 'delete') {
@@ -246,71 +280,138 @@ function adjustHunkPositions(appliedHunk) {
         shift = appliedHunk.modified_lines.length - appliedHunk.base_lines.length;
     }
 
-    if (shift === 0) return;
+    // console.log(`[Shift] Applied hunk caused shift: ${shift}`);
 
-    // Adjust all pending hunks that come after this one
-    for (const hunk of reviewState.hunks) {
-        if (hunk.status !== 'pending') continue;
-        if (hunk.base_start_line > appliedHunk.base_start_line) {
-            hunk.base_start_line += shift;
-            hunk.base_end_line += shift;
+    const appliedStart = appliedHunk.base_start_line;
+    // appliedEnd is exclusive for the *original* range
+    const appliedEnd = appliedHunk.base_end_line;
+
+    // Adjust all other hunks
+    // console.log(`[Shift] Iterating ${reviewState.hunks.length} hunks to adjust positions...`);
+    for (let i = 0; i < reviewState.hunks.length; i++) {
+        const h = reviewState.hunks[i];
+
+        // Debug status
+        // console.log(`[Shift] Checking Hunk ${h.internal_id} (Status: ${h.status}, Start: ${h.base_start_line})`);
+
+        if (h.internal_id === appliedHunk.internal_id) continue;
+        if (h.status === 'accepted' || h.status === 'rejected') {
+            // console.log(`[Shift] Skipping ${h.internal_id}: status ${h.status}`);
+            continue;
         }
+
+        // Check for overlap
+        // Two ranges [A,B) and [C,D) overlap if A < D and C < B
+        // Here, hunk ranges are [start, end) where end is exclusive (usually start+length)
+        // Let's verify end logic.
+        // Rust calculator: base_end_line is start + len. So it IS exclusive.
+
+        // Strict overlap check on the ORIGINAL base coordinates?
+        // NO! We need to check against the APPLIED hunk's range.
+        // But wait. `appliedStart` and `appliedEnd` are based on the state *before* this applies?
+        // Yes, `appliedHunk.base_start_line` is the line in the document *before* the splice.
+        // And `h.base_start_line` is also currently referring to the document *before* the splice (for downstream hunks).
+        // So comparing them directly works.
+
+        const hStart = h.base_start_line;
+        const hEnd = h.base_end_line;
+
+        // If a hunk ends before the applied hunk starts, it's safe (and needs no shift).
+        if (hEnd <= appliedStart) {
+            // Hunk is strictly before. No shift needed.
+            // console.log(`[Shift] ${h.internal_id} is before. No change.`);
+            continue;
+        }
+
+        // If a hunk starts after the applied hunk ends, it needs shifting.
+        // NOTE: We only shift hunks that are stricly AFTER.
+        if (hStart >= appliedEnd) {
+            const oldStart = h.base_start_line;
+            h.base_start_line += shift;
+            h.base_end_line += shift;
+            // console.log(`[Shift] Hunk ${h.internal_id} shifted: ${oldStart} -> ${h.base_start_line}`);
+            continue;
+        }
+
+        // Otherwise (hEnd > appliedStart AND hStart < appliedEnd), they overlap.
+        // This hunk is now invalid because the context it relied on has changed.
+        console.warn(`[Conflict] Hunk ${h.internal_id} overlaps with applied hunk. Marking as conflict.`);
+        h.status = 'conflict';
+        reviewState.conflictHunkIds.add(h.internal_id);
     }
 }
 
 /**
- * Accept all pending hunks
+ * Accept All
  */
 function acceptAllHunks() {
-    // Process from bottom to top to avoid position issues
+    // Sort pending hunks by position (descending) so we can apply bottom-up without shifting?
+    // NO! The shift accumulation is tricky if there are overlaps.
+    // Safer: Sort by position (Ascending), and iteratively call acceptHunk.
+    // Since acceptHunk handles shifting and conflict detection, this is robust.
+
+    // Get currently pending
     const pending = reviewState.hunks
-        .map((h, i) => ({ hunk: h, index: i }))
-        .filter(x => x.hunk.status === 'pending')
-        .sort((a, b) => b.hunk.base_start_line - a.hunk.base_start_line);
+        .filter(h => h.status === 'pending')
+        .map((h, index) => ({ h, index })) // keep ref to original array index
+        .sort((a, b) => a.h.base_start_line - b.h.base_start_line);
 
-    for (const { hunk } of pending) {
-        applyHunk(hunk);
-        hunk.status = 'accepted';
-    }
+    let acceptedCount = 0;
 
-    renderHunks();
-}
+    // We must look up the FRESH index each time because 'pending' list above is static snapshots
+    // but the 'status' might change to 'conflict' during the loop if we accept the first one.
 
-/**
- * Reject all pending hunks
- */
-function rejectAllHunks() {
-    for (const hunk of reviewState.hunks) {
-        if (hunk.status === 'pending') {
-            hunk.status = 'rejected';
+    for (const item of pending) {
+        // Re-check status in live state
+        const liveHunk = reviewState.hunks.find(h => h.internal_id === item.h.internal_id);
+        if (liveHunk && liveHunk.status === 'pending') {
+            // Find its current index in the main array
+            const currentIndex = reviewState.hunks.indexOf(liveHunk);
+            acceptHunk(currentIndex);
+            acceptedCount++;
         }
     }
-    renderHunks();
+
+    if (acceptedCount > 0) {
+        showToast(`Accepted ${acceptedCount} changes`);
+    } else {
+        showToast("No valid changes to accept");
+    }
 }
 
 /**
- * Check if review is active
+ * Reject All
  */
+function rejectAllHunks() {
+    reviewState.hunks.forEach(h => {
+        if (h.status === 'pending') {
+            h.status = 'rejected';
+            reviewState.rejectedHunkIds.add(h.internal_id);
+        }
+    });
+    renderHunks();
+}
+
+// Helpers
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function isHunkReviewActive() {
     return reviewState.active;
 }
 
-/**
- * Clear the review state
- */
 export function clearHunkReview() {
     reviewState.active = false;
     reviewState.hunks = [];
-    reviewState.baseContent = '';
     clearReconciliationHunks();
     renderHunks();
-}
-
-/**
- * Escape HTML
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }

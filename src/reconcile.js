@@ -95,24 +95,7 @@ export async function startReconciliation() {
         console.log(`Reconciliation: Computed ${reconciliationHunks.length} hunks`);
 
         // Detailed debug output for each hunk
-        console.log('=== RECONCILIATION HUNKS ===');
-        for (const hunk of reconciliationHunks) {
-            console.log(`\n--- Hunk ${hunk.hunk_id} ---`);
-            console.log(`  Type: ${hunk.type}`);
-            console.log(`  Author: ${hunk.author_name} (${hunk.author})`);
-            console.log(`  Color: ${hunk.author_color}`);
-            console.log(`  Base lines: ${hunk.base_start_line}-${hunk.base_end_line}`);
-            console.log(`  Modified lines: ${hunk.modified_start_line}-${hunk.modified_end_line}`);
-            if (hunk.base_lines && hunk.base_lines.length > 0) {
-                console.log(`  Base content (${hunk.base_lines.length} lines):`);
-                hunk.base_lines.forEach((line, i) => console.log(`    - "${line}"`));
-            }
-            if (hunk.modified_lines && hunk.modified_lines.length > 0) {
-                console.log(`  Modified content (${hunk.modified_lines.length} lines):`);
-                hunk.modified_lines.forEach((line, i) => console.log(`    + "${line}"`));
-            }
-        }
-        console.log('=== END HUNKS ===');
+
 
         // Refresh the timeline to show imported patches
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
@@ -122,7 +105,10 @@ export async function startReconciliation() {
 
         // Dispatch event that hunks are ready
         window.dispatchEvent(new CustomEvent('reconciliation-hunks-ready', {
-            detail: { hunks: reconciliationHunks }
+            detail: {
+                hunks: reconciliationHunks,
+                patches: patchInputs
+            }
         }));
 
     } catch (err) {
