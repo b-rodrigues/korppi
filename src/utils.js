@@ -60,3 +60,51 @@ export function tokenize(text) {
 
     return tokens;
 }
+
+/**
+ * Strip markdown syntax to get plain text.
+ * Used to align diff positions with ProseMirror text nodes.
+ * @param {string} markdown - Markdown text
+ * @returns {string} Plain text without markdown syntax
+ */
+export function stripMarkdown(markdown) {
+    if (!markdown) return '';
+
+    let text = markdown;
+
+    // Remove images first: ![alt](url) -> alt
+    text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+    // Remove links: [text](url) -> text
+    text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+    // Remove bold/italic: **text** or __text__ -> text
+    text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+    text = text.replace(/__([^_]+)__/g, '$1');
+
+    // Remove italic: *text* or _text_ -> text
+    // Be careful not to match list items or horizontal rules
+    text = text.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
+    text = text.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
+
+    // Remove strikethrough: ~~text~~ -> text
+    text = text.replace(/~~([^~]+)~~/g, '$1');
+
+    // Remove inline code: `code` -> code
+    text = text.replace(/`([^`]+)`/g, '$1');
+
+    // Remove heading markers at start of lines: # ## ### etc -> just the text
+    text = text.replace(/^(#{1,6})\s+/gm, '');
+
+    // Remove blockquote markers: > text -> text
+    text = text.replace(/^>\s*/gm, '');
+
+    // Remove horizontal rules (---, ***, ___)
+    text = text.replace(/^[-*_]{3,}\s*$/gm, '');
+
+    // Remove list markers: - item, * item, + item, 1. item
+    text = text.replace(/^[\s]*[-*+]\s+/gm, '');
+    text = text.replace(/^[\s]*\d+\.\s+/gm, '');
+
+    return text;
+}
