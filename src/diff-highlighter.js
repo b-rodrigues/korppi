@@ -1,31 +1,7 @@
 // src/diff-highlighter.js
 // Character-level diff highlighting for patch preview
 
-/**
- * Calculate word-level diff between two texts
- * Returns an array of diff operations
- * @param {string} oldText - Previous text
- * @param {string} newText - Current text
- * @returns {Array} Array of {type: 'add'|'delete'|'equal', text: string}
- */
-// Reusable tokenizer regex - compiled once
-const TOKEN_REGEX = /(\S+|\s+)/g;
-
-/**
- * Tokenize text into words and whitespace tokens
- * @param {string} text - Text to tokenize
- * @returns {string[]} Array of tokens
- */
-function tokenize(text) {
-    if (!text) return [];
-    const tokens = [];
-    TOKEN_REGEX.lastIndex = 0; // Reset regex state
-    let match;
-    while ((match = TOKEN_REGEX.exec(text)) !== null) {
-        tokens.push(match[0]);
-    }
-    return tokens;
-}
+import { tokenize } from './utils.js';
 
 export function calculateCharDiff(oldText, newText) {
     // Fast path: identical texts

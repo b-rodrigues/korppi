@@ -24,3 +24,39 @@ export function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+/**
+ * Fast whitespace check using charCode
+ * @param {number} code - Character code
+ * @returns {boolean} True if whitespace
+ */
+export function isWhitespace(code) {
+    return code === 32 || code === 9 || code === 10 || code === 13 || code === 12;
+}
+
+/**
+ * Tokenize text into words and whitespace tokens.
+ * Uses character-based approach (faster than regex).
+ * @param {string} text - Text to tokenize
+ * @returns {string[]} Array of tokens
+ */
+export function tokenize(text) {
+    if (!text) return [];
+
+    const tokens = [];
+    const len = text.length;
+    let start = 0;
+    let inWhitespace = isWhitespace(text.charCodeAt(0));
+
+    for (let i = 1; i <= len; i++) {
+        const isWs = i < len ? isWhitespace(text.charCodeAt(i)) : !inWhitespace;
+
+        if (isWs !== inWhitespace) {
+            tokens.push(text.slice(start, i));
+            start = i;
+            inWhitespace = isWs;
+        }
+    }
+
+    return tokens;
+}
