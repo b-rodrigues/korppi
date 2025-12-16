@@ -1,19 +1,17 @@
 // src/diff-preview.js
-// Visual diff preview overlay for patches
+// Visual diff preview using inline ghost decorations (track-changes style)
 
 import { invoke } from '@tauri-apps/api/core';
 import { calculateCharDiff } from './diff-highlighter.js';
-import { getCachedProfile, getCurrentUserInfo } from './profile-service.js';
+import { getCurrentUserInfo } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
-import { hexToRgba, escapeHtml } from './utils.js';
-import { getEditorContent, getMarkdown } from './editor.js';
+import { getMarkdown, showDiffPreview, clearEditorHighlight, getCharToPmMapping } from './editor.js';
 import { getConflictState, restoreToPatch } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
 
 let previewState = {
     active: false,
-    mode: 'diff', // 'diff' or 'highlight'
     patchId: null,
     oldText: '',
     newText: '',
@@ -23,8 +21,8 @@ let previewState = {
 /**
  * Enter preview mode for a patch
  * @param {number} patchId - Patch ID
- * @param {string} oldText - Previous version text
- * @param {string} newText - Current version text
+ * @param {string} oldText - Previous version text (current editor content)
+ * @param {string} newText - New version text (merged result)
  */
 export function enterPreview(patchId, oldText, newText) {
     // Get conflict group if this patch is in conflict
@@ -33,7 +31,6 @@ export function enterPreview(patchId, oldText, newText) {
 
     previewState = {
         active: true,
-        mode: 'diff',
         patchId,
         oldText,
         newText,
@@ -41,7 +38,7 @@ export function enterPreview(patchId, oldText, newText) {
     };
 
     showPreviewBanner();
-    renderPreview();
+    renderGhostPreview();
 }
 
 /**
@@ -50,7 +47,6 @@ export function enterPreview(patchId, oldText, newText) {
 export function exitPreview() {
     previewState = {
         active: false,
-        mode: 'diff',
         patchId: null,
         oldText: '',
         newText: '',
@@ -58,26 +54,7 @@ export function exitPreview() {
     };
 
     hidePreviewBanner();
-    clearPreview();
-}
-
-/**
- * Toggle between highlight and diff modes
- * @param {string} mode - 'highlight' or 'diff'
- */
-export function setPreviewMode(mode) {
-    if (!previewState.active) return;
-
-    previewState.mode = mode;
-    renderPreview();
-
-    // Update button states
-    const banner = document.getElementById('diff-preview-banner');
-    if (banner) {
-        banner.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-    }
+    clearEditorHighlight();
 }
 
 /**
@@ -91,12 +68,12 @@ function showPreviewBanner() {
         banner.id = 'diff-preview-banner';
         banner.innerHTML = `
             <div class="preview-info">
-                <span class="preview-label">📋 Preview Mode: Patch #<span id="preview-patch-id"></span></span>
+                <span class="preview-label">👁 Previewing Patch #<span id="preview-patch-id"></span></span>
+                <span class="preview-hint">(changes shown inline)</span>
             </div>
+            <div id="conflict-tabs"></div>
             <div class="preview-controls">
-                <button class="mode-btn" data-mode="highlight">🎨 Highlight</button>
-                <button class="mode-btn active" data-mode="diff">📝 Diff</button>
-                <button class="restore-btn" style="background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; margin-right: 10px;">↺ Restore this Version</button>
+                <button class="restore-btn" title="Restore document to this patch version">↺ Restore</button>
                 <button class="exit-btn">✕ Exit Preview</button>
             </div>
         `;
@@ -106,17 +83,12 @@ function showPreviewBanner() {
             editorContainer.parentElement.insertBefore(banner, editorContainer);
         }
 
-        // Add event listeners
-        banner.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                setPreviewMode(btn.dataset.mode);
-            });
-        });
-
+        // Wire up Exit Preview button
         banner.querySelector('.exit-btn').addEventListener('click', () => {
             exitPreview();
         });
 
+        // Wire up Restore button
         banner.querySelector('.restore-btn').addEventListener('click', async () => {
             if (previewState.patchId) {
                 const success = await restoreToPatch(previewState.patchId);
@@ -133,6 +105,9 @@ function showPreviewBanner() {
         patchIdEl.textContent = previewState.patchId;
     }
 
+    // Update conflict tabs if in a conflict group
+    updateConflictTabs();
+
     banner.style.display = 'flex';
 }
 
@@ -147,177 +122,58 @@ function hidePreviewBanner() {
 }
 
 /**
- * Render the preview overlay
+ * Render the ghost preview using inline decorations
  */
-function renderPreview() {
+function renderGhostPreview() {
     if (!previewState.active) return;
 
+    // Calculate character-level diff between old (current) and new (merged) text
     const diff = calculateCharDiff(previewState.oldText, previewState.newText);
-    const profile = getCachedProfile();
-    const userColor = profile?.color || '#3498db';
 
-    let overlay = document.getElementById('diff-preview-overlay');
+    // Get character-to-PM-position mapping
+    const { charToPm, pmText, docSize } = getCharToPmMapping();
 
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'diff-preview-overlay';
-        overlay.className = 'diff-preview-overlay';
-        const editorContainer = document.getElementById('editor');
-        if (editorContainer && editorContainer.parentElement) {
-            // Insert before the editor so it appears at the top, below the banner
-            editorContainer.parentElement.insertBefore(overlay, editorContainer);
-        }
-    }
+    // Convert diff operations to PM-position-based operations
+    const operations = [];
+    let oldOffset = 0; // Track position in oldText
 
-    // Build HTML with highlights
-    let html = '';
+    for (const op of diff) {
+        if (op.type === 'equal') {
+            // Advance position in old text
+            oldOffset += op.text.length;
+        } else if (op.type === 'delete') {
+            // Text being removed - highlight in editor
+            const fromChar = oldOffset;
+            const toChar = oldOffset + op.text.length;
 
-    if (previewState.mode === 'highlight') {
-        // Highlight mode: show only additions highlighted
-        for (const op of diff) {
-            if (op.type === 'add') {
-                html += `<span class="diff-addition" style="background-color:${hexToRgba(userColor, 0.3)};">${escapeHtml(op.text)}</span>`;
-            } else if (op.type === 'equal') {
-                html += escapeHtml(op.text);
+            // Map character offsets to PM positions
+            const fromPm = charToPm(fromChar);
+            const toPm = charToPm(toChar);
+
+            if (fromPm < toPm) {
+                operations.push({
+                    type: 'delete',
+                    from: fromPm,
+                    to: toPm
+                });
             }
-            // Skip deletions in highlight mode
-        }
-    } else {
-        // Diff mode: show additions highlighted + deletions with strikethrough
-        for (const op of diff) {
-            if (op.type === 'add') {
-                html += `<span class="diff-addition" style="background-color:${hexToRgba(userColor, 0.3)};">${escapeHtml(op.text)}</span>`;
-            } else if (op.type === 'delete') {
-                html += `<span class="diff-deletion">${escapeHtml(op.text)}</span>`;
-            } else {
-                html += escapeHtml(op.text);
-            }
-        }
-    }
 
-    overlay.innerHTML = `<pre class="diff-content">${html}</pre>`;
-    overlay.style.display = 'block';
-}
+            oldOffset += op.text.length;
+        } else if (op.type === 'add') {
+            // Text being added - show as ghost insert widget
+            const posPm = charToPm(oldOffset);
 
-/**
- * Clear the preview overlay
- */
-function clearPreview() {
-    const overlay = document.getElementById('diff-preview-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-        overlay.innerHTML = '';
-    }
-}
-
-// Utility functions hexToRgba and escapeHtml are imported from utils.js
-
-/**
- * Accept the current patch being previewed
- */
-async function acceptCurrentPatch() {
-    if (!previewState.active || !previewState.patchId) return;
-
-    const docId = getActiveDocumentId();
-    if (!docId) return;
-
-    const currentPatchId = previewState.patchId;
-
-    try {
-        // Update review status in database
-        const { fetchPatch } = await import('./timeline.js');
-        const patch = await fetchPatch(currentPatchId);
-        if (patch && patch.uuid) {
-            const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
-
-            await invoke("record_document_patch_review", {
-                docId,
-                patchUuid: patch.uuid,
-                reviewerId: currentUserId,
-                decision: "accepted",
-                reviewerName: currentUserName
+            operations.push({
+                type: 'add',
+                text: op.text,
+                pos: posPm
             });
+            // Don't advance oldOffset for additions
         }
-
-        // Perform 3-way merge
-        // base: original document (from first patch)
-        // local: current editor content
-        // canonical: the ORIGINAL patch snapshot (NOT previewState.newText which is already merged)
-
-        const { fetchPatchList } = await import('./timeline.js');
-        const allPatches = await fetchPatchList();
-
-        // Find the base snapshot (first patch)
-        const savePatchesOnly = allPatches
-            .filter(p => p.kind === "Save" && p.data?.snapshot)
-            .sort((a, b) => a.timestamp - b.timestamp);
-
-        const baseSnapshot = savePatchesOnly.length > 0
-            ? savePatchesOnly[0].data.snapshot
-            : '';
-
-        // Get current editor content as markdown (local)
-        const currentContent = getMarkdown();
-
-        // Get the ORIGINAL patch snapshot (not the preview merged content)
-        const patchContent = patch.data?.snapshot || '';
-
-        // Perform merge
-        const mergedContent = mergeText(baseSnapshot, currentContent, patchContent);
-
-        // Apply merged result to editor using markdown-aware function
-        const { setMarkdownContent } = await import('./editor.js');
-        setMarkdownContent(mergedContent);
-
-        // Refresh timeline first
-        window.dispatchEvent(new CustomEvent('patch-status-updated'));
-
-        // Try to advance to the next pending patch in the conflict group
-        await advanceToNextPendingPatch(currentPatchId);
-
-    } catch (err) {
-        console.error("Failed to accept patch:", err);
-        alert(`Error: ${err}`);
     }
-}
 
-/**
- * Reject the current patch being previewed
- */
-async function rejectCurrentPatch() {
-    if (!previewState.active || !previewState.patchId) return;
-
-    const docId = getActiveDocumentId();
-    if (!docId) return;
-
-    const currentPatchId = previewState.patchId;
-
-    try {
-        // Update review status in database
-        const { fetchPatch } = await import('./timeline.js');
-        const patch = await fetchPatch(currentPatchId);
-        if (patch && patch.uuid) {
-            const { id: currentUserId, name: currentUserName } = getCurrentUserInfo();
-
-            await invoke("record_document_patch_review", {
-                docId,
-                patchUuid: patch.uuid,
-                reviewerId: currentUserId,
-                decision: "rejected",
-                reviewerName: currentUserName
-            });
-        }
-
-        // Refresh timeline first
-        window.dispatchEvent(new CustomEvent('patch-status-updated'));
-
-        // Try to advance to the next pending patch in the conflict group
-        await advanceToNextPendingPatch(currentPatchId);
-
-    } catch (err) {
-        console.error("Failed to reject patch:", err);
-        alert(`Error: ${err}`);
-    }
+    // Apply the decorations to the editor
+    showDiffPreview(operations);
 }
 
 /**
@@ -376,35 +232,6 @@ async function getPendingConflictPatchIds(excludePatchId = null) {
 }
 
 /**
- * Advance to the next pending patch in the conflict group
- * If no more pending patches, exit preview
- * @param {number} justProcessedPatchId - The patch that was just accepted/rejected
- */
-async function advanceToNextPendingPatch(justProcessedPatchId) {
-    // If no conflict group, just exit
-    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
-        exitPreview();
-        return;
-    }
-
-    // Find remaining pending patches (excluding the just-processed one)
-    const remainingPending = await getPendingConflictPatchIds(justProcessedPatchId);
-
-    // If no more pending patches, exit preview
-    if (remainingPending.length === 0) {
-        exitPreview();
-        return;
-    }
-
-    // Switch to the first remaining pending patch
-    const nextPatchId = remainingPending[0];
-    await switchToConflictPatch(nextPatchId);
-
-    // Update the conflict tabs to reflect the new state
-    await updateConflictTabs();
-}
-
-/**
  * Update the conflict tabs in the preview banner
  */
 async function updateConflictTabs() {
@@ -414,10 +241,15 @@ async function updateConflictTabs() {
     // Clear existing tabs
     tabsContainer.innerHTML = '';
 
+    // Only show tabs if in a conflict group with multiple patches
+    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
+        return;
+    }
+
     // Get pending patches in the conflict group
     const pendingPatchIds = await getPendingConflictPatchIds();
 
-    // Only show tabs if there are multiple pending patches in conflict
+    // Only show tabs if there are multiple pending patches
     if (pendingPatchIds.length <= 1) {
         return;
     }
@@ -434,7 +266,7 @@ async function updateConflictTabs() {
         const tab = document.createElement('button');
         tab.className = 'conflict-tab';
         tab.dataset.patchId = patchId;
-        tab.textContent = `Patch #${patchId}`;
+        tab.textContent = `#${patchId}`;
 
         if (patchId === previewState.patchId) {
             tab.classList.add('active');
@@ -447,15 +279,13 @@ async function updateConflictTabs() {
         tabsContainer.appendChild(tab);
     }
 
-    // Add "Resolve Conflict" button if there are multiple conflicting patches
+    // Add "Resolve Conflict" button
     const resolveBtn = document.createElement('button');
     resolveBtn.className = 'resolve-conflict-btn';
-    resolveBtn.innerHTML = '🔀 Resolve Conflict';
+    resolveBtn.innerHTML = '🔀 Merge';
     resolveBtn.style.cssText = 'margin-left:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;';
     resolveBtn.addEventListener('click', async () => {
-        // Exit preview first
         exitPreview();
-        // Open merge wizard with these patches
         const { openPatchMergeWizardWithPatches } = await import('./patch-merge-wizard.js');
         openPatchMergeWizardWithPatches(pendingPatchIds);
     });
@@ -469,7 +299,6 @@ async function updateConflictTabs() {
 async function switchToConflictPatch(patchId) {
     if (patchId === previewState.patchId) return;
 
-    // Import fetchPatch from timeline
     const { fetchPatch, fetchPatchList } = await import('./timeline.js');
 
     const patch = await fetchPatch(patchId);
@@ -512,6 +341,6 @@ async function switchToConflictPatch(patchId) {
         tab.classList.toggle('active', parseInt(tab.dataset.patchId) === patchId);
     });
 
-    // Re-render preview
-    renderPreview();
+    // Re-render ghost preview
+    renderGhostPreview();
 }

@@ -6,6 +6,7 @@ import { getReconciliationHunks, clearReconciliationHunks } from './reconcile.js
 import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewGhostHunk } from './editor.js';
 import { showRightSidebar } from './components/sidebar-controller.js';
 import { getProfile } from './profile-service.js';
+import { escapeHtml } from './utils.js';
 
 // State for the hunk review
 let reviewState = {
@@ -481,10 +482,6 @@ function showToast(msg) {
     t.style.cssText = `position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999`;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3000);
-}
-
-function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function isHunkReviewActive() {

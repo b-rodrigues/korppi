@@ -98,6 +98,41 @@ const hunkHighlightPlugin = new Plugin({
 
                         return DecorationSet.create(tr.doc, decorations);
 
+                    } else if (action.type === 'diffPreview') {
+                        // Full diff preview with multiple operations
+                        const decorations = [];
+                        const ops = action.operations || [];
+
+                        // Helper to create insert widget
+                        const createInsertWidget = (text, pos) => {
+                            const safePos = Math.min(pos, tr.doc.content.size);
+                            return Decoration.widget(safePos, () => {
+                                const span = document.createElement('span');
+                                span.className = 'ghost-insert';
+                                span.textContent = text;
+                                return span;
+                            }, { side: 1 });
+                        };
+
+                        // Helper to create delete inline decoration
+                        const createDeleteDecoration = (from, to) => {
+                            const safeFrom = Math.max(0, Math.min(from, tr.doc.content.size));
+                            const safeTo = Math.max(safeFrom, Math.min(to, tr.doc.content.size));
+                            if (safeFrom >= safeTo) return null;
+                            return Decoration.inline(safeFrom, safeTo, { class: 'ghost-delete' });
+                        };
+
+                        for (const op of ops) {
+                            if (op.type === 'add' && op.text) {
+                                decorations.push(createInsertWidget(op.text, op.pos));
+                            } else if (op.type === 'delete' && op.from !== undefined && op.to !== undefined) {
+                                const deco = createDeleteDecoration(op.from, op.to);
+                                if (deco) decorations.push(deco);
+                            }
+                        }
+
+                        return DecorationSet.create(tr.doc, decorations);
+
                     } else if (action.type === 'clear') {
                         return DecorationSet.empty;
                     }
@@ -140,6 +175,73 @@ export function clearEditorHighlight() {
             view.dispatch(tr);
         });
     }
+}
+
+/**
+ * Show a full diff preview in the editor using ghost decorations.
+ * @param {Array} operations - Array of {type: 'add'|'delete', text, pos, from, to}
+ *   - For 'add': {type: 'add', text: string, pos: number}
+ *   - For 'delete': {type: 'delete', from: number, to: number}
+ */
+export function showDiffPreview(operations) {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const tr = view.state.tr.setMeta(highlightKey, {
+            type: 'diffPreview',
+            operations
+        });
+        view.dispatch(tr);
+    });
+}
+
+/**
+ * Build a mapping from character offsets (in plain text) to ProseMirror positions.
+ * Returns a function that converts character offset to PM position.
+ * @returns {{charToPm: function(number): number, pmText: string}}
+ */
+export function getCharToPmMapping() {
+    if (!editor) return { charToPm: (n) => n, pmText: '' };
+
+    let result = { charToPm: (n) => n, pmText: '' };
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const doc = view.state.doc;
+
+        // Build arrays: charOffsets[i] = PM position for character i in extracted text
+        const charOffsets = [];
+        let textContent = '';
+
+        doc.descendants((node, pos) => {
+            if (node.isText) {
+                for (let i = 0; i < node.text.length; i++) {
+                    charOffsets.push(pos + i);
+                    textContent += node.text[i];
+                }
+            } else if (node.isBlock && charOffsets.length > 0) {
+                // Add newline for block boundaries
+                charOffsets.push(pos);
+                textContent += '\n';
+            }
+            return true;
+        });
+
+        result = {
+            charToPm: (charOffset) => {
+                if (charOffset < 0) return 0;
+                if (charOffset >= charOffsets.length) {
+                    return charOffsets.length > 0 ? charOffsets[charOffsets.length - 1] + 1 : doc.content.size;
+                }
+                return charOffsets[charOffset];
+            },
+            pmText: textContent,
+            docSize: doc.content.size
+        };
+    });
+
+    return result;
 }
 
 /**

@@ -886,6 +886,28 @@ textarea {
     transform: scale(0.95);
 }
 
+/* Exit Preview Button */
+.exit-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.05s;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.exit-btn:hover {
+    background: #c0392b;
+}
+
+.exit-btn:active {
+    transform: scale(0.95);
+}
+
 /* Preview Button */
 .preview-btn {
     padding: 3px 6px;
@@ -1149,48 +1171,6 @@ textarea {
     border-color: var(--danger) !important;
 }
 
-/* ===== DIFF PREVIEW ===== */
-.diff-preview-overlay {
-    position: relative;
-    background: var(--bg-page);
-    z-index: 5;
-    overflow: auto;
-    padding: 16px;
-    max-height: 50vh;
-    border-bottom: 2px solid var(--border-color);
-    margin-bottom: 8px;
-}
-
-.diff-line {
-    font-family: "SF Mono", Monaco, monospace;
-    font-size: 12px;
-    padding: 2px 8px;
-    white-space: pre-wrap;
-}
-
-.diff-line.added {
-    background: rgba(76, 175, 80, 0.2);
-}
-
-.diff-line.removed {
-    background: rgba(244, 67, 54, 0.2);
-    text-decoration: line-through;
-}
-
-/* Inline diff spans (character-level) */
-.diff-addition {
-    border-radius: 2px;
-    padding: 0 1px;
-}
-
-.diff-deletion {
-    background: rgba(244, 67, 54, 0.3);
-    text-decoration: line-through;
-    color: var(--text-muted);
-    border-radius: 2px;
-    padding: 0 1px;
-}
-
 /* ===== DIFF PREVIEW BANNER ===== */
 #diff-preview-banner {
     display: flex;
@@ -1219,32 +1199,17 @@ textarea {
     white-space: nowrap;
 }
 
+.preview-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 .preview-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-}
-
-.mode-btn {
-    padding: 3px 6px;
-    font-size: 0.75rem;
-    background: var(--bg-panel);
-    border: 1px solid var(--border-light);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background 0.1s;
-    white-space: nowrap;
-}
-
-.mode-btn.active {
-    background: var(--accent);
-    color: #000;
-    border-color: var(--accent);
-}
-
-.mode-btn:hover:not(.active) {
-    background: var(--btn-bg-hover);
 }
 
 /* ===== CONFLICT TABS ===== */

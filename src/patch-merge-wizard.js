@@ -9,6 +9,7 @@ import { mergeWithConflicts, parseConflicts, resolveConflict, hasUnresolvedConfl
 import { detectConflictZones, extractZoneContent, replaceZoneContent, getZoneContext, formatZoneForDisplay } from "./conflict-zones.js";
 import { setMarkdownContent, getMarkdown } from "./editor.js";
 import { getCachedProfile, getCurrentUserInfo } from "./profile-service.js";
+import { escapeHtml } from "./utils.js";
 
 let wizardState = {
     isOpen: false,
@@ -1086,12 +1087,6 @@ function updateNextButton() {
     const canProceed = (wizardState.conflictGroup && wizardState.conflictGroup.length >= 2) ||
         (wizardState.patchA && wizardState.patchB);
     nextBtn.disabled = !canProceed;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 export function initPatchMergeWizard() {

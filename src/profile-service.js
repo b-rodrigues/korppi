@@ -26,14 +26,6 @@ export async function saveProfile(profile) {
 }
 
 /**
- * Get the config directory path (for avatar storage).
- * @returns {Promise<string>} The config directory path
- */
-export async function getProfilePath() {
-    return await invoke("get_profile_path");
-}
-
-/**
  * Get the cached profile synchronously.
  * Returns null if profile hasn't been loaded yet.
  * Use getProfile() to load the profile first.
