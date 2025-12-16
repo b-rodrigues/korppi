@@ -886,6 +886,28 @@ textarea {
     transform: scale(0.95);
 }
 
+/* Exit Preview Button */
+.exit-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.05s;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.exit-btn:hover {
+    background: #c0392b;
+}
+
+.exit-btn:active {
+    transform: scale(0.95);
+}
+
 /* Preview Button */
 .preview-btn {
     padding: 3px 6px;
@@ -1217,6 +1239,12 @@ textarea {
     font-weight: 600;
     font-size: 0.8rem;
     white-space: nowrap;
+}
+
+.preview-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 .preview-controls {
