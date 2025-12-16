@@ -3,7 +3,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { calculateCharDiff } from './diff-highlighter.js';
-import { getCachedProfile, getCurrentUserInfo } from './profile-service.js';
+import { getCurrentUserInfo } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
 import { getMarkdown, showDiffPreview, clearEditorHighlight, getCharToPmMapping } from './editor.js';
