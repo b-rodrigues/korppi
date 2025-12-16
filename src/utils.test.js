@@ -203,8 +203,14 @@ Check [this link](url) for more.`;
             expect(stripMarkdown('Just plain text')).toBe('Just plain text');
         });
 
-        it('preserves newlines', () => {
+        it('preserves single newlines', () => {
             expect(stripMarkdown('line1\nline2')).toBe('line1\nline2');
+        });
+
+        it('collapses multiple newlines to single newline', () => {
+            // This matches how ProseMirror represents block boundaries
+            expect(stripMarkdown('line1\n\nline2')).toBe('line1\nline2');
+            expect(stripMarkdown('line1\n\n\nline2')).toBe('line1\nline2');
         });
     });
 });

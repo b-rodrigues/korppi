@@ -106,5 +106,9 @@ export function stripMarkdown(markdown) {
     text = text.replace(/^[\s]*[-*+]\s+/gm, '');
     text = text.replace(/^[\s]*\d+\.\s+/gm, '');
 
+    // Normalize newlines: collapse multiple consecutive newlines to single newline
+    // This matches how ProseMirror represents block boundaries (one \n per block)
+    text = text.replace(/\n{2,}/g, '\n');
+
     return text;
 }

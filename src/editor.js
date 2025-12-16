@@ -222,7 +222,11 @@ export function getCharToPmMapping() {
                 }
             } else if (node.isBlock && charOffsets.length > 0) {
                 // Add newline for block boundaries
-                charOffsets.push(pos);
+                // Map the newline to the position RIGHT AFTER the last character,
+                // not to the start of the next block. This ensures insertions at
+                // block boundaries appear at the end of the previous block's content.
+                const lastCharPos = charOffsets[charOffsets.length - 1];
+                charOffsets.push(lastCharPos + 1);
                 textContent += '\n';
             }
             return true;
