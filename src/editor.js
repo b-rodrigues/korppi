@@ -323,17 +323,35 @@ export function scrollToEditorRange(from, to) {
             try {
                 // Safeguard against out of bounds
                 const safeFrom = Math.min(from, view.state.doc.content.size);
-                // const resolved = view.state.doc.resolve(safeFrom);
-                const tr = view.state.tr;
+                console.log(`[Scroll] Scrolling to PM position: ${safeFrom}`);
 
-                // We want to scroll to 'safeFrom'. 
-                // Creating a selection is one way, but strictly scrolling to a point 
-                // can be done by ensure that point is in view.
-                // We'll trust ScrollIntoView with the transaction.
-                // To help it, we might need a selection change, but let's try just the flag if possible?
-                // ProseMirror usually scrolls to selection.
-                // Let's create a temporary selection at the target.
+                // Get the DOM coordinates for the position
+                const coords = view.coordsAtPos(safeFrom);
+                if (coords) {
+                    console.log(`[Scroll] Coords:`, coords);
+
+                    // Find the scroll container
+                    const scrollContainer = document.querySelector('.editor-scroll') ||
+                        document.querySelector('.milkdown') ||
+                        view.dom.parentElement;
+
+                    if (scrollContainer) {
+                        // Calculate scroll position to center the target
+                        const containerRect = scrollContainer.getBoundingClientRect();
+                        const targetY = coords.top - containerRect.top + scrollContainer.scrollTop;
+                        const centerOffset = containerRect.height / 3;
+
+                        scrollContainer.scrollTo({
+                            top: Math.max(0, targetY - centerOffset),
+                            behavior: 'smooth'
+                        });
+                        console.log(`[Scroll] Scrolled to Y: ${targetY - centerOffset}`);
+                    }
+                }
+
+                // Also try ProseMirror's built-in scroll
                 const resolved = view.state.doc.resolve(safeFrom);
+                const tr = view.state.tr;
                 tr.setSelection(TextSelection.near(resolved));
                 tr.scrollIntoView();
                 view.dispatch(tr);
@@ -574,6 +592,10 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
 
         if (operations.length > 0) {
             showDiffPreview(operations);
+
+            // Auto-scroll to the hunk location
+            const scrollTarget = charToPm(baseStart);
+            setTimeout(() => scrollToEditorRange(scrollTarget, scrollTarget), 0);
         } else {
             console.warn(`[HunkPreview] No operations generated!`);
         }
