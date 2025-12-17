@@ -3,7 +3,7 @@
 // Updates character offsets locally and detects overlaps.
 
 import { getReconciliationHunks, clearReconciliationHunks } from './reconcile.js';
-import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewGhostHunk } from './editor.js';
+import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewGhostHunk, previewGhostHunkByPosition } from './editor.js';
 import { showRightSidebar } from './components/sidebar-controller.js';
 import { getProfile } from './profile-service.js';
 import { escapeHtml } from './utils.js';
@@ -275,40 +275,29 @@ window.hunkReview_enter = (index) => {
     const hunk = reviewState.hunks[index];
     if (hunk && hunk.status === 'pending') {
         const content = getMarkdown();
-        let relativePos = 0.5;
-        if (content.length > 0) {
-            relativePos = hunk.base_start / content.length;
-        }
 
         console.log(`[PreviewDebug] Hover Hunk #${index}:`, {
             id: hunk.internal_id,
             start: hunk.base_start,
             end: hunk.base_end,
-            relativePos: relativePos,
             contentLen: content.length,
             textSnippet: content.substring(hunk.base_start, hunk.base_start + 20) + "..."
         });
 
-        // Logic to determine type and arguments for Ghost Preview
-        // Note: 'hunk.type' roughly tells us, but checking text lengths is safer
-
+        // Use position-based preview which handles markdown stripping correctly
         if (hunk.type === 'add') {
-            // Insert: need modified_text and context (preceding text)
-            // Context: grab 20 chars before base_start
-            const contextStart = Math.max(0, hunk.base_start - 20);
-            const contextText = content.substring(contextStart, hunk.base_start);
-            previewGhostHunk(hunk.modified_text, 'insert', relativePos, contextText);
+            // Insert at base_start position
+            previewGhostHunkByPosition(hunk.modified_text, 'insert', hunk.base_start, content);
 
         } else if (hunk.type === 'delete') {
-            // Delete: need base_text (the text currently in editor)
-            // We can extract it from range to be sure, or use hunk.base_text
+            // Delete: the text from base_start to base_end
             const targetText = content.substring(hunk.base_start, hunk.base_end);
-            previewGhostHunk(targetText, 'delete', relativePos);
+            previewGhostHunkByPosition(targetText, 'delete', hunk.base_start, content);
 
         } else {
-            // Mod/Replace: need modified_text (to insert) and base_text (to delete)
+            // Mod/Replace: delete old text, insert new text
             const deleteText = content.substring(hunk.base_start, hunk.base_end);
-            previewGhostHunk(hunk.modified_text, 'replace', relativePos, deleteText);
+            previewGhostHunkByPosition(hunk.modified_text, 'replace', hunk.base_start, content, deleteText);
         }
     }
 };

@@ -446,6 +446,137 @@ export function highlightByText(text, type, relativePos) {
 }
 
 /**
+ * Show Ghost Preview for a Hunk using direct position mapping.
+ * This version takes a markdown position and converts it to PM position
+ * using the same logic as renderGhostPreview.
+ * @param {string} text - The text to insert, or the text being deleted.
+ * @param {string} kind - 'insert', 'delete', or 'replace'
+ * @param {number} markdownPos - Character position in the markdown string
+ * @param {string} markdownContent - The full markdown content
+ * @param {string} [deleteTextOrInsertText] - For replace: text being deleted. For insert: ignored.
+ */
+export function previewGhostHunkByPosition(text, kind, markdownPos, markdownContent, deleteTextOrInsertText) {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+
+        // Import stripMarkdown dynamically to avoid circular deps
+        // Actually, we'll compute the position directly
+
+        // Get character-to-PM-position mapping (plain text from PM)
+        const { charToPm, pmText } = getCharToPmMapping();
+
+        // Strip markdown from the content up to markdownPos to find the plain text offset
+        // We need to find what plain text position corresponds to markdownPos in markdown
+        const prefixMarkdown = markdownContent.substring(0, markdownPos);
+
+        // Strip markdown from the prefix - this gives us the plain text before the insert point
+        // We need stripMarkdown here - let's inline a simple version
+        let prefixPlain = prefixMarkdown;
+        // Remove images: ![alt](url) -> alt
+        prefixPlain = prefixPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+        // Remove links: [text](url) -> text
+        prefixPlain = prefixPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+        // Remove bold: **text** -> text
+        prefixPlain = prefixPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
+        prefixPlain = prefixPlain.replace(/__([^_]+)__/g, '$1');
+        // Remove italic (careful not to match list items)
+        prefixPlain = prefixPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
+        prefixPlain = prefixPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
+        // Remove strikethrough
+        prefixPlain = prefixPlain.replace(/~~([^~]+)~~/g, '$1');
+        // Remove inline code
+        prefixPlain = prefixPlain.replace(/`([^`]+)`/g, '$1');
+        // Remove heading markers
+        prefixPlain = prefixPlain.replace(/^(#{1,6})\s+/gm, '');
+        // Remove blockquote markers
+        prefixPlain = prefixPlain.replace(/^>\s*/gm, '');
+        // Remove horizontal rules
+        prefixPlain = prefixPlain.replace(/^[-*_]{3,}\s*$/gm, '');
+        // Remove list markers
+        prefixPlain = prefixPlain.replace(/^[\s]*[-*+]\s+/gm, '');
+        prefixPlain = prefixPlain.replace(/^[\s]*\d+\.\s+/gm, '');
+        // Normalize newlines
+        prefixPlain = prefixPlain.replace(/\n{2,}/g, '\n');
+
+        // The plain text offset is the length of the stripped prefix
+        const plainOffset = prefixPlain.length;
+
+        let from, to;
+        let deleteFrom, deleteTo;
+
+        if (kind === 'insert') {
+            // Insert at the plain text offset
+            const posPm = charToPm(plainOffset);
+            from = posPm;
+            to = posPm;
+        } else if (kind === 'delete') {
+            // Delete: we need the range of text being deleted
+            // Strip markdown from the delete text to get its plain length
+            let deleteTextPlain = text;
+            deleteTextPlain = deleteTextPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/__([^_]+)__/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/~~([^~]+)~~/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/`([^`]+)`/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/^(#{1,6})\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^>\s*/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[-*_]{3,}\s*$/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[\s]*[-*+]\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[\s]*\d+\.\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/\n{2,}/g, '\n');
+
+            const fromPm = charToPm(plainOffset);
+            const toPm = charToPm(plainOffset + deleteTextPlain.length);
+            from = fromPm;
+            to = toPm;
+        } else if (kind === 'replace') {
+            // Replace: delete the old text and insert new text at that position
+            const deleteText = deleteTextOrInsertText;
+            let deleteTextPlain = deleteText || '';
+            deleteTextPlain = deleteTextPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/__([^_]+)__/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/~~([^~]+)~~/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/`([^`]+)`/g, '$1');
+            deleteTextPlain = deleteTextPlain.replace(/^(#{1,6})\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^>\s*/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[-*_]{3,}\s*$/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[\s]*[-*+]\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/^[\s]*\d+\.\s+/gm, '');
+            deleteTextPlain = deleteTextPlain.replace(/\n{2,}/g, '\n');
+
+            deleteFrom = charToPm(plainOffset);
+            deleteTo = charToPm(plainOffset + deleteTextPlain.length);
+        }
+
+        const tr = view.state.tr.setMeta(highlightKey, {
+            type: 'preview',
+            kind,
+            from,
+            to,
+            deleteFrom,
+            deleteTo,
+            text // text to insert
+        });
+        view.dispatch(tr);
+
+        // Scroll target
+        const scrollTarget = (kind === 'replace') ? deleteFrom : from;
+        if (scrollTarget !== undefined) {
+            setTimeout(() => scrollToEditorRange(scrollTarget, scrollTarget), 0);
+        }
+    });
+}
+
+/**
  * Show Ghost Preview for a Hunk
  * @param {string} text - The text to insert, or the text being deleted.
  * @param {string} kind - 'insert' or 'delete'
