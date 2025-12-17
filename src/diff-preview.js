@@ -129,17 +129,21 @@ function renderGhostPreview() {
     if (!previewState.active) return;
 
     // Get character-to-PM-position mapping
-    // pmText is the plain text extracted from ProseMirror nodes (no markdown syntax)
-    const { charToPm, pmText, docSize } = getCharToPmMapping();
+    const { charToPm } = getMarkdownToPmMapping();
 
-    // Strip markdown from newText to get plain text for comparison
-    // This ensures both sides of the diff use the same text representation
-    // as the position mapping (plain text without markdown syntax)
-    const oldPlainText = pmText;
-    const newPlainText = stripMarkdown(previewState.newText);
+    // For coordinate mapping, we don't need 'pmText' stripping.
+    // The diff is calculated against the original Markdown text (which we don't have here easily?)
+    // Wait, renderGhostPreview relies on `calculateCharDiff` between `oldText` and `newText`.
+    // oldText was `pmText`?
+    // In strict mode, previewState.oldText SHOULD be the Markdown Content?
 
-    // Calculate character-level diff between old (current) and new (merged) plain text
-    const diff = calculateCharDiff(oldPlainText, newPlainText);
+    // If we use getMarkdownToPmMapping, we assume `previewState.oldText` is the FULL MARKDOWN.
+    // And `previewState.newText` is the NEW FULL MARKDOWN.
+    // So `diff` is computed on Markdown chars.
+    // And `charToPm` maps Markdown chars to PM.
+    // This is correct.
+
+    const diff = calculateCharDiff(previewState.oldText, previewState.newText);
 
     // Convert diff operations to PM-position-based operations
     const operations = [];
@@ -156,7 +160,16 @@ function renderGhostPreview() {
 
             // Map character offsets to PM positions
             const fromPm = charToPm(fromChar);
-            const toPm = charToPm(toChar);
+            let toPm = charToPm(toChar);
+
+            // Debug
+            console.log(`[GhostPreview] Delete: MD ${fromChar}-${toChar} -> PM ${fromPm}-${toPm}, text: "${op.text.substring(0, 30)}..."`);
+
+            // Ensure minimum range of 1 for non-empty deletes
+            if (op.text.length > 0 && toPm <= fromPm) {
+                toPm = fromPm + 1;
+                console.log(`[GhostPreview] Adjusted toPm to ${toPm} for minimum range`);
+            }
 
             if (fromPm < toPm) {
                 operations.push({
@@ -171,6 +184,9 @@ function renderGhostPreview() {
             // Text being added - show as ghost insert widget
             const posPm = charToPm(oldOffset);
 
+            // Debug
+            console.log(`[GhostPreview] Add: MD offset ${oldOffset} -> PM ${posPm}, text: "${op.text.substring(0, 30)}..."`);
+
             operations.push({
                 type: 'add',
                 text: op.text,
@@ -179,6 +195,9 @@ function renderGhostPreview() {
             // Don't advance oldOffset for additions
         }
     }
+
+    // Debug final operations
+    console.log(`[GhostPreview] Final operations:`, operations);
 
     // Apply the decorations to the editor
     showDiffPreview(operations);

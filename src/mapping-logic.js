@@ -36,11 +36,17 @@ export function computeBlockMapping(doc, serializer) {
         const mdStart = currentMdOffset;
         const mdEnd = mdStart + mdLength;
 
+        // Skip empty blocks to prevent them from capturing offsets
+        if (mdLength === 0) {
+            return;
+        }
+
         blockMap.push({
             mdStart,
             mdEnd,
             pmStart: blockStartPm,
             pmEnd: blockEndPm,
+            type: node.type.name
         });
 
         // Advance
@@ -83,7 +89,7 @@ export function computeBlockMapping(doc, serializer) {
             const prevBlockIndex = blockMap.findIndex(b => mdOffset < b.mdStart);
             let prevBlock;
             if (prevBlockIndex === -1) {
-                prevBlock = blockMap[blockMap.length - 1];
+                prevBlock = blockMap[blockMap.length - 1]; // End of Doc implicit
             } else if (prevBlockIndex > 0) {
                 prevBlock = blockMap[prevBlockIndex - 1];
             }
@@ -91,6 +97,14 @@ export function computeBlockMapping(doc, serializer) {
             if (prevBlock) {
                 if (mdOffset > prevBlock.mdEnd) {
                     console.log(`[BlockMap] Gap! Attaching to PrevBlock:`, prevBlock);
+
+                    // Fix: End of Document
+                    // If this is the last block, and we are appending AFTER it, map to doc end.
+                    if (prevBlock === blockMap[blockMap.length - 1]) {
+                        console.log(`[BlockMap] End of Doc detected. Mapping to Doc Size.`);
+                        return doc.content.size;
+                    }
+
                     const result = Math.max(prevBlock.pmStart + 1, prevBlock.pmEnd - 1);
                     console.log(`[BlockMap] Gap Result: ${result}`);
                     return result;
@@ -100,6 +114,13 @@ export function computeBlockMapping(doc, serializer) {
             const nextBlock = blockMap.find(b => mdOffset < b.mdStart);
             if (nextBlock) {
                 console.log(`[BlockMap] Fallback to Next Block:`, nextBlock);
+
+                // Fix: Offset 0 (Start of Doc)
+                // If mapping to first block, force "Inside" logic.
+                if (mdOffset === 0) {
+                    return nextBlock.pmStart + 1;
+                }
+
                 return nextBlock.pmStart;
             }
 
