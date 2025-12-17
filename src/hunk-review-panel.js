@@ -292,7 +292,8 @@ window.hunkReview_enter = (index) => {
             hunk.base_start,
             hunk.base_end,
             hunk.modified_text || '',
-            content
+            content,
+            hunk.base_text || ''
         );
     }
 };
