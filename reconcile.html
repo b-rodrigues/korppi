@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Korppi - A modern markdown editor with timeline tracking and reconciliation features">
+    <meta name="keywords" content="korppi, markdown, editor, timeline, version control, document editing">
+    <meta name="author" content="Korppi Team">
+    <title>Reconcile - Korppi Documentation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="rationale.html" >Rationale</a></li><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Documentation</div><ul><li><a href="profile.html" >Configure Profile</a></li><li><a href="first-document.html" >Your First Document</a></li><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="reconcile.html" class="current">Reconciliation {{NAV}} Version Control</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" >FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Reconcile</h1>
+            </header>
+
+            <article class="content">
+<h1 id="reconciliation--version-control">Reconciliation &amp; Version
+Control</h1>
+<p>Korppi provides powerful tools to manage document history and
+collaborate with others through <strong>Reconciliation</strong>. This
+allows you to import changes from other <code>.kmd</code> files, review
+them, and manage versions.</p>
+<hr />
+<h2 id="1-the-workflow">1. The Workflow</h2>
+<h3 id="step-1-import-changes">Step 1: Import Changes</h3>
+<ol type="1">
+<li>Save your current document.</li>
+<li>Click <strong>Reconcile</strong> in the left sidebar.</li>
+<li>Select the <code>.kmd</code> file you want to import (e.g., a
+version from a reviewer).</li>
+</ol>
+<h3 id="step-2-review-process">Step 2: Review Process</h3>
+<p>Once reconciliation starts, you will see a notification guiding you
+to two key tabs in the right sidebar:</p>
+<ul>
+<li><strong>Track Changes:</strong> For reviewing individual text
+edits.</li>
+<li><strong>Timeline:</strong> For managing the entire document
+history.</li>
+</ul>
+<hr />
+<h2 id="2-visualizing-changes">2. Visualizing Changes</h2>
+<h3 id="track-changes-tab-individual-edits">Track Changes Tab
+(Individual Edits)</h3>
+<p>This tab focuses on the <em>specifics</em>. It breaks down the
+difference between your document and the imported version into small
+"Hunks".</p>
+<ul>
+<li><strong>View:</strong> See exactly which lines were added (Green),
+removed (Red), or modified.</li>
+<li><strong>Review:</strong> Scroll through the list to understand the
+granular impact of the import.</li>
+<li><strong>Reset:</strong> If the changes aren't what you expected,
+click <strong>Reset to Original</strong> to discard the import and
+revert to your pre-reconciliation state.</li>
+</ul>
+<h3 id="timeline-tab-whole-history">Timeline Tab (Whole History)</h3>
+<p>The Timeline acts as your <strong>Version Control</strong>. It shows
+the complete history of the document, including your local saves and the
+imported patches.</p>
+<ul>
+<li><strong>Chronological View:</strong> See every significant edit as a
+"patch" with a timestamp and author.</li>
+<li><strong>Status Indicators:</strong>
+<ul>
+<li><strong>Pending:</strong> Imported changes that haven't been
+finalized.</li>
+<li><strong>Accepted:</strong> Changes merged into your document.</li>
+</ul></li>
+<li><strong>Filtering:</strong> Filter by Author or Status to find
+specific versions.</li>
+</ul>
+<hr />
+<h2 id="3-restoring-versions">3. Restoring Versions</h2>
+<p>You have multiple ways to undo or revert changes:</p>
+<h3 id="reset-to-original">Reset to Original</h3>
+<p>Located in the <strong>Track Changes</strong> and
+<strong>Timeline</strong> tabs.</p>
+<ul>
+<li><strong>Action:</strong> Instantly reverts the document to the state
+<em>before</em> you started the current reconciliation.</li>
+<li><strong>Use Case:</strong> You imported the wrong file or want to
+restart the review process from scratch.</li>
+</ul>
+<h3 id="restore-from-timeline">Restore from Timeline</h3>
+<p>Located on each item in the <strong>Timeline</strong>.</p>
+<ul>
+<li><strong>Action:</strong> Replaces your <em>entire</em> current
+document with that specific historical version.</li>
+<li><strong>Use Case:</strong> Recovering an old draft or undoing a
+series of bad edits.</li>
+<li><strong>Warning:</strong> This overwrites your current content
+(though the overwrite itself becomes a new history entry).</li>
+</ul>
+<hr />
+<h2 id="4-best-practices">4. Best Practices</h2>
+<ol type="1">
+<li><strong>Save Often:</strong> Frequent saves create more timeline
+entries, giving you more "undo points".</li>
+<li><strong>Review Before Accepted:</strong> Use the <strong>Track
+Changes</strong> tab to verify imported text before considering it
+"done".</li>
+<li><strong>Collaborate:</strong> Use the Export/Import workflow to
+share <code>.kmd</code> files with others. Reconciliation handles the
+merging logic for you.</li>
+</ol>
+<hr />
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="file-format.html">File Format</a> - About .kmd files</li>
+<li><a href="comments.html">Comments</a> - managing feedback</li>
+</ul>
+            </article>
+
+            <footer class="footer">
+                <p>Last updated: 2025-12-17</p>
+                <div class="badges">
+                    <span>MADE WITH ♥</span>
+                    <span>HTML 4.0</span>
+                    <span>640x480</span>
+                    <span>BEST VIEWED IN NETSCAPE</span>
+                </div>
+                <p style="margin-top: 12px;">
+                    <a href="https://github.com/b-rodrigues/korppi">★ Visit us on GitHub ★</a>
+                </p>
+            </footer>
+        </main>
+    </div>
+</body>
+
+</html>

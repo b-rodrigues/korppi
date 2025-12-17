@@ -16,7 +16,7 @@
     <div class="page-wrapper">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
-            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="rationale.html" >Rationale</a></li><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Documentation</div><ul><li><a href="profile.html" >Configure Profile</a></li><li><a href="first-document.html" >Your First Document</a></li><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="timeline.html" >Timeline and History</a></li><li><a href="reconciliation.html" >Reconciliation</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" class="current">FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
+            <div class="sidebar-header"><a href="index.html" >KORPPI</a></div><div class="sidebar-section"><div class="sidebar-title">Getting Started</div><ul><li><a href="rationale.html" >Rationale</a></li><li><a href="installation.html" >Installation</a></li><li><a href="quick-start.html" >Quick Start</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Documentation</div><ul><li><a href="profile.html" >Configure Profile</a></li><li><a href="first-document.html" >Your First Document</a></li><li><a href="formatting.html" >Text Formatting</a></li><li><a href="comments.html" >Comments and Reviews</a></li><li><a href="reconcile.html" >Reconciliation {{NAV}} Version Control</a></li><li><a href="export.html" >Export Options</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Reference</div><ul><li><a href="keyboard-shortcuts.html" >Keyboard Shortcuts</a></li><li><a href="file-format.html" >File Format (.kmd)</a></li><li><a href="configuration.html" >Configuration</a></li></ul></div><div class="sidebar-section"><div class="sidebar-title">Help</div><ul><li><a href="faq.html" class="current">FAQ</a></li><li><a href="troubleshooting.html" >Troubleshooting</a></li><li><a href="contributing.html" >Contributing</a></li></ul></div>
         </nav>
 
         <!-- Main Content -->
@@ -36,9 +36,11 @@ conflict-free merging. It lets you write, track changes, and collaborate
 asynchronously, all locally, with no dependence on third-party
 servers.</p>
 <h3 id="why-korppi">Why "Korppi"?</h3>
-<p>Korppi means "raven" in Finnish. Ravens are known for their
-intelligence and memory—fitting for an editor that remembers
-everything!</p>
+<p>Korppi means "raven" in Finnish. At first I wanted to use
+<em>Pijul</em> an open source tool named after the <a
+href="https://en.wikipedia.org/wiki/Smooth-billed_ani">Pijul</a> for the
+patch engine, and so I wanted to give my tool also a bird name. In the
+end I didn't stick with Pijul, but kept <em>Korppi</em>.</p>
 <h3 id="is-korppi-free">Is Korppi free?</h3>
 <p>Yes! Korppi is free and open source software, released under the
 GPLv3 license.</p>
@@ -58,13 +60,11 @@ support?</h3>
 native format. It's a ZIP archive containing your markdown content,
 version history, comments, and metadata. See <a
 href="file-format.html">File Format</a> for details.</p>
-<h3 id="can-i-open-regular-md-files">Can I open regular .md files?</h3>
-<p>Currently, Korppi uses its own <code>.kmd</code> format. You can:</p>
-<ul>
-<li>Create a new document and paste markdown content</li>
-<li>Export to <code>.md</code> at any time</li>
-</ul>
-<p>Direct <code>.md</code> import is planned for a future release.</p>
+<h3 id="can-i-open-regular-markdwon-or-word-files">Can I open regular
+Markdwon or Word files?</h3>
+<p>Currently, Korppi uses its own <code>.kmd</code> format, but you can
+import <code>.md</code>, (and some variants, such as <code>.rmd</code>,
+<code>.qmd</code>) and <code>.docx</code> files.</p>
 <h3 id="how-do-i-share-documents-with-non-korppi-users">How do I share
 documents with non-Korppi users?</h3>
 <p>Export your document:</p>
@@ -120,30 +120,9 @@ version. Can I undo that?</h3>
 reconcile with a backup of your newer version.</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting</h2>
-<h3 id="korppi-wont-start">Korppi won't start</h3>
-<p>See <a href="troubleshooting.html">Troubleshooting</a> for
-platform-specific solutions.</p>
-<h3 id="my-document-looks-corrupted">My document looks corrupted</h3>
-<p>Try:</p>
-<ol type="1">
-<li>Check if the <code>.kmd</code> file opens (it's a ZIP file)</li>
-<li>Extract <code>content.md</code> manually</li>
-<li>Open in a new Korppi document</li>
-</ol>
-<h3 id="export-isnt-working">Export isn't working</h3>
-<p>Check for:</p>
-<ul>
-<li>Disk space</li>
-<li>Write permissions in the target folder</li>
-<li>Special characters in filename</li>
-</ul>
-<h3 id="the-editor-is-slow">The editor is slow</h3>
-<p>For very large documents (50,000+ words):</p>
-<ul>
-<li>Split into multiple documents</li>
-<li>Reduce timeline history (coming soon)</li>
-<li>Check available RAM</li>
-</ul>
+<p>Open an issue on <a
+href="https://github.com/b-rodrigues/korppi/issues">GitHub</a> if
+something's wrong.</p>
 <hr />
 <h2 id="development">Development</h2>
 <h3 id="how-do-i-report-bugs">How do I report bugs?</h3>
@@ -170,7 +149,7 @@ Issue</a></li>
             </article>
 
             <footer class="footer">
-                <p>Last updated: 2025-12-12</p>
+                <p>Last updated: 2025-12-17</p>
                 <div class="badges">
                     <span>MADE WITH ♥</span>
                     <span>HTML 4.0</span>
