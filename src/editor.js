@@ -265,6 +265,8 @@ export function getCharToPmMapping() {
  *   blockMap: Array<{ mdStart, mdEnd, pmStart, pmEnd, text }>
  * }
  */
+import { computeBlockMapping } from './mapping-logic.js';
+
 export function getMarkdownToPmMapping() {
     if (!editor) return { charToPm: (n) => n, blockMap: [] };
 
@@ -274,101 +276,38 @@ export function getMarkdownToPmMapping() {
         const view = ctx.get(editorViewCtx);
         const doc = view.state.doc;
         const serializer = ctx.get(serializerCtx);
+        const schema = view.state.schema;
 
-        // precise full markdown
-        const fullMarkdown = serializer(doc);
-        const blockMap = [];
-
-        let currentMdOffset = 0;
-
-        // Iterate top-level blocks
-        doc.forEach((node, offset, index) => {
-            const blockStartPm = offset;
-            const blockEndPm = offset + node.nodeSize;
-
-            // Serialize just this node
-            // Note: serializeNode wrapper might be slower if called in loop?
-            // But we can call serializer directly here since we have context.
-            let blockMd = "";
+        const safeSerializer = (node) => {
             try {
-                blockMd = serializer(node);
-            } catch (e) {
-                console.warn("Block serialization failed", e);
-                blockMd = node.textContent; // Fallback
-            }
-
-            // trimming might be needed if serializer adds newlines?
-            // Usually serializer(node) returns the text exactly.
-            // But fullMarkdown has separators.
-
-            // Find this block in fullMarkdown starting at currentMdOffset
-            // We expect it to be very close (just after newlines)
-
-            // Skip separators (newlines) in fullMarkdown
-            while (currentMdOffset < fullMarkdown.length &&
-                (fullMarkdown[currentMdOffset] === '\n' || fullMarkdown[currentMdOffset] === ' ')) {
-                currentMdOffset++;
-            }
-
-            // Now we should be at the start of the block
-            // Safety check: does it match?
-            // Note: blockMd might technically differ if context matters (e.g. lists merging)
-            // But for independent paragraphs/headings it should match.
-
-            // Optimization: Assume match to avoid expensive string compares, 
-            // but check length.
-            const mdLength = blockMd.length;
-            const mdStart = currentMdOffset;
-            const mdEnd = mdStart + mdLength;
-
-            blockMap.push({
-                mdStart,
-                mdEnd,
-                pmStart: blockStartPm,
-                pmEnd: blockEndPm,
-                // store snippet for debug
-                // text: blockMd.substring(0, 20) 
-            });
-
-            // Advance
-            currentMdOffset = mdEnd;
-        });
-
-        mapping = {
-            blockMap,
-            charToPm: (mdOffset) => {
-                // Find the block containing this offset
-                const block = blockMap.find(b => mdOffset >= b.mdStart && mdOffset < b.mdEnd);
-                if (block) {
-                    // We are inside a block.
-                    // Calculate relative offset
-                    const relativeMd = mdOffset - block.mdStart;
-                    const relativeRatio = relativeMd / (block.mdEnd - block.mdStart);
-
-                    // Map to PM range (approximate within the block)
-                    // The PM block includes tags (nodeSize).
-                    // This is still slightly fuzzy INSIDE the block, but accurate to the block.
-                    // Ideally we would drill down, but block-level is likely enough for "Ghost Preview"
-                    // to find the right search scope.
-
-                    // For precise cursor: 
-                    // pmPos = pmStart + 1 (start of content) + relative * contentSize
-                    const contentStart = block.pmStart + 1;
-                    const contentSize = block.pmEnd - block.pmStart - 2; // approximation (tags)
-                    // clamp contentSize
-                    const safeSize = Math.max(0, contentSize);
-
-                    return Math.floor(contentStart + (relativeRatio * safeSize));
+                // Try direct serialization first
+                return serializer(node);
+            } catch (err) {
+                // If direct fails (e.g. Milkdown stack interactions), try wrapping in a temporary doc
+                try {
+                    // Create a temp doc with just this node
+                    // Note: This might add a trailing newline which standard blocks have anyway.
+                    // But we want the block's own markdown.
+                    const tempDoc = schema.topNodeType.create(null, node);
+                    // Serialize the doc
+                    let md = serializer(tempDoc);
+                    // Removing trailing newline usually added by doc serialization
+                    return md.trim();
+                } catch (e2) {
+                    console.warn("[BlockMap] Serialization completely failed for node:", node, e2);
+                    throw err; // Throw original
                 }
-
-                // If in gap?
-                // Return start of next block
-                const nextBlock = blockMap.find(b => mdOffset < b.mdStart);
-                if (nextBlock) return nextBlock.pmStart;
-
-                return doc.content.size;
             }
         };
+
+        // Note: We use the original serializer for the full doc because it works on doc.
+        // But computeBlockMapping uses the passed serializer for individual blocks.
+        // We pass safeSerializer.
+        // For the "fullMarkdown" arg inside computeBlockMapping, we can just pass the doc.
+        // Wait, computeBlockMapping calls serializer(doc) inside.
+        // safeSerializer handles doc too (direct call).
+
+        mapping = computeBlockMapping(doc, safeSerializer);
     });
 
     return mapping;
