@@ -1,6 +1,6 @@
 {
   "name": "korppi",
-  "version": "0.2.0-rc",
+  "version": "0.2.0",
   "description": "Korppi - Local-first collaborative markdown editor",
   "scripts": {
     "tauri": "tauri",
