@@ -9,6 +9,7 @@ import { mergeText } from './three-way-merge.js';
 import { getMarkdown, showDiffPreview, clearEditorHighlight, getCharToPmMapping } from './editor.js';
 import { getConflictState, restoreToPatch } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
+import { stripMarkdown } from './utils.js';
 
 let previewState = {
     active: false,
@@ -127,15 +128,22 @@ function hidePreviewBanner() {
 function renderGhostPreview() {
     if (!previewState.active) return;
 
-    // Calculate character-level diff between old (current) and new (merged) text
-    const diff = calculateCharDiff(previewState.oldText, previewState.newText);
-
     // Get character-to-PM-position mapping
+    // pmText is the plain text extracted from ProseMirror nodes (no markdown syntax)
     const { charToPm, pmText, docSize } = getCharToPmMapping();
+
+    // Strip markdown from newText to get plain text for comparison
+    // This ensures both sides of the diff use the same text representation
+    // as the position mapping (plain text without markdown syntax)
+    const oldPlainText = pmText;
+    const newPlainText = stripMarkdown(previewState.newText);
+
+    // Calculate character-level diff between old (current) and new (merged) plain text
+    const diff = calculateCharDiff(oldPlainText, newPlainText);
 
     // Convert diff operations to PM-position-based operations
     const operations = [];
-    let oldOffset = 0; // Track position in oldText
+    let oldOffset = 0; // Track position in oldPlainText (which matches pmText)
 
     for (const op of diff) {
         if (op.type === 'equal') {
