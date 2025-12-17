@@ -1,15 +1,10 @@
 // src/diff-preview.js
 // Visual diff preview using inline ghost decorations (track-changes style)
 
-import { invoke } from '@tauri-apps/api/core';
 import { calculateCharDiff } from './diff-highlighter.js';
-import { getCurrentUserInfo } from './profile-service.js';
-import { getActiveDocumentId } from './document-manager.js';
-import { mergeText } from './three-way-merge.js';
-import { getMarkdown, showDiffPreview, clearEditorHighlight, getMarkdownToPmMapping } from './editor.js';
+import { showDiffPreview, clearEditorHighlight, getMarkdownToPmMapping } from './editor.js';
 import { getConflictState, restoreToPatch } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
-import { stripMarkdown } from './utils.js';
 
 let previewState = {
     active: false,
@@ -204,113 +199,3 @@ export function isPreviewActive() {
     return previewState.active;
 }
 
-/**
- * Get pending patch IDs in the current conflict group
- * @param {number|null} excludePatchId - Optional patch ID to exclude from results
- * @returns {Promise<Array<number>>} - Array of pending patch IDs
- */
-async function getPendingConflictPatchIds(excludePatchId = null) {
-    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
-        return [];
-    }
-
-    const { fetchPatchList } = await import('./timeline.js');
-    const allPatches = await fetchPatchList();
-    const docId = getActiveDocumentId();
-    const { id: currentUserId } = getCurrentUserInfo();
-
-    // Build a map of patch ID to patch for quick lookup
-    const patchMap = new Map(allPatches.map(p => [p.id, p]));
-
-    // Filter conflict group to only include pending patches
-    const pendingIds = [];
-
-    for (const patchId of previewState.conflictGroup) {
-        if (excludePatchId !== null && patchId === excludePatchId) continue;
-
-        const patch = patchMap.get(patchId);
-        if (!patch) continue;
-
-        // Patches by current user are implicitly accepted (not pending)
-        if (patch.author === currentUserId) continue;
-
-        // Check if current user has already reviewed this patch
-        if (patch.uuid && docId) {
-            const reviews = await invoke("get_document_patch_reviews", {
-                docId,
-                patchUuid: patch.uuid
-            }).catch(() => []);
-
-            const hasReviewed = reviews.some(r => r.reviewer_id === currentUserId);
-            if (hasReviewed) continue;
-        }
-
-        pendingIds.push(patchId);
-    }
-
-    return pendingIds;
-}
-
-/**
- * Update the conflict tabs in the preview banner
- */
-/**
- * Update the conflict tabs in the preview banner - Disabled
- */
-async function updateConflictTabs() {
-    // Conflict tabs and merge wizard disabled per user request
-    return;
-}
-
-/**
- * Switch preview to a different patch in the conflict group
- * @param {number} patchId - The patch ID to switch to
- */
-async function switchToConflictPatch(patchId) {
-    if (patchId === previewState.patchId) return;
-
-    const { fetchPatch, fetchPatchList } = await import('./timeline.js');
-
-    const patch = await fetchPatch(patchId);
-    if (!patch) {
-        alert("Failed to load patch");
-        return;
-    }
-
-    // Get current editor content as markdown (the "old" state)
-    const currentContent = getMarkdown();
-
-    // Calculate what the merged result would be (3-way merge simulation)
-    const allPatches = await fetchPatchList();
-    const savePatchesOnly = allPatches
-        .filter(p => p.kind === "Save" && p.data?.snapshot)
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-    const baseSnapshot = savePatchesOnly.length > 0
-        ? savePatchesOnly[0].data.snapshot
-        : '';
-
-    const patchContent = patch.data?.snapshot || '';
-
-    // Simulate what the merge would produce
-    const mergedResult = mergeText(baseSnapshot, currentContent, patchContent);
-
-    // Update preview state
-    previewState.patchId = patchId;
-    previewState.oldText = currentContent;
-    previewState.newText = mergedResult;
-
-    // Update UI
-    const patchIdEl = document.querySelector('#preview-patch-id');
-    if (patchIdEl) {
-        patchIdEl.textContent = patchId;
-    }
-
-    // Update tab states
-    document.querySelectorAll('.conflict-tab').forEach(tab => {
-        tab.classList.toggle('active', parseInt(tab.dataset.patchId) === patchId);
-    });
-
-    // Re-render ghost preview
-    renderGhostPreview();
-}

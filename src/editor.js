@@ -632,34 +632,8 @@ export function previewGhostHunkByPosition(text, kind, markdownPos, markdownCont
         // We need to find what plain text position corresponds to markdownPos in markdown
         const prefixMarkdown = markdownContent.substring(0, markdownPos);
 
-        // Strip markdown from the prefix - this gives us the plain text before the insert point
-        // We need stripMarkdown here - let's inline a simple version
-        let prefixPlain = prefixMarkdown;
-        // Remove images: ![alt](url) -> alt
-        prefixPlain = prefixPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
-        // Remove links: [text](url) -> text
-        prefixPlain = prefixPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-        // Remove bold: **text** -> text
-        prefixPlain = prefixPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
-        prefixPlain = prefixPlain.replace(/__([^_]+)__/g, '$1');
-        // Remove italic (careful not to match list items)
-        prefixPlain = prefixPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
-        prefixPlain = prefixPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
-        // Remove strikethrough
-        prefixPlain = prefixPlain.replace(/~~([^~]+)~~/g, '$1');
-        // Remove inline code
-        prefixPlain = prefixPlain.replace(/`([^`]+)`/g, '$1');
-        // Remove heading markers
-        prefixPlain = prefixPlain.replace(/^(#{1,6})\s+/gm, '');
-        // Remove blockquote markers
-        prefixPlain = prefixPlain.replace(/^>\s*/gm, '');
-        // Remove horizontal rules
-        prefixPlain = prefixPlain.replace(/^[-*_]{3,}\s*$/gm, '');
-        // Remove list markers
-        prefixPlain = prefixPlain.replace(/^[\s]*[-*+]\s+/gm, '');
-        prefixPlain = prefixPlain.replace(/^[\s]*\d+\.\s+/gm, '');
-        // Normalize newlines
-        prefixPlain = prefixPlain.replace(/\n{2,}/g, '\n');
+        // Strip markdown from the prefix to get plain text length
+        const prefixPlain = stripMarkdown(prefixMarkdown);
 
         // The plain text offset is the length of the stripped prefix
         const plainOffset = prefixPlain.length;
@@ -674,46 +648,14 @@ export function previewGhostHunkByPosition(text, kind, markdownPos, markdownCont
             to = posPm;
         } else if (kind === 'delete') {
             // Delete: we need the range of text being deleted
-            // Strip markdown from the delete text to get its plain length
-            let deleteTextPlain = text;
-            deleteTextPlain = deleteTextPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/__([^_]+)__/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/~~([^~]+)~~/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/`([^`]+)`/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/^(#{1,6})\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^>\s*/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[-*_]{3,}\s*$/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[\s]*[-*+]\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[\s]*\d+\.\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/\n{2,}/g, '\n');
-
+            const deleteTextPlain = stripMarkdown(text);
             const fromPm = charToPm(plainOffset);
             const toPm = charToPm(plainOffset + deleteTextPlain.length);
             from = fromPm;
             to = toPm;
         } else if (kind === 'replace') {
             // Replace: delete the old text and insert new text at that position
-            const deleteText = deleteTextOrInsertText;
-            let deleteTextPlain = deleteText || '';
-            deleteTextPlain = deleteTextPlain.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/\*\*([^*]+)\*\*/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/__([^_]+)__/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/(?<![*_])\*([^*\n]+)\*(?![*])/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/(?<![_*])_([^_\n]+)_(?![_])/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/~~([^~]+)~~/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/`([^`]+)`/g, '$1');
-            deleteTextPlain = deleteTextPlain.replace(/^(#{1,6})\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^>\s*/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[-*_]{3,}\s*$/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[\s]*[-*+]\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/^[\s]*\d+\.\s+/gm, '');
-            deleteTextPlain = deleteTextPlain.replace(/\n{2,}/g, '\n');
-
+            const deleteTextPlain = stripMarkdown(deleteTextOrInsertText || '');
             deleteFrom = charToPm(plainOffset);
             deleteTo = charToPm(plainOffset + deleteTextPlain.length);
         }
