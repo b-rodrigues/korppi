@@ -72,7 +72,6 @@ function showPreviewBanner() {
                 <span class="preview-label">👁 Previewing Patch #<span id="preview-patch-id"></span></span>
                 <span class="preview-hint">(changes shown inline)</span>
             </div>
-            <div id="conflict-tabs"></div>
             <div class="preview-controls">
                 <button class="restore-btn" title="Restore document to this patch version">↺ Restore</button>
                 <button class="exit-btn">✕ Exit Preview</button>
@@ -105,9 +104,6 @@ function showPreviewBanner() {
     if (patchIdEl) {
         patchIdEl.textContent = previewState.patchId;
     }
-
-    // Update conflict tabs if in a conflict group
-    updateConflictTabs();
 
     banner.style.display = 'flex';
 }
@@ -163,12 +159,9 @@ function renderGhostPreview() {
             let toPm = charToPm(toChar);
 
             // Debug
-            console.log(`[GhostPreview] Delete: MD ${fromChar}-${toChar} -> PM ${fromPm}-${toPm}, text: "${op.text.substring(0, 30)}..."`);
-
             // Ensure minimum range of 1 for non-empty deletes
             if (op.text.length > 0 && toPm <= fromPm) {
                 toPm = fromPm + 1;
-                console.log(`[GhostPreview] Adjusted toPm to ${toPm} for minimum range`);
             }
 
             if (fromPm < toPm) {
@@ -185,7 +178,7 @@ function renderGhostPreview() {
             const posPm = charToPm(oldOffset);
 
             // Debug
-            console.log(`[GhostPreview] Add: MD offset ${oldOffset} -> PM ${posPm}, text: "${op.text.substring(0, 30)}..."`);
+
 
             operations.push({
                 type: 'add',
@@ -197,7 +190,7 @@ function renderGhostPreview() {
     }
 
     // Debug final operations
-    console.log(`[GhostPreview] Final operations:`, operations);
+
 
     // Apply the decorations to the editor
     showDiffPreview(operations);
@@ -261,62 +254,12 @@ async function getPendingConflictPatchIds(excludePatchId = null) {
 /**
  * Update the conflict tabs in the preview banner
  */
+/**
+ * Update the conflict tabs in the preview banner - Disabled
+ */
 async function updateConflictTabs() {
-    const tabsContainer = document.getElementById('conflict-tabs');
-    if (!tabsContainer) return;
-
-    // Clear existing tabs
-    tabsContainer.innerHTML = '';
-
-    // Only show tabs if in a conflict group with multiple patches
-    if (!previewState.conflictGroup || previewState.conflictGroup.length <= 1) {
-        return;
-    }
-
-    // Get pending patches in the conflict group
-    const pendingPatchIds = await getPendingConflictPatchIds();
-
-    // Only show tabs if there are multiple pending patches
-    if (pendingPatchIds.length <= 1) {
-        return;
-    }
-
-    // Show warning indicator
-    const warningDiv = document.createElement('div');
-    warningDiv.className = 'conflict-warning-header';
-    warningDiv.innerHTML = '⚠️ Conflicting patches:';
-    warningDiv.style.cssText = 'color:#f44336;font-weight:bold;font-size:0.9rem;margin-right:8px;';
-    tabsContainer.appendChild(warningDiv);
-
-    // Create tabs for each pending patch in the conflict group
-    for (const patchId of pendingPatchIds) {
-        const tab = document.createElement('button');
-        tab.className = 'conflict-tab';
-        tab.dataset.patchId = patchId;
-        tab.textContent = `#${patchId}`;
-
-        if (patchId === previewState.patchId) {
-            tab.classList.add('active');
-        }
-
-        tab.addEventListener('click', async () => {
-            await switchToConflictPatch(patchId);
-        });
-
-        tabsContainer.appendChild(tab);
-    }
-
-    // Add "Resolve Conflict" button
-    const resolveBtn = document.createElement('button');
-    resolveBtn.className = 'resolve-conflict-btn';
-    resolveBtn.innerHTML = '🔀 Merge';
-    resolveBtn.style.cssText = 'margin-left:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;';
-    resolveBtn.addEventListener('click', async () => {
-        exitPreview();
-        const { openPatchMergeWizardWithPatches } = await import('./patch-merge-wizard.js');
-        openPatchMergeWizardWithPatches(pendingPatchIds);
-    });
-    tabsContainer.appendChild(resolveBtn);
+    // Conflict tabs and merge wizard disabled per user request
+    return;
 }
 
 /**

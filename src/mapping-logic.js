@@ -54,19 +54,19 @@ export function computeBlockMapping(doc, serializer) {
     });
 
     // Debug Block Map
-    console.log("[BlockMap] Built Map:", blockMap);
+
 
     return {
         blockMap,
         charToPm: (mdOffset) => {
-            console.log(`[BlockMap] Mapping Offset: ${mdOffset}`);
+
 
             // Find the block containing this offset
             // We use >= start and <= end to capture the trailing edge.
             const block = blockMap.find(b => mdOffset >= b.mdStart && mdOffset <= b.mdEnd);
 
             if (block) {
-                console.log(`[BlockMap] Hit Block:`, block);
+
                 // We are inside a block.
                 const relativeMd = mdOffset - block.mdStart;
 
@@ -81,7 +81,7 @@ export function computeBlockMapping(doc, serializer) {
                 // console.log(`[BlockMap] Ratio: ${relativeMd}/${block.mdEnd - block.mdStart} = ${relativeRatio}`);
 
                 const result = Math.floor(contentStart + (relativeRatio * contentSize));
-                console.log(`[BlockMap] Mapped to PM: ${result}`);
+                return result;
                 return result;
             }
 
@@ -96,24 +96,24 @@ export function computeBlockMapping(doc, serializer) {
 
             if (prevBlock) {
                 if (mdOffset > prevBlock.mdEnd) {
-                    console.log(`[BlockMap] Gap! Attaching to PrevBlock:`, prevBlock);
+
 
                     // Fix: End of Document
                     // If this is the last block, and we are appending AFTER it, map to doc end.
                     if (prevBlock === blockMap[blockMap.length - 1]) {
-                        console.log(`[BlockMap] End of Doc detected. Mapping to Doc Size.`);
+                        // End of document detected
                         return doc.content.size;
                     }
 
                     const result = Math.max(prevBlock.pmStart + 1, prevBlock.pmEnd - 1);
-                    console.log(`[BlockMap] Gap Result: ${result}`);
+
                     return result;
                 }
             }
 
             const nextBlock = blockMap.find(b => mdOffset < b.mdStart);
             if (nextBlock) {
-                console.log(`[BlockMap] Fallback to Next Block:`, nextBlock);
+
 
                 // Fix: Offset 0 (Start of Doc)
                 // If mapping to first block, force "Inside" logic.

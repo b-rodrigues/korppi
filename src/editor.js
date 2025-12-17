@@ -323,12 +323,12 @@ export function scrollToEditorRange(from, to) {
             try {
                 // Safeguard against out of bounds
                 const safeFrom = Math.min(from, view.state.doc.content.size);
-                console.log(`[Scroll] Scrolling to PM position: ${safeFrom}`);
+
 
                 // Get the DOM coordinates for the position
                 const coords = view.coordsAtPos(safeFrom);
                 if (coords) {
-                    console.log(`[Scroll] Coords:`, coords);
+
 
                     // Find the scroll container
                     const scrollContainer = document.querySelector('.editor-scroll') ||
@@ -345,7 +345,7 @@ export function scrollToEditorRange(from, to) {
                             top: Math.max(0, targetY - centerOffset),
                             behavior: 'smooth'
                         });
-                        console.log(`[Scroll] Scrolled to Y: ${targetY - centerOffset}`);
+
                     }
                 }
 
@@ -526,7 +526,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
         // Use coordinate mapping - maps markdown offsets directly to PM positions
         const { charToPm } = getMarkdownToPmMapping();
 
-        console.log(`[HunkPreview] Type: ${hunkType}, BaseStart: ${baseStart}, BaseEnd: ${baseEnd}`);
+
 
         const operations = [];
 
@@ -535,7 +535,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
             const fromPm = charToPm(baseStart);
             const toPm = charToPm(baseEnd);
 
-            console.log(`[HunkPreview] Delete: MD ${baseStart}-${baseEnd} -> PM ${fromPm}-${toPm}`);
+
 
             if (fromPm < toPm) {
                 operations.push({
@@ -555,7 +555,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
             // Map the insertion point directly
             const posPm = charToPm(baseStart);
 
-            console.log(`[HunkPreview] Add: MD ${baseStart} -> PM ${posPm}, text: "${modifiedText.substring(0, 30)}..."`);
+
 
             operations.push({
                 type: 'add',
@@ -567,7 +567,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
             const fromPm = charToPm(baseStart);
             const toPm = charToPm(baseEnd);
 
-            console.log(`[HunkPreview] Modify: MD ${baseStart}-${baseEnd} -> PM ${fromPm}-${toPm}`);
+
 
             // Delete the old text
             if (fromPm < toPm) {
@@ -588,7 +588,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
             }
         }
 
-        console.log(`[HunkPreview] Final operations:`, operations);
+
 
         if (operations.length > 0) {
             showDiffPreview(operations);

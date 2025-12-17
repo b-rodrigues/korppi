@@ -256,8 +256,8 @@ export async function renderPatchList(patches) {
     const list = document.getElementById("timeline-list");
     list.innerHTML = "";
 
-    // Detect conflicts in patches
-    conflictState = detectPatchConflicts(patches);
+    // Detect conflicts in patches - Disabled per user request
+    // conflictState = detectPatchConflicts(patches);
 
     // Reset the flag (we no longer show alerts, conflicts are visible in timeline)
 
@@ -431,18 +431,22 @@ export async function renderPatchList(patches) {
             }
         }
 
-        // Check if this patch is in conflict
-        const hasConflict = isInConflict(patch.id, conflictState.patchConflicts);
+        // Check if this patch is in conflict - Disabled
+        const hasConflict = false; // isInConflict(patch.id, conflictState.patchConflicts);
+        /*
         if (hasConflict) {
             div.classList.add("has-conflict");
         }
+        */
 
         // Get conflict info
         let conflictInfo = '';
+        /*
         if (hasConflict) {
             const conflictingIds = conflictState.patchConflicts.get(patch.id) || [];
             conflictInfo = formatConflictInfo(patch.id, conflictingIds);
         }
+        */
 
 
 
