@@ -57,6 +57,7 @@
           cargo-outdated
           cargo-audit
           cargo-flamegraph
+          pandoc
           nodejs_24
           nodePackages.npm
           openssl

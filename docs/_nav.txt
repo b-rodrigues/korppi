@@ -17,8 +17,7 @@ profile|Configure Profile
 first-document|Your First Document
 formatting|Text Formatting
 comments|Comments and Reviews
-timeline|Timeline and History
-reconciliation|Reconciliation
+reconcile|Reconciliation & Version Control
 export|Export Options
 
 SECTION: Reference

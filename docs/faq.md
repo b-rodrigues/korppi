@@ -14,8 +14,10 @@ locally, with no dependence on third-party servers.
 
 ### Why "Korppi"?
 
-Korppi means "raven" in Finnish. Ravens are known for their intelligence and
-memory—fitting for an editor that remembers everything!
+Korppi means "raven" in Finnish. At first I wanted to use *Pijul* an open source tool
+named after the [Pijul](https://en.wikipedia.org/wiki/Smooth-billed_ani) for the
+patch engine, and so I wanted to give my tool also a bird name. In the end I didn't
+stick with Pijul, but kept *Korppi*.
 
 ### Is Korppi free?
 
@@ -41,13 +43,10 @@ A `.kmd` (Korppi Markdown Document) file is Korppi's native format. It's a ZIP
 archive containing your markdown content, version history, comments, and
 metadata. See [File Format](file-format.html) for details.
 
-### Can I open regular .md files?
+### Can I open regular Markdwon or Word files?
 
-Currently, Korppi uses its own `.kmd` format. You can:
-- Create a new document and paste markdown content
-- Export to `.md` at any time
-
-Direct `.md` import is planned for a future release.
+Currently, Korppi uses its own `.kmd` format, but you can import `.md`, (and
+some variants, such as `.rmd`, `.qmd`) and `.docx` files.
 
 ### How do I share documents with non-Korppi users?
 
@@ -117,30 +116,8 @@ your newer version.
 
 ## Troubleshooting
 
-### Korppi won't start
-
-See [Troubleshooting](troubleshooting.html) for platform-specific solutions.
-
-### My document looks corrupted
-
-Try:
-1. Check if the `.kmd` file opens (it's a ZIP file)
-2. Extract `content.md` manually
-3. Open in a new Korppi document
-
-### Export isn't working
-
-Check for:
-- Disk space
-- Write permissions in the target folder
-- Special characters in filename
-
-### The editor is slow
-
-For very large documents (50,000+ words):
-- Split into multiple documents
-- Reduce timeline history (coming soon)
-- Check available RAM
+Open an issue on [GitHub](https://github.com/b-rodrigues/korppi/issues) if
+something's wrong.
 
 ---
 

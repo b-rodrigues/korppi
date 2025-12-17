@@ -82,38 +82,6 @@ Preferences are stored locally:
 
 ---
 
-## Command Line Options
-
-When launching Korppi from terminal:
-
-```bash
-# Open a specific file
-korppi /path/to/document.kmd
-
-# Open in current directory
-korppi .
-```
-
----
-
-## Environment Variables
-
-*Advanced configuration via environment variables is planned for future releases.*
-
----
-
-## Configuration File
-
-*A global configuration file is planned for future releases.*
-
-Planned options:
-- Default theme
-- Default autosave interval
-- Custom keyboard shortcuts
-- Editor preferences
-
----
-
 ## Related
 
 - [Quick Start](quick-start.html) - Initial setup

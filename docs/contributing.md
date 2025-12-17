@@ -34,7 +34,7 @@ Documentation lives in `docs/`:
 
 ### Write Code
 
-LLM written code welcome!
+LLM-generated code welcome!
 
 ---
 
