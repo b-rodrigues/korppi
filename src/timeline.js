@@ -689,8 +689,11 @@ export function renderPatchDetails(patch) {
  * Reset document to state before reconciliation
  */
 async function resetToOriginal() {
-    const snapshot = localStorage.getItem('reconciliation-snapshot');
-    const reconciliationStartTime = localStorage.getItem('reconciliation-start-time');
+    const docId = getActiveDocumentId();
+    if (!docId) return;
+
+    const snapshot = localStorage.getItem(`reconciliation-snapshot-${docId}`);
+    const reconciliationStartTime = localStorage.getItem(`reconciliation-start-time-${docId}`);
 
     if (!snapshot) {
         alert("No reconciliation snapshot found. This only works after importing patches.");

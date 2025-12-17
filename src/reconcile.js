@@ -53,7 +53,7 @@ export async function startReconciliation() {
 
     // Save the timestamp when reconciliation started (for resetting reviews)
     const reconciliationStartTime = Date.now();
-    localStorage.setItem('reconciliation-start-time', reconciliationStartTime.toString());
+    localStorage.setItem(`reconciliation-start-time-${docId}`, reconciliationStartTime.toString());
 
     // Let user pick one or more .kmd files
     const selectedPaths = await open({
