@@ -18,6 +18,7 @@ import { getEditorContent, editor, editorViewCtx } from "./editor.js";
 import { escapeHtml } from "./utils.js";
 import { getProfile } from "./profile-service.js";
 import { showRightSidebar } from "./components/sidebar-controller.js";
+import { onDocumentChange } from "./document-manager.js";
 
 // ============================================================================
 // State
@@ -408,7 +409,11 @@ export function initCommentsPanel() {
     }
 
     // Listen for document changes to refresh comments
-    window.addEventListener("document-changed", refreshComments);
+    onDocumentChange((event, doc) => {
+        if (event === "activeChange" && doc) {
+            refreshComments();
+        }
+    });
 
     // Listen for sidebar tab changes
     window.addEventListener("sidebar-tab-changed", (e) => {

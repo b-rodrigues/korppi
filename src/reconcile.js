@@ -6,21 +6,26 @@ import { showRightSidebar } from "./components/sidebar-controller.js";
 import { getCachedProfile } from "./profile-service.js";
 
 // In-memory storage for computed hunks during reconciliation
-let reconciliationHunks = [];
+// Map<documentId, Array<AuthoredHunk>>
+const reconciliationHunks = new Map();
 
 /**
- * Get the current reconciliation hunks
+ * Get the current reconciliation hunks for the active document
  * @returns {Array} Array of AuthoredHunk objects
  */
 export function getReconciliationHunks() {
-    return reconciliationHunks;
+    const docId = getActiveDocumentId();
+    return (docId && reconciliationHunks.get(docId)) || [];
 }
 
 /**
- * Clear the reconciliation hunks
+ * Clear the reconciliation hunks for the active document
  */
 export function clearReconciliationHunks() {
-    reconciliationHunks = [];
+    const docId = getActiveDocumentId();
+    if (docId) {
+        reconciliationHunks.delete(docId);
+    }
 }
 
 /**
@@ -164,12 +169,15 @@ export async function recalculateReconcileState(newBaseContent, newBasePatchId =
     }));
 
     // 6. Calculate Hunks
-    reconciliationHunks = await invoke("calculate_hunks_for_patches", {
+    const hunks = await invoke("calculate_hunks_for_patches", {
         baseContent: newBaseContent,
         patches: patchInputs
     });
 
-    console.log(`Computed ${reconciliationHunks.length} hunks against New Base`);
+    // Store in per-document map
+    reconciliationHunks.set(docId, hunks);
+
+    console.log(`Computed ${hunks.length} hunks against New Base`);
 
     // 7. Update LocalStorage with NEW Base Info
     localStorage.setItem(`reconciliation-snapshot-${docId}`, newBaseContent);
@@ -192,7 +200,7 @@ export async function recalculateReconcileState(newBaseContent, newBasePatchId =
     // 8. Dispatch Events
     window.dispatchEvent(new CustomEvent('reconciliation-hunks-ready', {
         detail: {
-            hunks: reconciliationHunks,
+            hunks: hunks,
             patches: patchInputs
         }
     }));
