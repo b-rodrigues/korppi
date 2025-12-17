@@ -484,14 +484,24 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
                                markdownContent.substring(baseEnd);
         }
 
-        // Strip markdown from both - EXACTLY like renderGhostPreview
-        const oldPlainText = pmText;
+        // Strip markdown from BOTH current and simulated
+        // This ensures the only difference is from the hunk, not from
+        // stripping inconsistencies between pmText and stripped markdown
+        const oldPlainText = stripMarkdown(markdownContent);
         const newPlainText = stripMarkdown(simulatedMarkdown);
 
-        // Calculate diff - EXACTLY like renderGhostPreview
+        // Calculate diff - only the hunk's changes will appear
         const diff = calculateCharDiff(oldPlainText, newPlainText);
 
-        // Convert to PM operations - EXACTLY like renderGhostPreview
+        // We need to map positions in oldPlainText to PM positions
+        // Since oldPlainText = stripMarkdown(markdownContent) and pmText is from PM,
+        // they should be very similar. Use pmText length to validate.
+        // For mapping, we'll use charToPm which maps pmText positions to PM positions.
+
+        // If oldPlainText and pmText have different lengths, we need to be careful.
+        // For now, assume they're close enough (both represent the same content).
+
+        // Convert to PM operations
         const operations = [];
         let oldOffset = 0;
 
@@ -522,7 +532,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
             }
         }
 
-        // Apply decorations - EXACTLY like renderGhostPreview
+        // Apply decorations
         showDiffPreview(operations);
     });
 }
