@@ -15,6 +15,7 @@ export { rebuildFigureRegistry, resetFigureRegistry };
 import { Plugin, PluginKey, TextSelection } from "@milkdown/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/prose/view";
 import { ySyncPlugin, yUndoPlugin, undo, redo } from "y-prosemirror";
+import { keymap } from "@milkdown/prose/keymap";
 import { invoke } from "@tauri-apps/api/core";
 
 import { ydoc, yXmlFragment, loadInitialDoc, forceSave, enablePersistence, switchDocument, loadDocumentState, isApplyingUpdate } from "./yjs-setup.js";
@@ -1069,6 +1070,11 @@ export async function initEditor() {
                 ...state.plugins,
                 ySyncPlugin(yXmlFragment),
                 yUndoPlugin(),
+                keymap({
+                    "Mod-z": undo,
+                    "Mod-y": redo,
+                    "Mod-Shift-z": redo
+                }),
                 patchLoggerPlugin,
                 hunkHighlightPlugin,
             ],
