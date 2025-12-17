@@ -81,6 +81,9 @@ export async function startReconciliation() {
         showRightSidebar('timeline');
         window.dispatchEvent(new CustomEvent('reconciliation-imported'));
 
+        // Show guidance toast
+        showReconciliationToast();
+
     } catch (err) {
         console.error("Reconciliation failed:", err);
         alert(`Failed to import patches: ${err}`);
@@ -193,4 +196,63 @@ export async function recalculateReconcileState(newBaseContent, newBasePatchId =
             patches: patchInputs
         }
     }));
+}
+
+/**
+ * Show a toast notification with guidance
+ */
+function showReconciliationToast() {
+    const toast = document.createElement("div");
+    toast.className = "reconciliation-toast"; // Use minimal class for potential css targeting
+    toast.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 4px; font-size: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>Reconciliation Started</span>
+            <span id="toast-countdown" style="font-size: 0.8em; opacity: 0.8; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">5s</span>
+        </div>
+        <div style="line-height: 1.4;">
+            Review individual changes in <span style="font-weight:bold; color: var(--primary, #4fc3f7);">Track Changes</span> tab<br>
+            or completely restore versions in <span style="font-weight:bold; color: var(--primary, #4fc3f7);">Timeline</span> tab.
+        </div>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        background: var(--bg-elevated, #333);
+        color: var(--text-primary, #fff);
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        border: 1px solid var(--border-color, #444);
+        z-index: 10000;
+        font-size: 0.95rem;
+        text-align: left;
+        opacity: 0;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        pointer-events: none; 
+    `;
+
+    document.body.appendChild(toast);
+
+    // Fade in
+    requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateY(0)"; // subtle pop
+    });
+
+    // Countdown logic
+    let timeLeft = 5;
+    const countdownEl = toast.querySelector("#toast-countdown");
+
+    const intervalId = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+            if (countdownEl) countdownEl.textContent = `${timeLeft}s`;
+        } else {
+            clearInterval(intervalId);
+            // Fade out and remove
+            toast.style.opacity = "0";
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 1000);
 }
