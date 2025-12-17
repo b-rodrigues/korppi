@@ -257,6 +257,124 @@ export function getCharToPmMapping() {
 }
 
 /**
+ * Build a robust mapping from Markdown Offsets to ProseMirror Positions.
+ * Uses the serializer to map Blocks to Markdown ranges.
+ * 
+ * Returns: {
+ *   charToPm: (mdOffset) => pmPos,
+ *   blockMap: Array<{ mdStart, mdEnd, pmStart, pmEnd, text }>
+ * }
+ */
+export function getMarkdownToPmMapping() {
+    if (!editor) return { charToPm: (n) => n, blockMap: [] };
+
+    let mapping = { charToPm: (n) => n, blockMap: [] };
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const doc = view.state.doc;
+        const serializer = ctx.get(serializerCtx);
+
+        // precise full markdown
+        const fullMarkdown = serializer(doc);
+        const blockMap = [];
+
+        let currentMdOffset = 0;
+
+        // Iterate top-level blocks
+        doc.forEach((node, offset, index) => {
+            const blockStartPm = offset;
+            const blockEndPm = offset + node.nodeSize;
+
+            // Serialize just this node
+            // Note: serializeNode wrapper might be slower if called in loop?
+            // But we can call serializer directly here since we have context.
+            let blockMd = "";
+            try {
+                blockMd = serializer(node);
+            } catch (e) {
+                console.warn("Block serialization failed", e);
+                blockMd = node.textContent; // Fallback
+            }
+
+            // trimming might be needed if serializer adds newlines?
+            // Usually serializer(node) returns the text exactly.
+            // But fullMarkdown has separators.
+
+            // Find this block in fullMarkdown starting at currentMdOffset
+            // We expect it to be very close (just after newlines)
+
+            // Skip separators (newlines) in fullMarkdown
+            while (currentMdOffset < fullMarkdown.length &&
+                (fullMarkdown[currentMdOffset] === '\n' || fullMarkdown[currentMdOffset] === ' ')) {
+                currentMdOffset++;
+            }
+
+            // Now we should be at the start of the block
+            // Safety check: does it match?
+            // Note: blockMd might technically differ if context matters (e.g. lists merging)
+            // But for independent paragraphs/headings it should match.
+
+            // Optimization: Assume match to avoid expensive string compares, 
+            // but check length.
+            const mdLength = blockMd.length;
+            const mdStart = currentMdOffset;
+            const mdEnd = mdStart + mdLength;
+
+            blockMap.push({
+                mdStart,
+                mdEnd,
+                pmStart: blockStartPm,
+                pmEnd: blockEndPm,
+                // store snippet for debug
+                // text: blockMd.substring(0, 20) 
+            });
+
+            // Advance
+            currentMdOffset = mdEnd;
+        });
+
+        mapping = {
+            blockMap,
+            charToPm: (mdOffset) => {
+                // Find the block containing this offset
+                const block = blockMap.find(b => mdOffset >= b.mdStart && mdOffset < b.mdEnd);
+                if (block) {
+                    // We are inside a block.
+                    // Calculate relative offset
+                    const relativeMd = mdOffset - block.mdStart;
+                    const relativeRatio = relativeMd / (block.mdEnd - block.mdStart);
+
+                    // Map to PM range (approximate within the block)
+                    // The PM block includes tags (nodeSize).
+                    // This is still slightly fuzzy INSIDE the block, but accurate to the block.
+                    // Ideally we would drill down, but block-level is likely enough for "Ghost Preview"
+                    // to find the right search scope.
+
+                    // For precise cursor: 
+                    // pmPos = pmStart + 1 (start of content) + relative * contentSize
+                    const contentStart = block.pmStart + 1;
+                    const contentSize = block.pmEnd - block.pmStart - 2; // approximation (tags)
+                    // clamp contentSize
+                    const safeSize = Math.max(0, contentSize);
+
+                    return Math.floor(contentStart + (relativeRatio * safeSize));
+                }
+
+                // If in gap?
+                // Return start of next block
+                const nextBlock = blockMap.find(b => mdOffset < b.mdStart);
+                if (nextBlock) return nextBlock.pmStart;
+
+                return doc.content.size;
+            }
+        };
+    });
+
+    return mapping;
+}
+
+/**
  * Scroll the editor to make the range visible
  */
 export function scrollToEditorRange(from, to) {
@@ -291,7 +409,15 @@ export function scrollToEditorRange(from, to) {
  * Helper: Find best relative match for text in editor.
  * Uses Head/Tail anchoring and Gap detection to handle node boundaries robustly.
  */
-function findBestMatch(view, text, relativePos) {
+/**
+ * Helper: Find best relative match for text in editor.
+ * Uses Head/Tail anchoring and Gap detection.
+ * @param {EditorView} view
+ * @param {string} text
+ * @param {number} relativePos - fallback ratio
+ * @param {number} [targetPmPos] - Precise PM position if available
+ */
+function findBestMatch(view, text, relativePos, targetPmPos) {
     if (!text) return null;
 
     // 1. Prepare Text
@@ -300,19 +426,7 @@ function findBestMatch(view, text, relativePos) {
     cleanText = cleanText.replace(/!?(?:\[([^\]]*)\])\([^\)]*\)/g, '$1');
     // Strip simple formatting: * _ # ` ~ (also strikethrough)
     cleanText = cleanText.replace(/[*_#`~]/g, '');
-    // Strip list markers at start of string? No, hunk text might be middle.
-    // Strip remaining brackets/parens if they look like syntax?
-    // Let's just strip []() if they are not part of text logic?
-    // Actually, VirtualText has no brackets. So if SearchHead has brackets, it fails.
-    // Logic: VirtualText is raw node text. Raw node text does NOT contain * _ [ ] (usually).
-    // Wait, in ProseMirror header node, text is "Title". In MD it is "# Title".
-    // So stripping '#' is correct.
-    // In Link node, text is "Label". In MD it is "[Label](url)".
-    // So stripping around Label is correct.
-
-    // Safety Force: Remove all []() characters?
     cleanText = cleanText.replace(/[\[\]\(\)]/g, '');
-
     cleanText = cleanText.trim();
 
     if (cleanText.length === 0) return null;
@@ -322,23 +436,14 @@ function findBestMatch(view, text, relativePos) {
     const searchTail = cleanText.slice(-SnippetLen);
 
     const doc = view.state.doc;
+    const docSize = doc.content.size;
 
     // 2. Build Virtual Text Stream & Candidate Map
-    // We walk text nodes. If Gap > 0, we insert space.
-    // We store candidates for Head.
-
     let virtualText = "";
-    let lastEndPos = 0; // End of last text node
+    let lastEndPos = 0;
 
-    // Map: virtualIndex -> { pos (node start), offsetInNode, gapCorrection }
-    // Actually, we just need to resolve back.
-    // Let's store "Checkpoints". 
-    // Optimization: Just Search!
-
-    // We can't build the whole string and map if doc is huge.
-    // But for typical docs (100k chars) it's fine.
-
-    const nodeMap = []; // { vStart, vEnd, pmStart }
+    // nodeMap: { vStart, vEnd, pmStart }
+    const nodeMap = [];
 
     doc.descendants((node, pos) => {
         if (node.isText) {
@@ -356,6 +461,18 @@ function findBestMatch(view, text, relativePos) {
         }
     });
 
+    // 6. Map Virtual Indices -> PM Positions (Moved up for use in scoring)
+    const mapToPM = (vIndex) => {
+        const node = nodeMap.find(n => vIndex >= n.vStart && vIndex <= n.vEnd);
+        if (node) {
+            const offset = vIndex - node.vStart;
+            return node.pmStart + offset;
+        }
+        const nextNode = nodeMap.find(n => n.vStart > vIndex);
+        if (nextNode) return nextNode.pmStart;
+        return docSize;
+    };
+
     // 3. Find Matches in Virtual Text
     const headMatches = [];
     let idx = virtualText.indexOf(searchHead);
@@ -365,25 +482,31 @@ function findBestMatch(view, text, relativePos) {
     }
 
     if (headMatches.length === 0) {
-        console.warn(`[PreviewDebug] Head NOT found. SearchHead: "${searchHead}"`);
-        console.log(`[PreviewDebug] VirtualText Snippet (around relativePos):`,
-            virtualText.substring(Math.floor(virtualText.length * relativePos) - 50, Math.floor(virtualText.length * relativePos) + 50));
+        // console.warn(`[PreviewDebug] Head NOT found: "${searchHead}"`);
         return null;
     }
 
     // 4. Select Best Head
-    const estimatedIndex = Math.floor(virtualText.length * relativePos);
-    headMatches.sort((a, b) => Math.abs(a - estimatedIndex) - Math.abs(b - estimatedIndex));
-    const bestHeadIndex = headMatches[0];
+    // If targetPmPos is provided, sort by distance to it (converted from candidate vIndex -> PM)
+    // Otherwise use estimated virtual index
+    if (targetPmPos !== undefined) {
+        headMatches.sort((a, b) => {
+            const posA = mapToPM(a);
+            const posB = mapToPM(b);
+            return Math.abs(posA - targetPmPos) - Math.abs(posB - targetPmPos);
+        });
+    } else {
+        const estimatedIndex = Math.floor(virtualText.length * relativePos);
+        headMatches.sort((a, b) => Math.abs(a - estimatedIndex) - Math.abs(b - estimatedIndex));
+    }
 
-    console.log(`[PreviewDebug] Matches: ${headMatches.length}. BestHeadIdx: ${bestHeadIndex}. Est: ${estimatedIndex}. Diff: ${Math.abs(bestHeadIndex - estimatedIndex)}`);
+    const bestHeadIndex = headMatches[0];
 
     // 5. Find Tail
     let bestTailIndex = -1;
     if (cleanText.length <= SnippetLen) {
         bestTailIndex = bestHeadIndex + cleanText.length;
     } else {
-        // Search for tail after head
         const searchStart = bestHeadIndex + cleanText.length - SnippetLen - 20;
         const tailIdx = virtualText.indexOf(searchTail, Math.max(bestHeadIndex, searchStart));
 
@@ -394,31 +517,8 @@ function findBestMatch(view, text, relativePos) {
         }
     }
 
-    // 6. Map Virtual Indices -> PM Positions
-    const mapToPM = (vIndex) => {
-        // Find node containing vIndex
-        const node = nodeMap.find(n => vIndex >= n.vStart && vIndex <= n.vEnd);
-        if (node) {
-            // Exact match inside a node
-            const offset = vIndex - node.vStart;
-            return node.pmStart + offset;
-        }
-
-        // If index is in a "Gap" (space we inserted)?
-        // e.g. vEnd of Node A = 10. vStart of Node B = 11. vIndex = 10 (the space).
-        // Map to end of Node A? Or start of Node B?
-        // Start of Node B is safer.
-        const nextNode = nodeMap.find(n => n.vStart > vIndex);
-        if (nextNode) return nextNode.pmStart;
-
-        // EOF
-        return doc.content.size;
-    };
-
     const fromPos = mapToPM(bestHeadIndex);
     const toPos = mapToPM(bestTailIndex);
-
-    console.log(`[PreviewDebug] Result: [${fromPos}, ${toPos}] for "${cleanText.substring(0, 20)}..."`);
 
     return { from: fromPos, to: toPos };
 }
@@ -433,10 +533,7 @@ export function highlightByText(text, type, relativePos) {
         const view = ctx.get(editorViewCtx);
         const match = findBestMatch(view, text, relativePos);
 
-        if (!match) {
-            console.warn("Could not find text for highlight:", text);
-            return;
-        }
+        if (!match) return;
 
         let from = match.from;
         let to = match.to;
@@ -720,6 +817,11 @@ export function previewGhostHunkByPosition(text, kind, markdownPos, markdownCont
 export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
     if (!editor) return;
 
+    // Use Serializer Map to get precise estimation
+    const mapping = getMarkdownToPmMapping();
+    const content = getMarkdown();
+    const estimatedPmPos = mapping.charToPm(Math.floor(relativePos * content.length));
+
     editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
 
@@ -731,17 +833,18 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
             if (!context) {
                 from = 0;
             } else {
-                const match = findBestMatch(view, context, relativePos);
+                // Pass estimatedPmPos to findBestMatch
+                const match = findBestMatch(view, context, relativePos, estimatedPmPos);
                 if (match) {
                     // Insert AFTER the context
                     from = match.to; // User precise end of context
                 } else {
-                    from = Math.floor(relativePos * view.state.doc.content.size);
+                    from = estimatedPmPos;
                 }
             }
             to = from;
         } else if (kind === 'delete') {
-            const match = findBestMatch(view, text, relativePos);
+            const match = findBestMatch(view, text, relativePos, estimatedPmPos);
             if (match) {
                 from = match.from;
                 to = match.to;
@@ -749,11 +852,9 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
                 return;
             }
         } else if (kind === 'replace') {
-            // Text to insert = text
-            // Text to delete = contextOrDeleteText
             const deleteText = contextOrDeleteText;
             if (deleteText) {
-                const match = findBestMatch(view, deleteText, relativePos);
+                const match = findBestMatch(view, deleteText, relativePos, estimatedPmPos);
                 if (match) {
                     deleteFrom = match.from;
                     deleteTo = match.to;
@@ -770,7 +871,7 @@ export function previewGhostHunk(text, kind, relativePos, contextOrDeleteText) {
             to,
             deleteFrom,
             deleteTo,
-            text // text to insert
+            text
         });
         view.dispatch(tr);
 
@@ -822,6 +923,28 @@ export function getMarkdown() {
             });
         } catch (err) {
             console.error("[ERROR] getMarkdown serialization failed:", err);
+        }
+    }
+    return markdown;
+}
+
+/**
+ * Serialize a single ProseMirror node to Markdown.
+ * Useful for calculating precise offset mappings.
+ * @param {Node} node - The ProseMirror node to serialize
+ * @returns {string} The markdown string
+ */
+export function serializeNode(node) {
+    let markdown = "";
+    if (editor) {
+        try {
+            editor.action((ctx) => {
+                const serializer = ctx.get(serializerCtx);
+                // The serializer usually expects a Node.
+                markdown = serializer(node);
+            });
+        } catch (err) {
+            console.error("[ERROR] serializeNode failed:", err);
         }
     }
     return markdown;

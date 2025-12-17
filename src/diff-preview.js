@@ -6,7 +6,7 @@ import { calculateCharDiff } from './diff-highlighter.js';
 import { getCurrentUserInfo } from './profile-service.js';
 import { getActiveDocumentId } from './document-manager.js';
 import { mergeText } from './three-way-merge.js';
-import { getMarkdown, showDiffPreview, clearEditorHighlight, getCharToPmMapping } from './editor.js';
+import { getMarkdown, showDiffPreview, clearEditorHighlight, getMarkdownToPmMapping } from './editor.js';
 import { getConflictState, restoreToPatch } from './timeline.js';
 import { getConflictGroup } from './conflict-detection.js';
 import { stripMarkdown } from './utils.js';
