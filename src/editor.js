@@ -25,6 +25,8 @@ import {
 } from "./patch-grouper.js";
 import { initProfile } from "./profile-service.js";
 import { getActiveDocumentId, onDocumentChange } from "./document-manager.js";
+import { calculateCharDiff } from "./diff-highlighter.js";
+import { stripMarkdown } from "./utils.js";
 
 // Create a unique key for the highlight plugin
 const highlightKey = new PluginKey("hunk-highlight");
@@ -442,6 +444,86 @@ export function highlightByText(text, type, relativePos) {
         const tr = view.state.tr.setMeta(highlightKey, { type: 'set', from, to });
         view.dispatch(tr);
         setTimeout(() => scrollToEditorRange(from, to), 0);
+    });
+}
+
+/**
+ * Show Ghost Preview for a Hunk using the same diff logic as full patch preview.
+ * This simulates applying the hunk and diffs the result, ensuring identical
+ * positioning logic to renderGhostPreview.
+ * @param {string} hunkType - 'add', 'delete', or 'mod'
+ * @param {number} baseStart - Start position in markdown
+ * @param {number} baseEnd - End position in markdown
+ * @param {string} modifiedText - Text being added (for add/mod hunks)
+ * @param {string} markdownContent - The full markdown content
+ */
+export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, markdownContent) {
+    if (!editor) return;
+
+    editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+
+        // Get character-to-PM-position mapping (plain text from PM)
+        const { charToPm, pmText } = getCharToPmMapping();
+
+        // Simulate applying the hunk to get the "new" markdown
+        let simulatedMarkdown;
+        if (hunkType === 'add') {
+            // Insert modifiedText at baseStart
+            simulatedMarkdown = markdownContent.substring(0, baseStart) +
+                               modifiedText +
+                               markdownContent.substring(baseStart);
+        } else if (hunkType === 'delete') {
+            // Remove text from baseStart to baseEnd
+            simulatedMarkdown = markdownContent.substring(0, baseStart) +
+                               markdownContent.substring(baseEnd);
+        } else {
+            // Replace: remove old, insert new
+            simulatedMarkdown = markdownContent.substring(0, baseStart) +
+                               modifiedText +
+                               markdownContent.substring(baseEnd);
+        }
+
+        // Strip markdown from both - EXACTLY like renderGhostPreview
+        const oldPlainText = pmText;
+        const newPlainText = stripMarkdown(simulatedMarkdown);
+
+        // Calculate diff - EXACTLY like renderGhostPreview
+        const diff = calculateCharDiff(oldPlainText, newPlainText);
+
+        // Convert to PM operations - EXACTLY like renderGhostPreview
+        const operations = [];
+        let oldOffset = 0;
+
+        for (const op of diff) {
+            if (op.type === 'equal') {
+                oldOffset += op.text.length;
+            } else if (op.type === 'delete') {
+                const fromChar = oldOffset;
+                const toChar = oldOffset + op.text.length;
+                const fromPm = charToPm(fromChar);
+                const toPm = charToPm(toChar);
+
+                if (fromPm < toPm) {
+                    operations.push({
+                        type: 'delete',
+                        from: fromPm,
+                        to: toPm
+                    });
+                }
+                oldOffset += op.text.length;
+            } else if (op.type === 'add') {
+                const posPm = charToPm(oldOffset);
+                operations.push({
+                    type: 'add',
+                    text: op.text,
+                    pos: posPm
+                });
+            }
+        }
+
+        // Apply decorations - EXACTLY like renderGhostPreview
+        showDiffPreview(operations);
     });
 }
 

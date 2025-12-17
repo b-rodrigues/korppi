@@ -3,7 +3,7 @@
 // Updates character offsets locally and detects overlaps.
 
 import { getReconciliationHunks, clearReconciliationHunks } from './reconcile.js';
-import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewGhostHunk, previewGhostHunkByPosition } from './editor.js';
+import { getMarkdown, setMarkdownContent, highlightEditorRange, clearEditorHighlight, scrollToEditorRange, highlightByText, previewHunkWithDiff } from './editor.js';
 import { showRightSidebar } from './components/sidebar-controller.js';
 import { getProfile } from './profile-service.js';
 import { escapeHtml } from './utils.js';
@@ -278,27 +278,22 @@ window.hunkReview_enter = (index) => {
 
         console.log(`[PreviewDebug] Hover Hunk #${index}:`, {
             id: hunk.internal_id,
+            type: hunk.type,
             start: hunk.base_start,
             end: hunk.base_end,
             contentLen: content.length,
             textSnippet: content.substring(hunk.base_start, hunk.base_start + 20) + "..."
         });
 
-        // Use position-based preview which handles markdown stripping correctly
-        if (hunk.type === 'add') {
-            // Insert at base_start position
-            previewGhostHunkByPosition(hunk.modified_text, 'insert', hunk.base_start, content);
-
-        } else if (hunk.type === 'delete') {
-            // Delete: the text from base_start to base_end
-            const targetText = content.substring(hunk.base_start, hunk.base_end);
-            previewGhostHunkByPosition(targetText, 'delete', hunk.base_start, content);
-
-        } else {
-            // Mod/Replace: delete old text, insert new text
-            const deleteText = content.substring(hunk.base_start, hunk.base_end);
-            previewGhostHunkByPosition(hunk.modified_text, 'replace', hunk.base_start, content, deleteText);
-        }
+        // Use the same diff logic as full patch preview
+        // This simulates applying the hunk and diffs the result
+        previewHunkWithDiff(
+            hunk.type,
+            hunk.base_start,
+            hunk.base_end,
+            hunk.modified_text || '',
+            content
+        );
     }
 };
 
