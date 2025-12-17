@@ -8,6 +8,7 @@ import { detectPatchConflicts, isInConflict, formatConflictInfo, getConflictGrou
 import { getEditorContent, getMarkdown, setMarkdownContent } from "./editor.js";
 import { getCachedProfile } from "./profile-service.js";
 import { recalculateReconcileState } from './reconcile.js';
+import { resetHunkReview } from './hunk-review-panel.js';
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -214,8 +215,16 @@ export function initTimeline() {
 
 
     // Wire up reset button
+    const trackResetBtn = document.getElementById("track-reset-to-original-btn");
+
     if (resetBtn) {
         resetBtn.addEventListener("click", async () => {
+            await resetToOriginal();
+        });
+    }
+
+    if (trackResetBtn) {
+        trackResetBtn.addEventListener("click", async () => {
             await resetToOriginal();
         });
     }
@@ -728,6 +737,12 @@ async function resetToOriginal() {
 
         alert("Document restored to state before reconciliation. Patch reviews have been reset.");
         await refreshTimeline();
+
+        // Reset hunk review UI
+        resetHunkReview();
+
+        // Re-calculate reconciliation state (this will re-generate hunks and show them as pending)
+        await recalculateReconcileState(snapshot, null);
 
     } catch (err) {
         console.error("Reset failed:", err);

@@ -473,9 +473,21 @@ export function isHunkReviewActive() {
     return reviewState.active;
 }
 
-export function clearHunkReview() {
-    reviewState.active = false;
+/**
+ * Reset the hunk review state (e.g. when resetting to original)
+ */
+export function resetHunkReview() {
     reviewState.hunks = [];
+    reviewState.acceptedHunkIds.clear();
+    reviewState.rejectedHunkIds.clear();
+    reviewState.conflictHunkIds.clear();
+    reviewState.active = false;
+
+    // Clear reconciliation state in backend wrapper
     clearReconciliationHunks();
+
+    // Re-render empty state
     renderHunks();
+
+    console.log("Hunk review state reset");
 }

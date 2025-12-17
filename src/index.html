@@ -193,7 +193,7 @@
                 <div class="sidebar-tabs">
                     <button class="sidebar-tab active" data-tab="timeline">📋 Timeline</button>
                     <button class="sidebar-tab" data-tab="comments">💬 Comments</button>
-                    <button class="sidebar-tab" data-tab="track-changes">✏️ Changes</button>
+                    <button class="sidebar-tab" data-tab="track-changes">✏️ Track Changes</button>
                 </div>
 
                 <!-- Timeline Tab Content -->
@@ -257,6 +257,13 @@
                         <div class="empty-state">
                             <p>Import document versions to review changes</p>
                         </div>
+                    </div>
+                    <div class="timeline-actions">
+                        <button id="track-reset-to-original-btn" class="action-btn"
+                            style="background: var(--danger); color: white; border-color: var(--danger);">
+                            <span class="icon">↺</span>
+                            <span class="label">Reset to Original</span>
+                        </button>
                     </div>
                 </div>
             </aside>
