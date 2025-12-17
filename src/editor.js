@@ -466,6 +466,18 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
         // Get character-to-PM-position mapping (plain text from PM)
         const { charToPm, pmText } = getCharToPmMapping();
 
+        // DEBUG: Log input parameters
+        console.log('[HunkPreview] === INPUT ===');
+        console.log('[HunkPreview] hunkType:', hunkType);
+        console.log('[HunkPreview] baseStart:', baseStart, 'baseEnd:', baseEnd);
+        console.log('[HunkPreview] modifiedText:', modifiedText?.substring(0, 50) + '...');
+        console.log('[HunkPreview] markdownContent around hunk:',
+            markdownContent.substring(Math.max(0, baseStart - 30), baseStart) +
+            '|HUNK_START|' +
+            markdownContent.substring(baseStart, baseEnd) +
+            '|HUNK_END|' +
+            markdownContent.substring(baseEnd, baseEnd + 30));
+
         // Simulate applying the hunk to get the "new" markdown
         let simulatedMarkdown;
         if (hunkType === 'add') {
@@ -485,21 +497,39 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
         }
 
         // Strip markdown from BOTH current and simulated
-        // This ensures the only difference is from the hunk, not from
-        // stripping inconsistencies between pmText and stripped markdown
         const oldPlainText = stripMarkdown(markdownContent);
         const newPlainText = stripMarkdown(simulatedMarkdown);
+
+        // DEBUG: Log stripped texts
+        console.log('[HunkPreview] === STRIPPED TEXTS ===');
+        console.log('[HunkPreview] pmText length:', pmText.length);
+        console.log('[HunkPreview] oldPlainText length:', oldPlainText.length);
+        console.log('[HunkPreview] newPlainText length:', newPlainText.length);
+        console.log('[HunkPreview] pmText vs oldPlainText match:', pmText === oldPlainText);
+
+        // Show where they differ if they don't match
+        if (pmText !== oldPlainText) {
+            for (let i = 0; i < Math.min(pmText.length, oldPlainText.length); i++) {
+                if (pmText[i] !== oldPlainText[i]) {
+                    console.log('[HunkPreview] First diff at position', i);
+                    console.log('[HunkPreview] pmText around diff:', pmText.substring(Math.max(0, i-20), i+20));
+                    console.log('[HunkPreview] oldPlainText around diff:', oldPlainText.substring(Math.max(0, i-20), i+20));
+                    break;
+                }
+            }
+        }
 
         // Calculate diff - only the hunk's changes will appear
         const diff = calculateCharDiff(oldPlainText, newPlainText);
 
-        // We need to map positions in oldPlainText to PM positions
-        // Since oldPlainText = stripMarkdown(markdownContent) and pmText is from PM,
-        // they should be very similar. Use pmText length to validate.
-        // For mapping, we'll use charToPm which maps pmText positions to PM positions.
-
-        // If oldPlainText and pmText have different lengths, we need to be careful.
-        // For now, assume they're close enough (both represent the same content).
+        // DEBUG: Log diff result
+        console.log('[HunkPreview] === DIFF RESULT ===');
+        console.log('[HunkPreview] diff operations:', diff.length);
+        diff.forEach((op, i) => {
+            if (op.type !== 'equal') {
+                console.log(`[HunkPreview] diff[${i}]:`, op.type, op.text?.substring(0, 50) + (op.text?.length > 50 ? '...' : ''));
+            }
+        });
 
         // Convert to PM operations
         const operations = [];
@@ -514,6 +544,8 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
                 const fromPm = charToPm(fromChar);
                 const toPm = charToPm(toChar);
 
+                console.log('[HunkPreview] DELETE: charRange [', fromChar, ',', toChar, '] -> pmRange [', fromPm, ',', toPm, ']');
+
                 if (fromPm < toPm) {
                     operations.push({
                         type: 'delete',
@@ -524,6 +556,7 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
                 oldOffset += op.text.length;
             } else if (op.type === 'add') {
                 const posPm = charToPm(oldOffset);
+                console.log('[HunkPreview] ADD: charPos', oldOffset, '-> pmPos', posPm, 'text:', op.text?.substring(0, 30));
                 operations.push({
                     type: 'add',
                     text: op.text,
@@ -531,6 +564,9 @@ export function previewHunkWithDiff(hunkType, baseStart, baseEnd, modifiedText, 
                 });
             }
         }
+
+        console.log('[HunkPreview] === FINAL OPERATIONS ===');
+        console.log('[HunkPreview] operations:', operations);
 
         // Apply decorations
         showDiffPreview(operations);
