@@ -71,12 +71,15 @@ const hunkHighlightPlugin = new Plugin({
 
                         // Helper to create insert widget
                         const createInsert = (text, pos) => {
-                            return Decoration.widget(pos, (view) => {
+                            const safePos = Math.min(pos, tr.doc.content.size);
+                            // Use side: -1 for end-of-document to ensure widget renders
+                            const side = safePos >= tr.doc.content.size ? -1 : 1;
+                            return Decoration.widget(safePos, (view) => {
                                 const span = document.createElement('span');
                                 span.className = 'ghost-insert';
                                 span.textContent = text;
                                 return span;
-                            }, { side: 1 });
+                            }, { side });
                         };
 
                         // Helper to create delete inline
@@ -108,12 +111,15 @@ const hunkHighlightPlugin = new Plugin({
                         // Helper to create insert widget
                         const createInsertWidget = (text, pos) => {
                             const safePos = Math.min(pos, tr.doc.content.size);
+                            // Use side: -1 for end-of-document to ensure widget renders
+                            // (side: 1 at doc.content.size has nothing to attach after)
+                            const side = safePos >= tr.doc.content.size ? -1 : 1;
                             return Decoration.widget(safePos, () => {
                                 const span = document.createElement('span');
                                 span.className = 'ghost-insert';
                                 span.textContent = text;
                                 return span;
-                            }, { side: 1 });
+                            }, { side });
                         };
 
                         // Helper to create delete inline decoration
