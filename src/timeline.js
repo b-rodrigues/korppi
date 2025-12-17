@@ -9,6 +9,7 @@ import { getEditorContent, getMarkdown, setMarkdownContent } from "./editor.js";
 import { getCachedProfile } from "./profile-service.js";
 import { recalculateReconcileState } from './reconcile.js';
 import { resetHunkReview } from './hunk-review-panel.js';
+import { logEvent, EVENT_TYPES } from './document-log.js';
 
 // Track the currently selected/restored patch
 let restoredPatchId = null;
@@ -84,6 +85,12 @@ export async function restoreToPatch(patchId) {
             if (success) {
                 restoredPatchId = patchId;
 
+                // Log the restore event
+                logEvent(EVENT_TYPES.RESTORE, {
+                    patchId,
+                    patchAuthor: patch.data?.authorName || patch.author
+                });
+
                 // Trigger Full Re-calculation (Perspective Switch)
                 await recalculateReconcileState(patch.data.snapshot, patchId);
 
@@ -102,6 +109,12 @@ export async function restoreToPatch(patchId) {
                 if (success) {
                     restoredPatchId = patchId;
 
+                    // Log the restore event
+                    logEvent(EVENT_TYPES.RESTORE, {
+                        patchId,
+                        patchAuthor: patch.data?.authorName || patch.author
+                    });
+
                     // Trigger Full Re-calculation (Perspective Switch)
                     await recalculateReconcileState(result.snapshot_content, patchId);
 
@@ -117,6 +130,12 @@ export async function restoreToPatch(patchId) {
             const success = setMarkdownContent(result.snapshot_content);
             if (success) {
                 restoredPatchId = patchId;
+
+                // Log the restore event
+                logEvent(EVENT_TYPES.RESTORE, {
+                    patchId,
+                    patchAuthor: patch.data?.authorName || patch.author
+                });
 
                 // Trigger Full Re-calculation (Perspective Switch)
                 await recalculateReconcileState(result.snapshot_content, patchId);

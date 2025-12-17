@@ -36,6 +36,7 @@ import { initWordCount } from "./word-count.js";
 import { initSidebarController } from "./components/sidebar-controller.js";
 import { initPatchMergeWizard, openPatchMergeWizard } from "./patch-merge-wizard.js";
 import { initHunkReviewPanel } from "./hunk-review-panel.js";
+import { showDocumentLog, logEvent, EVENT_TYPES, initDocumentLog } from "./document-log.js";
 
 // Store the current markdown content
 let currentMarkdown = "";
@@ -344,6 +345,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
                 const markdown = getMarkdown();
                 const path = await exportAsMarkdown(markdown);
+                if (path) {
+                    // Log the export event
+                    logEvent(EVENT_TYPES.EXPORT_MD, { filename: path.split('/').pop() || path.split('\\').pop() });
+                }
             } catch (err) {
                 console.error("Markdown export failed:", err);
                 alert("Markdown export failed: " + err);
@@ -362,6 +367,8 @@ window.addEventListener("DOMContentLoaded", async () => {
                 const path = await exportAsDocx(markdown);
                 if (path) {
                     console.log("DOCX exported successfully to:", path);
+                    // Log the export event
+                    logEvent(EVENT_TYPES.EXPORT_DOCX, { filename: path.split('/').pop() || path.split('\\').pop() });
                 }
             } catch (err) {
                 console.error("DOCX export failed:", err);
@@ -379,6 +386,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     initWordCount();
     initPatchMergeWizard();
     initHunkReviewPanel();
+    initDocumentLog();
+
+    // Wire up View Log button
+    const viewLogBtn = document.getElementById("view-log-btn");
+    if (viewLogBtn) {
+        viewLogBtn.addEventListener("click", () => {
+            showDocumentLog();
+        });
+    }
 
     // Wire up Merge Patches button
     const mergePatchesBtn = document.getElementById("merge-patches-btn");

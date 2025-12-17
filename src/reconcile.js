@@ -4,6 +4,7 @@ import { getActiveDocumentId } from "./document-manager.js";
 import { getMarkdown } from "./editor.js";
 import { showRightSidebar } from "./components/sidebar-controller.js";
 import { getCachedProfile } from "./profile-service.js";
+import { logEvent, EVENT_TYPES } from "./document-log.js";
 
 // In-memory storage for computed hunks during reconciliation
 // Map<documentId, Array<AuthoredHunk>>
@@ -78,6 +79,12 @@ export async function startReconciliation() {
                 sourcePath: sourcePath
             });
         }
+
+        // Log the import event
+        logEvent(EVENT_TYPES.IMPORT, {
+            count: selectedPaths.length,
+            files: selectedPaths.map(p => p.split('/').pop() || p.split('\\').pop())
+        });
 
         // Reuse the logic for calculating hunks
         await recalculateReconcileState(baseContent, null); // null patchId means no swap, just pure calc
