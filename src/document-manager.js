@@ -10,6 +10,42 @@ let openDocuments = new Map();
 let documentChangeListeners = [];
 
 /**
+ * Create a Save patch if content has changed from last save
+ * @param {string} docId - Document ID
+ * @param {string} content - Current editor content
+ * @returns {Promise<boolean>} True if patch was created
+ */
+async function createSavePatchIfChanged(docId, content) {
+    if (!content) return false;
+
+    try {
+        const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
+        const lastSavePatch = patches
+            .filter(p => p.kind === "Save" && p.data?.snapshot)
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+        if (!lastSavePatch || lastSavePatch.data.snapshot !== content) {
+            const profile = getCachedProfile();
+            const patch = {
+                timestamp: Date.now(),
+                author: profile?.id || "local",
+                kind: "Save",
+                data: {
+                    snapshot: content,
+                    authorName: profile?.name || "Local User",
+                    authorColor: profile?.color || "#3498db"
+                }
+            };
+            await invoke("record_document_patch", { id: docId, patch });
+            return true;
+        }
+    } catch (err) {
+        console.error("Failed to create save patch:", err);
+    }
+    return false;
+}
+
+/**
  * Create a new empty document
  * @returns {Promise<Object>} The document handle
  */
@@ -97,37 +133,7 @@ export async function saveDocument(id = null, path = null) {
 
     // Record a patch with the saved content BEFORE saving the file
     // so the patch is included in the bundled history.sqlite
-    if (editorContent) {
-        try {
-            // Check if content has changed from last save
-            const patches = await invoke("list_document_patches", { id: docId }).catch(() => []);
-            const lastSavePatch = patches
-                .filter(p => p.kind === "Save" && p.data?.snapshot)
-                .sort((a, b) => b.timestamp - a.timestamp)[0];
-
-            // Only create a new patch if content has actually changed
-            if (!lastSavePatch || lastSavePatch.data.snapshot !== editorContent) {
-                const timestamp = Date.now();
-                const profile = getCachedProfile();
-                const author = profile?.id || "local";
-                const authorName = profile?.name || "Local User";
-                const authorColor = profile?.color || "#3498db";
-                const patch = {
-                    timestamp,
-                    author,
-                    kind: "Save",
-                    data: {
-                        snapshot: editorContent,
-                        authorName,  // Store author name for display
-                        authorColor  // Store author color for multi-author highlighting
-                    }
-                };
-                await invoke("record_document_patch", { id: docId, patch });
-            }
-        } catch (err) {
-            console.error("Failed to record save patch:", err);
-        }
-    }
+    await createSavePatchIfChanged(docId, editorContent);
 
     // Save the document (bundles the history.sqlite with the patch we just recorded)
     const handle = await invoke("save_document", { id: docId, path });
@@ -176,35 +182,7 @@ export async function closeDocument(id, force = false) {
     // Auto-create a Save patch before closing to preserve changes for reconciliation
     try {
         const { getMarkdown } = await import("./editor.js");
-        const editorContent = getMarkdown();
-
-        if (editorContent) {
-            // Check if content has changed from last save
-            const patches = await invoke("list_document_patches", { id }).catch(() => []);
-            const lastSavePatch = patches
-                .filter(p => p.kind === "Save" && p.data?.snapshot)
-                .sort((a, b) => b.timestamp - a.timestamp)[0];
-
-            // Create a Save patch if content changed
-            if (!lastSavePatch || lastSavePatch.data.snapshot !== editorContent) {
-                const timestamp = Date.now();
-                const profile = getCachedProfile();
-                const author = profile?.id || "local";
-                const authorName = profile?.name || "Local User";
-                const authorColor = profile?.color || "#3498db";
-                const patch = {
-                    timestamp,
-                    author,
-                    kind: "Save",
-                    data: {
-                        snapshot: editorContent,
-                        authorName,
-                        authorColor
-                    }
-                };
-                await invoke("record_document_patch", { id, patch });
-            }
-        }
+        await createSavePatchIfChanged(id, getMarkdown());
     } catch (err) {
         console.warn("Could not create auto-save patch on close:", err);
     }
