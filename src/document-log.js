@@ -4,7 +4,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getActiveDocumentId } from "./document-manager.js";
 import { getCachedProfile } from "./profile-service.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, stripMarkdown } from "./utils.js";
+import { calculateCharDiff } from "./diff-highlighter.js";
 
 // Event types for the log
 const EVENT_TYPES = {
@@ -22,6 +23,9 @@ const EVENT_TYPES = {
 // Store logged events in memory (supplemental to patches)
 // Map<docId, Array<{type, timestamp, details}>>
 const documentEvents = new Map();
+
+// Cache for patch data (for hover previews)
+let patchCache = new Map();
 
 /**
  * Log an event for the current document
@@ -89,9 +93,19 @@ async function getAllLogEntries() {
 
     const entries = [];
 
+    // Clear and rebuild patch cache
+    patchCache = new Map();
+
     // 1. Get all patches
+    let patches = [];
     try {
-        const patches = await invoke("list_document_patches", { id: docId });
+        patches = await invoke("list_document_patches", { id: docId });
+
+        // Build patch cache for hover previews
+        for (const patch of patches) {
+            patchCache.set(patch.id, patch);
+        }
+
         for (const patch of patches) {
             if (patch.kind === "Save") {
                 entries.push({
@@ -109,7 +123,6 @@ async function getAllLogEntries() {
         }
 
         // 2. Get all reviews
-        const currentUser = getCachedProfile();
         const reviewerMap = new Map(); // Track unique patch reviews
 
         for (const patch of patches) {
@@ -131,7 +144,9 @@ async function getAllLogEntries() {
                                 authorColor: '#808080',
                                 details: {
                                     patchId: patch.id,
+                                    patchUuid: patch.uuid,
                                     patchAuthor: patch.data?.authorName || patch.author,
+                                    patchAuthorColor: patch.data?.authorColor || '#808080',
                                     decision: review.decision
                                 }
                             });
@@ -206,24 +221,6 @@ function getEventIcon(type) {
 }
 
 /**
- * Get label for event type
- */
-function getEventLabel(type) {
-    switch (type) {
-        case EVENT_TYPES.SAVE: return 'Document Saved';
-        case EVENT_TYPES.EXPORT_MD: return 'Exported as Markdown';
-        case EVENT_TYPES.EXPORT_DOCX: return 'Exported as DOCX';
-        case EVENT_TYPES.IMPORT: return 'Patches Imported';
-        case EVENT_TYPES.ACCEPT: return 'Patch Accepted';
-        case EVENT_TYPES.REJECT: return 'Patch Rejected';
-        case EVENT_TYPES.RESTORE: return 'Restored to Version';
-        case EVENT_TYPES.COMMENT: return 'Comment Added';
-        case EVENT_TYPES.COMMENT_RESOLVED: return 'Comment Resolved';
-        default: return 'Event';
-    }
-}
-
-/**
  * Get CSS class for event type
  */
 function getEventClass(type) {
@@ -241,32 +238,154 @@ function getEventClass(type) {
 }
 
 /**
- * Format event details for display
+ * Generate diff preview HTML for a patch
  */
-function formatEventDetails(entry) {
+function generatePatchDiffPreview(patch, allPatches) {
+    if (!patch || !patch.data?.snapshot) {
+        return '<div class="patch-preview-empty">No preview available</div>';
+    }
+
+    // Find the previous Save patch to compare against
+    const sortedPatches = allPatches
+        .filter(p => p.kind === "Save" && p.data?.snapshot && p.timestamp < patch.timestamp)
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    const previousPatch = sortedPatches[0];
+    const oldText = previousPatch?.data?.snapshot || '';
+    const newText = patch.data.snapshot;
+
+    // Calculate diff
+    const diffOps = calculateCharDiff(oldText, newText);
+
+    // Limit preview size
+    const maxPreviewLength = 500;
+    let totalLength = 0;
+    let truncated = false;
+
+    let html = '<div class="patch-preview-diff">';
+
+    for (const op of diffOps) {
+        if (totalLength >= maxPreviewLength) {
+            truncated = true;
+            break;
+        }
+
+        let text = op.text;
+        if (totalLength + text.length > maxPreviewLength) {
+            text = text.substring(0, maxPreviewLength - totalLength);
+            truncated = true;
+        }
+
+        const escaped = escapeHtml(text).replace(/\n/g, '↵<br>');
+
+        if (op.type === 'delete') {
+            html += `<span class="diff-delete">${escaped}</span>`;
+        } else if (op.type === 'add') {
+            html += `<span class="diff-add">${escaped}</span>`;
+        } else {
+            html += `<span class="diff-equal">${escaped}</span>`;
+        }
+
+        totalLength += text.length;
+    }
+
+    if (truncated) {
+        html += '<span class="diff-truncated">...</span>';
+    }
+
+    html += '</div>';
+
+    return html;
+}
+
+/**
+ * Render entry HTML for accept/reject events
+ */
+function renderAcceptRejectEntry(entry, time) {
     const details = entry.details || {};
+    const action = entry.type === EVENT_TYPES.ACCEPT ? 'accepted' : 'rejected';
+    const actionClass = entry.type === EVENT_TYPES.ACCEPT ? 'action-accepted' : 'action-rejected';
+    const icon = entry.type === EVENT_TYPES.ACCEPT ? '✓' : '✗';
+    const eventClass = getEventClass(entry.type);
+
+    return `
+        <div class="log-entry ${eventClass}">
+            <div class="log-entry-icon">${icon}</div>
+            <div class="log-entry-content">
+                <div class="log-entry-header">
+                    <span class="log-entry-time">${time}</span>
+                </div>
+                <div class="log-entry-description">
+                    <span class="log-author-name">${escapeHtml(entry.author)}</span>
+                    <span class="${actionClass}">${action}</span>
+                    <span class="patch-link" data-patch-id="${details.patchId}">patch #${details.patchId}</span>
+                    <span>from</span>
+                    <span class="log-patch-author" style="color: ${details.patchAuthorColor || '#808080'}">${escapeHtml(details.patchAuthor || 'Unknown')}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render entry HTML for other event types
+ */
+function renderGenericEntry(entry, time) {
+    const icon = getEventIcon(entry.type);
+    const eventClass = getEventClass(entry.type);
+    const details = entry.details || {};
+
+    let label = '';
+    let extraDetails = '';
 
     switch (entry.type) {
         case EVENT_TYPES.SAVE:
-            return details.snapshotLength
-                ? `${Math.round(details.snapshotLength / 1024 * 10) / 10} KB saved`
-                : '';
+            label = 'saved the document';
+            if (details.snapshotLength) {
+                extraDetails = `${Math.round(details.snapshotLength / 1024 * 10) / 10} KB`;
+            }
+            break;
         case EVENT_TYPES.EXPORT_MD:
+            label = 'exported as Markdown';
+            if (details.filename) extraDetails = details.filename;
+            break;
         case EVENT_TYPES.EXPORT_DOCX:
-            return details.filename ? `File: ${details.filename}` : '';
+            label = 'exported as DOCX';
+            if (details.filename) extraDetails = details.filename;
+            break;
         case EVENT_TYPES.IMPORT:
-            return details.count ? `${details.count} patch(es) imported` : '';
-        case EVENT_TYPES.ACCEPT:
-        case EVENT_TYPES.REJECT:
-            return details.patchAuthor ? `Patch by ${details.patchAuthor}` : '';
+            label = 'imported patches';
+            if (details.count) extraDetails = `${details.count} file(s)`;
+            break;
         case EVENT_TYPES.RESTORE:
-            return details.patchId ? `Restored to patch #${details.patchId}` : '';
+            label = `restored to patch #${details.patchId || '?'}`;
+            break;
         case EVENT_TYPES.COMMENT:
+            label = 'added a comment';
+            if (details.content) extraDetails = `"${details.content}"`;
+            break;
         case EVENT_TYPES.COMMENT_RESOLVED:
-            return details.content || '';
+            label = 'resolved a comment';
+            break;
         default:
-            return '';
+            label = 'performed an action';
     }
+
+    return `
+        <div class="log-entry ${eventClass}">
+            <div class="log-entry-icon">${icon}</div>
+            <div class="log-entry-content">
+                <div class="log-entry-header">
+                    <span class="log-entry-time">${time}</span>
+                </div>
+                <div class="log-entry-description">
+                    <span class="log-author-name" style="color: ${entry.authorColor}">${escapeHtml(entry.author)}</span>
+                    <span>${label}</span>
+                    ${extraDetails ? `<span class="log-extra-details">${escapeHtml(extraDetails)}</span>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 /**
@@ -294,26 +413,12 @@ async function renderLogModal() {
 
         for (const entry of dateEntries) {
             const time = new Date(entry.timestamp).toLocaleTimeString();
-            const icon = getEventIcon(entry.type);
-            const label = getEventLabel(entry.type);
-            const eventClass = getEventClass(entry.type);
-            const details = formatEventDetails(entry);
 
-            html += `
-                <div class="log-entry ${eventClass}">
-                    <div class="log-entry-icon">${icon}</div>
-                    <div class="log-entry-content">
-                        <div class="log-entry-header">
-                            <span class="log-entry-label">${label}</span>
-                            <span class="log-entry-time">${time}</span>
-                        </div>
-                        <div class="log-entry-author" style="color: ${entry.authorColor}">
-                            ${escapeHtml(entry.author)}
-                        </div>
-                        ${details ? `<div class="log-entry-details">${escapeHtml(details)}</div>` : ''}
-                    </div>
-                </div>
-            `;
+            if (entry.type === EVENT_TYPES.ACCEPT || entry.type === EVENT_TYPES.REJECT) {
+                html += renderAcceptRejectEntry(entry, time);
+            } else {
+                html += renderGenericEntry(entry, time);
+            }
         }
 
         html += `</div></div>`;
@@ -331,6 +436,76 @@ async function renderLogModal() {
 }
 
 /**
+ * Setup hover previews for patch links
+ */
+function setupPatchHoverPreviews() {
+    const modal = document.getElementById('document-log-modal');
+    if (!modal) return;
+
+    // Create tooltip element
+    let tooltip = document.getElementById('patch-preview-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'patch-preview-tooltip';
+        tooltip.className = 'patch-preview-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    // Get all patches as array for diff comparison
+    const allPatches = Array.from(patchCache.values());
+
+    // Add hover listeners to patch links
+    modal.querySelectorAll('.patch-link').forEach(link => {
+        link.addEventListener('mouseenter', (e) => {
+            const patchId = parseInt(link.dataset.patchId);
+            const patch = patchCache.get(patchId);
+
+            if (!patch) {
+                tooltip.innerHTML = '<div class="patch-preview-empty">Patch not found</div>';
+            } else {
+                const authorName = patch.data?.authorName || patch.author;
+                const authorColor = patch.data?.authorColor || '#808080';
+                const timestamp = new Date(patch.timestamp).toLocaleString();
+
+                tooltip.innerHTML = `
+                    <div class="patch-preview-header">
+                        <span class="patch-preview-id">#${patch.id}</span>
+                        <span class="patch-preview-author" style="background: ${authorColor}">${escapeHtml(authorName)}</span>
+                    </div>
+                    <div class="patch-preview-time">${timestamp}</div>
+                    ${generatePatchDiffPreview(patch, allPatches)}
+                `;
+            }
+
+            // Position tooltip
+            const rect = link.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+
+            // Position to the right of the link, or left if not enough space
+            let left = rect.right + 10;
+            if (left + 350 > window.innerWidth) {
+                left = rect.left - 360;
+            }
+
+            // Keep in viewport vertically
+            let top = rect.top;
+            if (top + 300 > window.innerHeight) {
+                top = window.innerHeight - 310;
+            }
+            if (top < 10) top = 10;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.display = 'block';
+        });
+
+        link.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+    });
+}
+
+/**
  * Show the document log modal
  */
 export async function showDocumentLog() {
@@ -338,6 +513,12 @@ export async function showDocumentLog() {
     let modal = document.getElementById('document-log-modal');
     if (modal) {
         modal.remove();
+    }
+
+    // Remove existing tooltip
+    const existingTooltip = document.getElementById('patch-preview-tooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
     }
 
     // Create modal
@@ -371,24 +552,24 @@ export async function showDocumentLog() {
     modal.style.display = 'flex';
 
     // Wire up close button
-    document.getElementById('log-modal-close').addEventListener('click', () => {
+    const closeModal = () => {
         modal.style.display = 'none';
         modal.remove();
-    });
+        const tooltip = document.getElementById('patch-preview-tooltip');
+        if (tooltip) tooltip.remove();
+    };
+
+    document.getElementById('log-modal-close').addEventListener('click', closeModal);
 
     // Close on backdrop click
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-            modal.remove();
-        }
+        if (e.target === modal) closeModal();
     });
 
     // Close on Escape
     const escapeHandler = (e) => {
         if (e.key === 'Escape') {
-            modal.style.display = 'none';
-            modal.remove();
+            closeModal();
             document.removeEventListener('keydown', escapeHandler);
         }
     };
@@ -399,6 +580,9 @@ export async function showDocumentLog() {
     try {
         const html = await renderLogModal();
         logBody.innerHTML = html;
+
+        // Setup hover previews after content is rendered
+        setupPatchHoverPreviews();
     } catch (e) {
         console.error("Failed to load log:", e);
         logBody.innerHTML = `<div class="log-error">Failed to load history: ${e.message}</div>`;

@@ -719,6 +719,131 @@ textarea {
     font-size: 12px;
 }
 
+/* Log entry description style */
+.log-entry-description {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.log-author-name {
+    font-weight: 600;
+}
+
+.log-patch-author {
+    font-weight: 500;
+}
+
+.log-extra-details {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.action-accepted {
+    color: #4caf50;
+    font-weight: 500;
+}
+
+.action-rejected {
+    color: #f44336;
+    font-weight: 500;
+}
+
+.patch-link {
+    color: var(--primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    font-weight: 500;
+}
+
+.patch-link:hover {
+    text-decoration-style: solid;
+}
+
+/* Patch preview tooltip */
+.patch-preview-tooltip {
+    position: fixed;
+    display: none;
+    width: 350px;
+    max-height: 300px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 10001;
+    overflow: hidden;
+}
+
+.patch-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.patch-preview-id {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.patch-preview-author {
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.patch-preview-time {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.patch-preview-diff {
+    padding: 10px 12px;
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.patch-preview-diff .diff-delete {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    text-decoration: line-through;
+}
+
+.patch-preview-diff .diff-add {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.patch-preview-diff .diff-equal {
+    color: var(--text-muted);
+}
+
+.patch-preview-diff .diff-truncated {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.patch-preview-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
 /* ===== KEYBOARD SHORTCUTS CHEATSHEET ===== */
 .shortcuts-cheatsheet-content {
     max-width: 700px;
