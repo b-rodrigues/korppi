@@ -660,28 +660,6 @@ pub struct RestoreResult {
     pub patch_id: i64,
 }
 
-/// Document event for the history log
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DocumentEvent {
-    pub id: i64,
-    pub timestamp: i64,
-    pub event_type: String,
-    pub author_id: String,
-    pub author_name: String,
-    pub author_color: Option<String>,
-    pub details: Option<serde_json::Value>,
-}
-
-/// Input for recording a document event
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DocumentEventInput {
-    pub event_type: String,
-    pub author_id: String,
-    pub author_name: String,
-    pub author_color: Option<String>,
-    pub details: Option<serde_json::Value>,
-}
-
 /// Restore to a specific patch - returns the snapshot content (text) for that patch
 /// This uses the text snapshot stored in the patch data if available
 #[tauri::command]
@@ -715,73 +693,4 @@ pub fn restore_to_patch(app: AppHandle, patch_id: i64) -> Result<RestoreResult, 
         snapshot_content: None,
         patch_id,
     })
-}
-
-/// Record a document event
-#[tauri::command]
-pub fn record_document_event(
-    app: AppHandle,
-    event: DocumentEventInput,
-) -> Result<i64, String> {
-    let conn = get_conn(&app)?;
-
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis() as i64;
-
-    let details_str = event.details
-        .map(|d| serde_json::to_string(&d).unwrap_or_default());
-
-    conn.execute(
-        "INSERT INTO document_events (timestamp, event_type, author_id, author_name, author_color, details)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![
-            timestamp,
-            event.event_type,
-            event.author_id,
-            event.author_name,
-            event.author_color,
-            details_str
-        ],
-    )
-    .map_err(|e| e.to_string())?;
-
-    Ok(conn.last_insert_rowid())
-}
-
-/// List all document events
-#[tauri::command]
-pub fn list_document_events(app: AppHandle) -> Result<Vec<DocumentEvent>, String> {
-    let conn = get_conn(&app)?;
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, timestamp, event_type, author_id, author_name, author_color, details
-             FROM document_events
-             ORDER BY timestamp DESC",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let events = stmt
-        .query_map([], |row| {
-            let details_str: Option<String> = row.get(6)?;
-            let details: Option<serde_json::Value> = details_str
-                .and_then(|s| serde_json::from_str(&s).ok());
-
-            Ok(DocumentEvent {
-                id: row.get(0)?,
-                timestamp: row.get(1)?,
-                event_type: row.get(2)?,
-                author_id: row.get(3)?,
-                author_name: row.get(4)?,
-                author_color: row.get(5)?,
-                details,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    Ok(events)
 }

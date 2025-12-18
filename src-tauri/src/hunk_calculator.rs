@@ -3,7 +3,7 @@
 // Uses the `similar` crate for efficient text diffing
 
 use serde::{Deserialize, Serialize};
-use similar::{DiffOp, TextDiff};
+use similar::TextDiff;
 
 
 
@@ -295,7 +295,7 @@ fn calculate_word_hunks_in_block(base_text: &str, modified_text: &str) -> Vec<Hu
                 // This is an Insertion (not in base, in new).
                 // Cursor does NOT advance (it stays at the insertion point).
                 
-                let len_bytes = change.value().len();
+                let _len_bytes = change.value().len();
                 // let len_utf16 = change.value().encode_utf16().count(); // Unneeded for base cursor
                 
                 if let Some(ref mut h) = current_hunk {
