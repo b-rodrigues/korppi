@@ -88,7 +88,7 @@ export async function restoreToPatch(patchId) {
                 // Log the restore event
                 logEvent(EVENT_TYPES.RESTORE, {
                     patchId,
-                    patchAuthor: patch.data?.authorName || patch.author
+                    authorName: patch.data?.authorName || patch.author
                 });
 
                 // Trigger Full Re-calculation (Perspective Switch)
@@ -112,7 +112,7 @@ export async function restoreToPatch(patchId) {
                     // Log the restore event
                     logEvent(EVENT_TYPES.RESTORE, {
                         patchId,
-                        patchAuthor: patch.data?.authorName || patch.author
+                        authorName: patch.data?.authorName || patch.author
                     });
 
                     // Trigger Full Re-calculation (Perspective Switch)
@@ -134,7 +134,7 @@ export async function restoreToPatch(patchId) {
                 // Log the restore event
                 logEvent(EVENT_TYPES.RESTORE, {
                     patchId,
-                    patchAuthor: patch.data?.authorName || patch.author
+                    authorName: patch.data?.authorName || patch.author
                 });
 
                 // Trigger Full Re-calculation (Perspective Switch)
@@ -760,6 +760,9 @@ async function resetToOriginal() {
                 // Continue even if review reset fails - document is already restored
             }
         }
+
+        // Log the reset event
+        logEvent(EVENT_TYPES.RESET, {});
 
         alert("Document restored to state before reconciliation. Patch reviews have been reset.");
         await refreshTimeline();

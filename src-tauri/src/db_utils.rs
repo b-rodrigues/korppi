@@ -40,6 +40,16 @@ pub fn ensure_schema(conn: &Connection) -> Result<(), String> {
             PRIMARY KEY (patch_uuid, reviewer_id)
         );
 
+        CREATE TABLE IF NOT EXISTS document_events (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp    INTEGER NOT NULL,
+            event_type   TEXT NOT NULL,
+            author_id    TEXT NOT NULL,
+            author_name  TEXT NOT NULL,
+            author_color TEXT,
+            details      TEXT
+        );
+
         CREATE INDEX IF NOT EXISTS idx_snapshots_patch_id ON snapshots(patch_id);
         CREATE INDEX IF NOT EXISTS idx_patch_reviews_reviewer_id ON patch_reviews(reviewer_id);
         -- Use unique index to enforce uniqueness on the uuid column (covers both new and migrated tables)
@@ -49,6 +59,7 @@ pub fn ensure_schema(conn: &Connection) -> Result<(), String> {
         CREATE INDEX IF NOT EXISTS idx_patches_author ON patches(author);
         CREATE INDEX IF NOT EXISTS idx_patches_kind ON patches(kind);
         CREATE INDEX IF NOT EXISTS idx_patch_reviews_patch_uuid ON patch_reviews(patch_uuid);
+        CREATE INDEX IF NOT EXISTS idx_document_events_timestamp ON document_events(timestamp);
         "#,
     )
     .map_err(|e| e.to_string())?;

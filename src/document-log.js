@@ -16,13 +16,10 @@ const EVENT_TYPES = {
     ACCEPT: 'accept',
     REJECT: 'reject',
     RESTORE: 'restore',
+    RESET: 'reset',
     COMMENT: 'comment',
     COMMENT_RESOLVED: 'comment_resolved'
 };
-
-// Store logged events in memory (supplemental to patches)
-// Map<docId, Array<{type, timestamp, details}>>
-const documentEvents = new Map();
 
 // Cache for patch data (for hover previews)
 let patchCache = new Map();
@@ -32,55 +29,26 @@ let patchCache = new Map();
  * @param {string} type - Event type from EVENT_TYPES
  * @param {object} details - Event details
  */
-export function logEvent(type, details = {}) {
+export async function logEvent(type, details = {}) {
     const docId = getActiveDocumentId();
     if (!docId) return;
 
-    if (!documentEvents.has(docId)) {
-        documentEvents.set(docId, []);
-    }
-
     const profile = getCachedProfile();
-    const event = {
-        type,
-        timestamp: Date.now(),
-        author: profile?.name || 'Local User',
-        authorId: profile?.id || 'local',
-        authorColor: profile?.color || '#3498db',
-        ...details
-    };
 
-    documentEvents.get(docId).push(event);
-
-    // Also persist to localStorage for session recovery
-    persistEvents(docId);
-}
-
-/**
- * Persist events to localStorage
- */
-function persistEvents(docId) {
-    const events = documentEvents.get(docId) || [];
     try {
-        localStorage.setItem(`document-events-${docId}`, JSON.stringify(events));
+        await invoke("record_document_event", {
+            docId,
+            event: {
+                event_type: type,
+                author_id: profile?.id || 'local',
+                author_name: profile?.name || 'Local User',
+                author_color: profile?.color || '#3498db',
+                details: Object.keys(details).length > 0 ? details : null
+            }
+        });
     } catch (e) {
-        console.warn("Failed to persist events:", e);
+        console.warn("Failed to log event:", e);
     }
-}
-
-/**
- * Load persisted events from localStorage
- */
-function loadPersistedEvents(docId) {
-    try {
-        const stored = localStorage.getItem(`document-events-${docId}`);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-    } catch (e) {
-        console.warn("Failed to load persisted events:", e);
-    }
-    return [];
 }
 
 /**
@@ -182,18 +150,20 @@ async function getAllLogEntries() {
         // Comments might not exist
     }
 
-    // 4. Add memory/persisted events (exports, imports, restores)
-    const persistedEvents = loadPersistedEvents(docId);
-    const memoryEvents = documentEvents.get(docId) || [];
-
-    // Merge persisted and memory events, deduplicate by timestamp
-    const eventMap = new Map();
-    for (const event of [...persistedEvents, ...memoryEvents]) {
-        eventMap.set(event.timestamp, event);
-    }
-
-    for (const event of eventMap.values()) {
-        entries.push(event);
+    // 4. Add logged events from database (exports, imports, restores, resets)
+    try {
+        const dbEvents = await invoke("list_document_events", { docId });
+        for (const event of dbEvents) {
+            entries.push({
+                type: event.event_type,
+                timestamp: event.timestamp,
+                author: event.author_name,
+                authorColor: event.author_color || '#808080',
+                details: event.details || {}
+            });
+        }
+    } catch (e) {
+        console.warn("Failed to load events from database:", e);
     }
 
     // Sort all entries by timestamp (newest first)
@@ -214,6 +184,7 @@ function getEventIcon(type) {
         case EVENT_TYPES.ACCEPT: return '✓';
         case EVENT_TYPES.REJECT: return '✗';
         case EVENT_TYPES.RESTORE: return '↺';
+        case EVENT_TYPES.RESET: return '⟲';
         case EVENT_TYPES.COMMENT: return '💬';
         case EVENT_TYPES.COMMENT_RESOLVED: return '✅';
         default: return '•';
@@ -231,6 +202,7 @@ function getEventClass(type) {
         case EVENT_TYPES.EXPORT_DOCX: return 'event-export';
         case EVENT_TYPES.IMPORT: return 'event-import';
         case EVENT_TYPES.RESTORE: return 'event-restore';
+        case EVENT_TYPES.RESET: return 'event-reset';
         case EVENT_TYPES.COMMENT:
         case EVENT_TYPES.COMMENT_RESOLVED: return 'event-comment';
         default: return 'event-save';
@@ -358,7 +330,16 @@ function renderGenericEntry(entry, time) {
             if (details.count) extraDetails = `${details.count} file(s)`;
             break;
         case EVENT_TYPES.RESTORE:
-            label = `restored to patch #${details.patchId || '?'}`;
+            if (details.authorName) {
+                label = `restored ${details.authorName}'s version`;
+            } else if (details.patchId) {
+                label = `restored to patch #${details.patchId}`;
+            } else {
+                label = 'restored a previous version';
+            }
+            break;
+        case EVENT_TYPES.RESET:
+            label = 'reset to original';
             break;
         case EVENT_TYPES.COMMENT:
             label = 'added a comment';
@@ -542,6 +523,7 @@ export async function showDocumentLog() {
                     <span class="legend-item"><span class="legend-icon">📥</span> Import</span>
                     <span class="legend-item"><span class="legend-icon">📝</span> Export</span>
                     <span class="legend-item"><span class="legend-icon">↺</span> Restore</span>
+                    <span class="legend-item"><span class="legend-icon">⟲</span> Reset</span>
                     <span class="legend-item"><span class="legend-icon">💬</span> Comment</span>
                 </div>
             </div>
@@ -593,14 +575,8 @@ export async function showDocumentLog() {
  * Initialize the document log module
  */
 export function initDocumentLog() {
-    // Load persisted events for current document
-    const docId = getActiveDocumentId();
-    if (docId) {
-        const persisted = loadPersistedEvents(docId);
-        if (persisted.length > 0) {
-            documentEvents.set(docId, persisted);
-        }
-    }
+    // Database events are loaded on demand in getAllLogEntries()
+    // No initialization needed
 }
 
 // Export event types for use by other modules

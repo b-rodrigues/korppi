@@ -32,6 +32,7 @@ use document_manager::{
     get_document_patches_needing_review, check_parent_patch_status,
     delete_document_reviews_after,
     import_document, check_pandoc_available, open_url,
+    record_document_event, list_document_events,
     DocumentManager,
 };
 use comments::{
@@ -113,6 +114,9 @@ pub fn run() {
             restore_comment,
             // Hunk calculator
             calculate_hunks_for_patches,
+            // Document events
+            record_document_event,
+            list_document_events,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

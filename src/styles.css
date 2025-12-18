@@ -651,6 +651,11 @@ textarea {
     color: #ff9800;
 }
 
+.log-entry.event-reset .log-entry-icon {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+
 .log-entry.event-comment .log-entry-icon {
     background: rgba(0, 188, 212, 0.2);
     color: #00bcd4;
