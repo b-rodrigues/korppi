@@ -11,7 +11,7 @@
 
 ---
 
-![Attention span fried by short-form, AI-generated content? Watch this 2 minute video instead!]()
+<iframe width="560" height="315" src="https://www.youtube.com/embed/nDaliT9W_zU?si=TsYiG5PRI46xPNgH" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## What is Korppi?
 
