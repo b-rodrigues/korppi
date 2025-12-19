@@ -11,7 +11,7 @@ others through **Reconciliation**. This allows you to import changes from other
 ### Step 1: Import Changes
 1.  Save your current document.
 2.  Click **Reconcile** in the left sidebar.
-3.  Select the `.kmd` file you want to import (e.g., a version from a reviewer).
+3.  Select the `.kmd` file (or files) you want to import (e.g., a version from a reviewer).
 
 ### Step 2: Review Process
 Once reconciliation starts, you will see a notification guiding you to two key tabs in the right sidebar:
@@ -31,13 +31,8 @@ This tab focuses on the *specifics*. It breaks down the difference between your 
 *   **Reset:** If the changes aren't what you expected, click **Reset to Original** to discard the import and revert to your pre-reconciliation state.
 
 ### Timeline Tab (Whole History)
-The Timeline acts as your **Version Control**. It shows the complete history of the document, including your local saves and the imported patches.
-
-*   **Chronological View:** See every significant edit as a "patch" with a timestamp and author.
-*   **Status Indicators:**
-    *   **Pending:** Imported changes that haven't been finalized.
-    *   **Accepted:** Changes merged into your document.
-*   **Filtering:** Filter by Author or Status to find specific versions.
+The Timeline acts as your **Version Control**. Here, you can visualize different versions of your document saved at different points
+in time, or other versions that you’ve imported during reconciliation.
 
 ---
 
